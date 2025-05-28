@@ -43,10 +43,14 @@ public partial class MainViewModel : ObservableObject
     }
 
     public async Task InitializeAsync()
-    {
-        try
+    {        try
         {
-            _voiceChatService = new VoiceChatService(_logger as ILogger<VoiceChatService>);
+            _voiceChatService = App.GetService<IVoiceChatService>();
+            
+            if (_voiceChatService == null)
+            {
+                throw new InvalidOperationException("VoiceChatService not available from DI container");
+            }
             
             // 注册事件处理器
             _voiceChatService.MessageReceived += OnMessageReceived;

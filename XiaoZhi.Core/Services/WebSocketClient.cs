@@ -13,7 +13,8 @@ public class WebSocketClient : ICommunicationClient
 {
     private ClientWebSocket? _webSocket;
     private CancellationTokenSource? _cancellationTokenSource;
-    private readonly string _serverUrl;
+    private readonly string? _serverUrl;
+    private readonly IConfigurationService _configurationService;
     private bool _isConnected;
 
     public event EventHandler<ChatMessage>? MessageReceived;
@@ -21,9 +22,9 @@ public class WebSocketClient : ICommunicationClient
 
     public bool IsConnected => _isConnected;
 
-    public WebSocketClient(string serverUrl)
+    public WebSocketClient(IConfigurationService service)
     {
-        _serverUrl = serverUrl;
+        _configurationService = service;
     }
 
     public async Task ConnectAsync()
@@ -33,9 +34,14 @@ public class WebSocketClient : ICommunicationClient
         try
         {
             _webSocket = new ClientWebSocket();
+            // 初始化 WebSocket
+            _webSocket.Options.SetRequestHeader("Authorization", "Bearer " + "test");
+            _webSocket.Options.SetRequestHeader("Protocol-Version", "1");
+            _webSocket.Options.SetRequestHeader("Device-Id", _configurationService.DeviceId);
+            _webSocket.Options.SetRequestHeader("Client-Id", Guid.NewGuid().ToString());
             _cancellationTokenSource = new CancellationTokenSource();
 
-            await _webSocket.ConnectAsync(new Uri(_serverUrl), _cancellationTokenSource.Token);
+            await _webSocket.ConnectAsync(new Uri(_configurationService.WebSocketUrl), _cancellationTokenSource.Token);
             _isConnected = true;
             ConnectionStateChanged?.Invoke(this, true);
 

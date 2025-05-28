@@ -28,14 +28,17 @@ namespace XiaoZhi.WinUI.Views
 
         private async void ConnectButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_isConnected) return;
-
-            try
+            if (_isConnected) return;            try
             {
                 ConnectButton.IsEnabled = false;
                 ConnectionStatusText.Text = "连接中...";
 
-                _voiceChatService = new VoiceChatService();
+                _voiceChatService = App.GetService<IVoiceChatService>();
+                
+                if (_voiceChatService == null)
+                {
+                    throw new InvalidOperationException("VoiceChatService not available from DI container");
+                }
                 
                 // 注册事件处理器
                 _voiceChatService.MessageReceived += OnMessageReceived;

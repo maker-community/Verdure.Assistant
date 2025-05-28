@@ -29,11 +29,14 @@ class Program
         System.Console.WriteLine("初始化中...");
 
         try
-        {
-            // 注册事件处理器
+        {            // 注册事件处理器
             _voiceChatService.MessageReceived += OnMessageReceived;
             _voiceChatService.VoiceChatStateChanged += OnVoiceChatStateChanged;
             _voiceChatService.ErrorOccurred += OnErrorOccurred;
+            _voiceChatService.DeviceStateChanged += OnDeviceStateChanged;
+            _voiceChatService.ListeningModeChanged += OnListeningModeChanged;
+            _voiceChatService.DeviceStateChanged += OnDeviceStateChanged;
+            _voiceChatService.ListeningModeChanged += OnListeningModeChanged;
 
             // 初始化服务
             await _voiceChatService.InitializeAsync(_config);
@@ -52,9 +55,7 @@ class Program
         {
             _voiceChatService?.Dispose();
         }
-    }
-
-    static IHostBuilder CreateHostBuilder(string[] args) =>
+    }    static IHostBuilder CreateHostBuilder(string[] args) =>
         Host.CreateDefaultBuilder(args)
             .ConfigureServices((context, services) =>
             {
@@ -64,6 +65,9 @@ class Program
                     builder.SetMinimumLevel(LogLevel.Information);
                 });
                 
+                // Register services with dependency injection
+                services.AddSingleton<IVerificationService, VerificationService>();
+                services.AddSingleton<IConfigurationService, ConfigurationService>();
                 services.AddSingleton<IVoiceChatService, VoiceChatService>();
             });
 
@@ -84,18 +88,18 @@ class Program
     static async Task ShowMenu()
     {
         while (true)
-        {
-            System.Console.WriteLine("\n请选择操作:");
+        {            System.Console.WriteLine("\n请选择操作:");
             System.Console.WriteLine("1. 开始语音对话");
             System.Console.WriteLine("2. 停止语音对话");
-            System.Console.WriteLine("3. 发送文本消息");
-            System.Console.WriteLine("4. 查看连接状态");
-            System.Console.WriteLine("5. 退出");
-            System.Console.Write("请输入选项 (1-5): ");
+            System.Console.WriteLine("3. 切换对话状态 (自动模式)");
+            System.Console.WriteLine("4. 切换自动对话模式");
+            System.Console.WriteLine("5. 发送文本消息");
+            System.Console.WriteLine("6. 查看连接状态");
+            System.Console.WriteLine("7. 退出");
+            System.Console.Write("请输入选项 (1-7): ");
 
             var input = System.Console.ReadLine();
-            
-            switch (input)
+              switch (input)
             {
                 case "1":
                     await StartVoiceChat();
@@ -104,12 +108,18 @@ class Program
                     await StopVoiceChat();
                     break;
                 case "3":
-                    await SendTextMessage();
+                    await ToggleChatState();
                     break;
                 case "4":
-                    ShowConnectionStatus();
+                    await ToggleAutoDialogueMode();
                     break;
                 case "5":
+                    await SendTextMessage();
+                    break;
+                case "6":
+                    ShowConnectionStatus();
+                    break;
+                case "7":
                     System.Console.WriteLine("再见!");
                     return;
                 default:
@@ -181,9 +191,7 @@ class Program
             await _voiceChatService.SendTextMessageAsync(message);
             System.Console.WriteLine("消息已发送");
         }
-    }
-
-    static void ShowConnectionStatus()
+    }    static void ShowConnectionStatus()
     {
         if (_voiceChatService == null)
         {
@@ -193,8 +201,53 @@ class Program
 
         System.Console.WriteLine($"连接状态: {(_voiceChatService.IsConnected ? "已连接" : "未连接")}");
         System.Console.WriteLine($"语音对话状态: {(_voiceChatService.IsVoiceChatActive ? "进行中" : "未开始")}");
+        System.Console.WriteLine($"设备状态: {_voiceChatService.CurrentState}");
+        System.Console.WriteLine($"监听模式: {_voiceChatService.CurrentListeningMode}");
+        System.Console.WriteLine($"自动对话模式: {(_voiceChatService.KeepListening ? "启用" : "禁用")}");
         System.Console.WriteLine($"通信协议: {(_config?.UseWebSocket == true ? "WebSocket" : "MQTT")}");
         System.Console.WriteLine($"语音功能: {(_config?.EnableVoice == true ? "启用" : "禁用")}");
+    }
+
+    static async Task ToggleChatState()
+    {
+        if (_voiceChatService == null)
+        {
+            System.Console.WriteLine("服务未初始化");
+            return;
+        }
+
+        if (!_voiceChatService.IsConnected)
+        {
+            System.Console.WriteLine("未连接到服务器");
+            return;
+        }
+
+        try
+        {
+            await _voiceChatService.ToggleChatStateAsync();
+            System.Console.WriteLine($"对话状态已切换，当前状态: {_voiceChatService.CurrentState}");
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"切换对话状态失败: {ex.Message}");
+        }
+    }    static Task ToggleAutoDialogueMode()
+    {
+        if (_voiceChatService == null)
+        {
+            System.Console.WriteLine("服务未初始化");
+            return Task.CompletedTask;
+        }
+
+        _voiceChatService.KeepListening = !_voiceChatService.KeepListening;
+        System.Console.WriteLine($"自动对话模式: {(_voiceChatService.KeepListening ? "已启用" : "已禁用")}");
+        
+        if (_voiceChatService.KeepListening)
+        {
+            System.Console.WriteLine("设备将在对话结束后自动开始下一轮监听");
+        }
+        
+        return Task.CompletedTask;
     }
 
     static void OnMessageReceived(object? sender, ChatMessage message)
@@ -210,5 +263,15 @@ class Program
     static void OnErrorOccurred(object? sender, string error)
     {
         System.Console.WriteLine($"\n错误: {error}");
+    }
+
+    static void OnDeviceStateChanged(object? sender, XiaoZhi.Core.Constants.DeviceState state)
+    {
+        System.Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] 设备状态变更: {state}");
+    }
+
+    static void OnListeningModeChanged(object? sender, XiaoZhi.Core.Constants.ListeningMode mode)
+    {
+        System.Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] 监听模式变更: {mode}");
     }
 }

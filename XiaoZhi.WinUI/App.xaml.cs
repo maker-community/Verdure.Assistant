@@ -56,9 +56,9 @@ namespace XiaoZhi.WinUI
                     {
                         builder.AddConsole();
                         builder.SetMinimumLevel(LogLevel.Information);
-                    });
-
-                    // Register core services
+                    });                    // Register core services
+                    services.AddSingleton<IVerificationService, VerificationService>();
+                    services.AddSingleton<IConfigurationService, ConfigurationService>();
                     services.AddSingleton<IAudioRecorder, PortAudioRecorder>();
                     services.AddSingleton<IAudioPlayer, PortAudioPlayer>();
                     services.AddSingleton<IAudioCodec, OpusAudioCodec>();
