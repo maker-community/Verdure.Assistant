@@ -62,13 +62,15 @@ class Program
                 services.AddLogging(builder =>
                 {
                     builder.AddConsole();
-                    builder.SetMinimumLevel(LogLevel.Information);
+                    // Set Debug as the minimum level, can be overridden by appsettings.json
+                    builder.SetMinimumLevel(LogLevel.Debug);
                 });
                 
                 // Register services with dependency injection
                 services.AddSingleton<IVerificationService, VerificationService>();
                 services.AddSingleton<IConfigurationService, ConfigurationService>();
                 services.AddSingleton<IVoiceChatService, VoiceChatService>();
+
             });
 
     static XiaoZhiConfig LoadConfiguration()

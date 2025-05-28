@@ -17,7 +17,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     private ClientWebSocket? _webSocket;
     private CancellationTokenSource? _cancellationTokenSource;
     private readonly IConfigurationService _configurationService;
-    private readonly ILogger<WebSocketClient>? _logger;
+    private readonly ILogger? _logger;
     private bool _isConnected;
     private string? _sessionId;
     private readonly TaskCompletionSource<bool> _helloReceived = new();
@@ -30,7 +30,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     public bool IsConnected => _isConnected;
     public string? SessionId => _sessionId;
 
-    public WebSocketClient(IConfigurationService configurationService, ILogger<WebSocketClient>? logger = null)
+    public WebSocketClient(IConfigurationService configurationService, ILogger? logger = null)
     {
         _configurationService = configurationService;
         _logger = logger;

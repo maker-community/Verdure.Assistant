@@ -306,10 +306,6 @@ public static class WebSocketProtocol
         return JsonSerializer.Serialize(message, JsonOptions);
     }
 
-    #endregion
-
-    #region Message Parsing
-
     /// <summary>
     /// 解析WebSocket消息
     /// </summary>
@@ -319,13 +315,18 @@ public static class WebSocketProtocol
     {
         try
         {
-            // 先解析为通用消息获取类型
-            var genericMessage = JsonSerializer.Deserialize<GenericProtocolMessage>(json, JsonOptions);
-            if (genericMessage?.Type == null)
+            using var document = JsonDocument.Parse(json);
+
+            // 直接获取类型字段
+            if (!document.RootElement.TryGetProperty("type", out var typeElement))
                 return null;
 
-            // 根据类型解析为具体消息
-            return genericMessage.Type.ToLowerInvariant() switch
+            string? messageType = typeElement.GetString()?.ToLowerInvariant();
+            if (string.IsNullOrEmpty(messageType))
+                return null;
+
+            // 根据类型直接反序列化为具体消息
+            return messageType switch
             {
                 "hello" => JsonSerializer.Deserialize<HelloMessage>(json, JsonOptions),
                 "listen" => JsonSerializer.Deserialize<ListenMessage>(json, JsonOptions),
@@ -334,7 +335,7 @@ public static class WebSocketProtocol
                 "iot" => JsonSerializer.Deserialize<IotMessage>(json, JsonOptions),
                 "llm" => JsonSerializer.Deserialize<LlmMessage>(json, JsonOptions),
                 "goodbye" => JsonSerializer.Deserialize<GoodbyeMessage>(json, JsonOptions),
-                _ => genericMessage
+                _ => JsonSerializer.Deserialize<GenericProtocolMessage>(json, JsonOptions)
             };
         }
         catch (JsonException)

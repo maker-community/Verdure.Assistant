@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
+using XiaoZhi.Core.Constants;
 using XiaoZhi.Core.Interfaces;
 using XiaoZhi.Core.Models;
-using XiaoZhi.Core.Constants;
 
 namespace XiaoZhi.Core.Services;
 
@@ -29,25 +29,25 @@ public class VoiceChatService : IVoiceChatService
     public event EventHandler<bool>? VoiceChatStateChanged;
     public event EventHandler<ChatMessage>? MessageReceived;
     public event EventHandler<string>? ErrorOccurred;
-    
+
     // Device state events
     public event EventHandler<DeviceState>? DeviceStateChanged;
     public event EventHandler<ListeningMode>? ListeningModeChanged;
 
     public bool IsVoiceChatActive => _isVoiceChatActive;
     public bool IsConnected => _communicationClient?.IsConnected ?? false;
-    
+
     // Auto dialogue mode properties
-    public bool KeepListening 
-    { 
-        get => _keepListening; 
-        set 
+    public bool KeepListening
+    {
+        get => _keepListening;
+        set
         {
             if (_keepListening != value)
             {
                 _keepListening = value;
                 _logger?.LogInformation("Keep listening mode changed: {KeepListening}", value);
-                
+
                 if (value)
                 {
                     SetListeningMode(ListeningMode.AlwaysOn);
@@ -57,13 +57,13 @@ public class VoiceChatService : IVoiceChatService
                     SetListeningMode(ListeningMode.Manual);
                 }
             }
-        } 
+        }
     }
-    
-    public DeviceState CurrentState 
-    { 
-        get => _currentState; 
-        private set 
+
+    public DeviceState CurrentState
+    {
+        get => _currentState;
+        private set
         {
             if (_currentState != value)
             {
@@ -72,13 +72,13 @@ public class VoiceChatService : IVoiceChatService
                 _logger?.LogInformation("Device state changed from {PreviousState} to {CurrentState}", previousState, value);
                 DeviceStateChanged?.Invoke(this, value);
             }
-        } 
+        }
     }
-    
-    public ListeningMode CurrentListeningMode 
-    { 
-        get => _listeningMode; 
-        private set 
+
+    public ListeningMode CurrentListeningMode
+    {
+        get => _listeningMode;
+        private set
         {
             if (_listeningMode != value)
             {
@@ -86,7 +86,7 @@ public class VoiceChatService : IVoiceChatService
                 _logger?.LogInformation("Listening mode changed to {ListeningMode}", value);
                 ListeningModeChanged?.Invoke(this, value);
             }
-        } 
+        }
     }
 
     public VoiceChatService(IConfigurationService configurationService, ILogger<VoiceChatService>? logger = null)
@@ -108,18 +108,18 @@ public class VoiceChatService : IVoiceChatService
                 throw new InvalidOperationException("Failed to initialize MQTT configuration from OTA server");
             }            // 初始化音频编解码器
             _audioCodec = new OpusAudioCodec();
-            
+
             // 初始化音频录制和播放
             if (config.EnableVoice)
             {
                 _audioRecorder = new PortAudioRecorder();
                 _audioPlayer = new PortAudioPlayer();
-                
+
                 _audioRecorder.DataAvailable += OnAudioDataReceived;
             }            // 初始化通信客户端
-            if (config.UseWebSocket)            
+            if (config.UseWebSocket)
             {
-                _communicationClient = new WebSocketClient(_configurationService);
+                _communicationClient = new WebSocketClient(_configurationService, _logger);
             }
             else
             {
@@ -127,9 +127,9 @@ public class VoiceChatService : IVoiceChatService
                 if (mqttInfo != null)
                 {
                     _communicationClient = new MqttNetClient(
-                        mqttInfo.Endpoint, 
+                        mqttInfo.Endpoint,
                         1883, // Default MQTT port
-                        mqttInfo.ClientId, 
+                        mqttInfo.ClientId,
                         mqttInfo.PublishTopic);
                 }
                 else
@@ -144,7 +144,7 @@ public class VoiceChatService : IVoiceChatService
             // 连接到服务器
             await _communicationClient.ConnectAsync();
             CurrentState = DeviceState.Idle;
-            
+
             _logger?.LogInformation("语音聊天服务初始化完成");
         }
         catch (Exception ex)
@@ -171,15 +171,15 @@ public class VoiceChatService : IVoiceChatService
                         await StartListeningAsync();
                     }
                     break;
-                    
+
                 case DeviceState.Listening:
                     await StopListeningAsync(AbortReason.UserInterruption);
                     break;
-                    
+
                 case DeviceState.Speaking:
                     await StopSpeakingAsync();
                     break;
-                    
+
                 case DeviceState.Connecting:
                     _logger?.LogWarning("Cannot toggle chat state while connecting");
                     break;
@@ -202,7 +202,7 @@ public class VoiceChatService : IVoiceChatService
         try
         {
             CurrentState = DeviceState.Listening;
-            
+
             if (_config?.EnableVoice == true && _audioRecorder != null)
             {
                 await _audioRecorder.StartRecordingAsync(_config.AudioSampleRate, _config.AudioChannels);
@@ -229,7 +229,7 @@ public class VoiceChatService : IVoiceChatService
         try
         {
             _lastAbortReason = reason;
-            
+
             if (_audioRecorder != null)
             {
                 await _audioRecorder.StopRecordingAsync();
@@ -238,7 +238,7 @@ public class VoiceChatService : IVoiceChatService
             _isVoiceChatActive = false;
             VoiceChatStateChanged?.Invoke(this, false);
             CurrentState = DeviceState.Idle;
-            
+
             _logger?.LogInformation("Stopped listening, reason: {Reason}", reason);
 
             // Auto restart listening if in always-on mode and not user interrupted
@@ -319,7 +319,7 @@ public class VoiceChatService : IVoiceChatService
     private void SetListeningMode(ListeningMode mode)
     {
         CurrentListeningMode = mode;
-        
+
         switch (mode)
         {
             case ListeningMode.AlwaysOn:
@@ -367,7 +367,7 @@ public class VoiceChatService : IVoiceChatService
 
     private async void OnAudioDataReceived(object? sender, byte[] audioData)
     {
-        if (!_isVoiceChatActive || _communicationClient == null || _audioCodec == null || _config == null) 
+        if (!_isVoiceChatActive || _communicationClient == null || _audioCodec == null || _config == null)
             return;
 
         try
@@ -403,7 +403,7 @@ public class VoiceChatService : IVoiceChatService
             if (message.AudioData != null)
             {
                 await StartSpeakingAsync();
-                
+
                 if (_audioPlayer != null && _audioCodec != null && _config != null)
                 {
                     var pcmData = _audioCodec.Decode(message.AudioData, _config.AudioSampleRate, _config.AudioChannels);
@@ -426,7 +426,7 @@ public class VoiceChatService : IVoiceChatService
     private void OnConnectionStateChanged(object? sender, bool isConnected)
     {
         _logger?.LogInformation("连接状态变化: {IsConnected}", isConnected);
-        
+
         if (isConnected)
         {
             CurrentState = DeviceState.Idle;
@@ -434,7 +434,7 @@ public class VoiceChatService : IVoiceChatService
         else
         {
             CurrentState = DeviceState.Connecting;
-            
+
             if (_isVoiceChatActive)
             {
                 // 连接断开时自动停止语音对话

@@ -129,7 +129,8 @@ public class GoodbyeMessage : ProtocolMessage
 /// </summary>
 public class GenericProtocolMessage : ProtocolMessage
 {
-    private string _type = string.Empty;    public override string Type => _type;
+    private string _type = string.Empty;    
+    public override string Type => _type;
     
     [JsonPropertyName("type")]
     public string TypeProperty
