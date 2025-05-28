@@ -70,21 +70,51 @@ public class OpusAudioCodec : IAudioCodec
                 return Array.Empty<byte>();
             }
         }
-    }
-
+    }    
+    
     public byte[] Decode(byte[] encodedData, int sampleRate, int channels)
     {
-        lock (_lock)        {
+        lock (_lock)
+        {
             if (_decoder == null || _currentSampleRate != sampleRate || _currentChannels != channels)
-            {                _decoder?.Dispose();
+            {
+                _decoder?.Dispose();
                 _decoder = (OpusDecoder)OpusCodecFactory.CreateDecoder(sampleRate, channels);
                 _currentSampleRate = sampleRate;
                 _currentChannels = channels;
             }
 
-            // 简化版本：直接返回输入数据（暂时跳过实际解码）
-            // TODO: 实现完整的 Opus 解码逻辑
-            return encodedData;
+            try
+            {                // 计算帧大小 (采样数，不是字节数)
+                int frameSize = sampleRate * 60 / 1000; // 60ms帧
+                
+                // 解码为16位PCM数据
+                short[] pcmShorts = new short[frameSize * channels];
+                ReadOnlySpan<byte> opusSpan = new ReadOnlySpan<byte>(encodedData);
+                Span<short> outputSpan = new Span<short>(pcmShorts);
+                
+                int decodedSamples = _decoder.Decode(opusSpan, outputSpan, frameSize, false);
+                
+                if (decodedSamples > 0)
+                {
+                    // 转换为字节数组
+                    byte[] pcmBytes = new byte[decodedSamples * channels * 2];
+                    for (int i = 0; i < decodedSamples * channels; i++)
+                    {
+                        byte[] shortBytes = BitConverter.GetBytes(pcmShorts[i]);
+                        pcmBytes[i * 2] = shortBytes[0];
+                        pcmBytes[i * 2 + 1] = shortBytes[1];
+                    }
+                    return pcmBytes;
+                }
+                
+                return Array.Empty<byte>();
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine($"Opus解码失败: {ex.Message}");
+                return Array.Empty<byte>();
+            }
         }
     }
 

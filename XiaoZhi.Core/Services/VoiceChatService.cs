@@ -136,7 +136,9 @@ public class VoiceChatService : IVoiceChatService
                 {
                     throw new InvalidOperationException("MQTT configuration not available");
                 }
-            }            _communicationClient.MessageReceived += OnMessageReceived;
+            }            
+            
+            _communicationClient.MessageReceived += OnMessageReceived;
             _communicationClient.ConnectionStateChanged += OnConnectionStateChanged;
 
             // 订阅WebSocket专有的TTS状态变化事件
