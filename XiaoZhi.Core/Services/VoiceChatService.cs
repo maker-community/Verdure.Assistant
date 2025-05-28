@@ -106,10 +106,9 @@ public class VoiceChatService : IVoiceChatService
             if (!await _configurationService.InitializeMqttInfoAsync())
             {
                 throw new InvalidOperationException("Failed to initialize MQTT configuration from OTA server");
-            }
-
-            // 初始化音频编解码器
-            _audioCodec = new OpusAudioCodec();            
+            }            // 初始化音频编解码器
+            _audioCodec = new OpusAudioCodec();
+            
             // 初始化音频录制和播放
             if (config.EnableVoice)
             {
@@ -117,13 +116,11 @@ public class VoiceChatService : IVoiceChatService
                 _audioPlayer = new PortAudioPlayer();
                 
                 _audioRecorder.DataAvailable += OnAudioDataReceived;
-            }
-
-            // 初始化通信客户端
-            if (config.UseWebSocket)
+            }            // 初始化通信客户端
+            if (config.UseWebSocket)            
             {
                 _communicationClient = new WebSocketClient(_configurationService);
-            }            
+            }
             else
             {
                 var mqttInfo = _configurationService.MqttInfo;
