@@ -39,11 +39,9 @@ namespace XiaoZhiSharp.Services
         private volatile bool _isPlaybackActive = false;
 
         public bool IsRecording { get; private set; }
-        public bool IsPlaying { get; private set; }
-
-        public AudioService()
+        public bool IsPlaying { get; private set; }        public AudioService()
         {
-            // 初始化音频编解码器
+            // 初始化音频编解码器 - 暂时使用Concentus进行测试
             audioCodec = new OpusAudioCodec();
 
             // 初始化 PortAudio
@@ -75,12 +73,10 @@ namespace XiaoZhiSharp.Services
                 sampleFormat = SampleFormat.Int16,  // 使用Int16格式匹配PCM数据
                 suggestedLatency = outputInfo.defaultLowOutputLatency,
                 hostApiSpecificStreamInfo = IntPtr.Zero
-            };
-
-            _waveOut = new PortAudioSharp.Stream(
+            };            _waveOut = new PortAudioSharp.Stream(
                 inParams: null, 
                 outParams: outparam, 
-                sampleRate: SampleRate, 
+                sampleRate: OutputSampleRate,  // 使用输出采样率24kHz
                 framesPerBuffer: OutputFrameSize,  // 使用正确的帧大小
                 streamFlags: StreamFlags.ClipOff, 
                 callback: PlayCallback, 
@@ -223,17 +219,15 @@ namespace XiaoZhiSharp.Services
             {
                 LogConsole.ErrorLine($"录制编码错误: {ex.Message}");
             }
-        }
-
-        public void AddOutStreamSamples(byte[] opusData)
+        }        public void AddOutStreamSamples(byte[] opusData)
         {
             if (opusData == null || opusData.Length == 0)
                 return;
 
             try
             {
-                // 解码 Opus 数据为 PCM
-                byte[] pcmData = audioCodec.Decode(opusData, SampleRate, Channels);
+                // 解码 Opus 数据为 PCM - 使用输出采样率24kHz
+                byte[] pcmData = audioCodec.Decode(opusData, OutputSampleRate, Channels);
 
                 if (pcmData.Length > 0)
                 {

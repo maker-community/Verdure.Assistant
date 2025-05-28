@@ -21,24 +21,22 @@ namespace XiaoZhiSharp.Services
         private readonly ConcurrentQueue<float[]> _waveOutStream = new ConcurrentQueue<float[]>();
 
         // 音频输入相关组件
-        private readonly PortAudioSharp.Stream? _waveIn;
-
-        // 音频参数
-        private const int SampleRate = 24000;
+        private readonly PortAudioSharp.Stream? _waveIn;        // 音频参数 - 匹配Python配置
+        private const int InputSampleRate = 16000;  // 输入采样率16kHz
+        private const int OutputSampleRate = 24000; // 输出采样率24kHz
         private const int Channels = 1;
-        private const int FrameDuration = 60;
-        private const int FrameSize = SampleRate * FrameDuration / 1000; // 帧大小
+        private const int FrameDuration = 60;  // 60ms帧
+        private const int InputFrameSize = InputSampleRate * FrameDuration / 1000; // 960 samples
+        private const int OutputFrameSize = OutputSampleRate * FrameDuration / 1000; // 1440 samples
 
         // Opus 数据包缓存池
         private readonly Queue<byte[]> _opusRecordPackets = new Queue<byte[]>();
         private readonly Queue<byte[]> _opusPlayPackets = new Queue<byte[]>();
 
         public bool IsRecording { get; private set; }
-        public bool IsPlaying { get; private set; }
-
-        public AudioService()
+        public bool IsPlaying { get; private set; }        public AudioService()
         {
-            // 初始化音频编解码器
+            // 初始化音频编解码器 - 暂时使用Concentus进行测试
             audioCodec = new OpusAudioCodec();
 
             // 初始化音频输出组件
@@ -66,10 +64,8 @@ namespace XiaoZhiSharp.Services
                 sampleFormat = SampleFormat.Float32,
                 suggestedLatency = outputInfo.defaultLowOutputLatency,
                 hostApiSpecificStreamInfo = IntPtr.Zero
-            };
-
-            _waveOut = new PortAudioSharp.Stream(
-                inParams: null, outParams: outparam, sampleRate: SampleRate, framesPerBuffer: 1440,
+            };            _waveOut = new PortAudioSharp.Stream(
+                inParams: null, outParams: outparam, sampleRate: OutputSampleRate, framesPerBuffer: (uint)OutputFrameSize,
                 streamFlags: StreamFlags.ClipOff, callback: PlayCallback, userData: IntPtr.Zero
             );
 
@@ -87,10 +83,8 @@ namespace XiaoZhiSharp.Services
                 sampleFormat = SampleFormat.Float32,
                 suggestedLatency = inputInfo.defaultLowInputLatency,
                 hostApiSpecificStreamInfo = IntPtr.Zero
-            };
-
-            _waveIn = new PortAudioSharp.Stream(
-                inParams: inparam, outParams: null, sampleRate: SampleRate, framesPerBuffer: 1440,
+            };            _waveIn = new PortAudioSharp.Stream(
+                inParams: inparam, outParams: null, sampleRate: InputSampleRate, framesPerBuffer: (uint)InputFrameSize,
                 streamFlags: StreamFlags.ClipOff, callback: InCallback, userData: IntPtr.Zero
             );
 
@@ -184,35 +178,31 @@ namespace XiaoZhiSharp.Services
                 Console.WriteLine(ex.ToString());
                 return StreamCallbackResult.Complete;
             }
-        }
-
-        private void AddRecordSamples(byte[] buffer, int bytesRecorded)
+        }        private void AddRecordSamples(byte[] buffer, int bytesRecorded)
         {
-            int frameCount = bytesRecorded / (FrameSize * 2); // 每个样本 2 字节
+            int frameCount = bytesRecorded / (InputFrameSize * 2); // 每个样本 2 字节
 
             for (int i = 0; i < frameCount; i++)
             {
-                byte[] frame = new byte[FrameSize * 2];
-                Array.Copy(buffer, i * FrameSize * 2, frame, 0, FrameSize * 2);
+                byte[] frame = new byte[InputFrameSize * 2];
+                Array.Copy(buffer, i * InputFrameSize * 2, frame, 0, InputFrameSize * 2);
 
-                // 编码音频帧
-                byte[] opusPacket = audioCodec.Encode(frame, SampleRate, Channels);
+                // 编码音频帧 - 使用输入采样率
+                byte[] opusPacket = audioCodec.Encode(frame, InputSampleRate, Channels);
                 if (opusPacket.Length > 0)
                 {
                     _opusRecordPackets.Enqueue(opusPacket);
                 }
             }
-        }
-
-        public void AddOutStreamSamples(byte[] opusData)
+        }        public void AddOutStreamSamples(byte[] opusData)
         {
             if (opusData == null || opusData.Length == 0)
                 return;
 
             try
             {
-                // 使用修复后的解码器解码 Opus 数据
-                byte[] pcmData = audioCodec.Decode(opusData, SampleRate, Channels);
+                // 使用修复后的解码器解码 Opus 数据 - 使用输出采样率
+                byte[] pcmData = audioCodec.Decode(opusData, OutputSampleRate, Channels);
 
                 if (pcmData.Length > 0)
                 {

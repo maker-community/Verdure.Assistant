@@ -16,8 +16,7 @@ public class PortAudioRecorder : IAudioRecorder
     public event EventHandler<byte[]>? DataAvailable;
     public event EventHandler? RecordingStopped;
 
-    public bool IsRecording => _isRecording;    
-    public async Task StartRecordingAsync(int sampleRate, int channels)
+    public bool IsRecording => _isRecording;      public async Task StartRecordingAsync(int sampleRate, int channels)
     {
         if (_isRecording) return;
 
@@ -29,12 +28,16 @@ public class PortAudioRecorder : IAudioRecorder
             var defaultInputDevice = PortAudio.DefaultInputDevice;
             if (defaultInputDevice == -1)
                 throw new InvalidOperationException("未找到音频输入设备");
+            
+            // 计算帧大小 (60ms帧，匹配Python配置)
+            uint frameSize = (uint)(sampleRate * 60 / 1000);
+            
             // 配置音频流参数
             var inputParameters = new StreamParameters
             {
                 device = defaultInputDevice,
                 channelCount = channels,
-                sampleFormat = SampleFormat.Int16,
+                sampleFormat = SampleFormat.Int16, // 匹配Python paInt16
                 suggestedLatency = PortAudio.GetDeviceInfo(defaultInputDevice).defaultLowInputLatency
             };
 
@@ -43,8 +46,8 @@ public class PortAudioRecorder : IAudioRecorder
                 inputParameters,
                 null,
                 sampleRate,
-                1024, // 帧大小
-                StreamFlags.NoFlag,
+                frameSize, // 60ms帧大小，匹配Python配置
+                StreamFlags.ClipOff, // 匹配Python配置
                 OnAudioDataReceived,
                 IntPtr.Zero);
 
@@ -82,9 +85,7 @@ public class PortAudioRecorder : IAudioRecorder
         {
             System.Console.WriteLine($"停止音频录制时出错: {ex.Message}");
         }
-    }
-
-    private StreamCallbackResult OnAudioDataReceived(
+    }    private StreamCallbackResult OnAudioDataReceived(
         IntPtr input,
         IntPtr output,
         uint frameCount,
@@ -96,8 +97,10 @@ public class PortAudioRecorder : IAudioRecorder
         {
             if (input != IntPtr.Zero && frameCount > 0)
             {
-                // 计算数据大小 (16-bit samples)
-                int dataSize = (int)(frameCount * 2); // 假设单声道，16位
+                // 计算数据大小 (16-bit samples * channels)
+                // 从流参数获取通道数，这里假设单声道(1通道)匹配Python配置
+                int channels = 1; // 应该从流参数获取，但目前假设单声道
+                int dataSize = (int)(frameCount * channels * 2); // 16位 = 2字节/样本
                 var audioData = new byte[dataSize];
 
                 // 从非托管内存复制数据

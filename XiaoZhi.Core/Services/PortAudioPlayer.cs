@@ -43,9 +43,7 @@ public class PortAudioPlayer : IAudioPlayer
                 });
             }
         }
-    }
-
-    public async Task InitializeAsync(int sampleRate, int channels)
+    }    public async Task InitializeAsync(int sampleRate, int channels)
     {
         _sampleRate = sampleRate;
         _channels = channels;
@@ -59,25 +57,29 @@ public class PortAudioPlayer : IAudioPlayer
             if (defaultOutputDevice == -1)
                 throw new InvalidOperationException("未找到音频输出设备");
 
-            // 配置音频流参数
+            // 配置音频流参数 - 匹配Python配置
             var outputParameters = new StreamParameters
             {
                 device = defaultOutputDevice,
                 channelCount = channels,
-                sampleFormat = SampleFormat.Int16,
+                sampleFormat = SampleFormat.Int16, // 使用Int16匹配Python的paInt16
                 suggestedLatency = PortAudio.GetDeviceInfo(defaultOutputDevice).defaultLowOutputLatency
             };
+
+            // 计算正确的帧大小 - 匹配Python的OUTPUT_FRAME_SIZE
+            int frameSize = sampleRate * 60 / 1000; // 60ms帧，匹配Python的FRAME_DURATION
 
             // 创建输出流
             _outputStream = new PortAudioSharp.Stream(
                 null,
                 outputParameters,
                 sampleRate,
-                1024, // 帧大小
-                StreamFlags.NoFlag,
+                (uint)frameSize, // 使用计算出的帧大小
+                StreamFlags.ClipOff, // 使用ClipOff匹配其他实现
                 OnAudioDataRequested,
                 IntPtr.Zero);
 
+            System.Console.WriteLine($"音频播放器初始化成功: {sampleRate}Hz, {channels}声道, 帧大小: {frameSize}");
             await Task.CompletedTask;
         }
         catch (Exception ex)

@@ -101,13 +101,14 @@ public class VoiceChatService : IVoiceChatService
         CurrentState = DeviceState.Connecting;
 
         try
-        {
-            // Initialize configuration service first
+        {            // Initialize configuration service first
             if (!await _configurationService.InitializeMqttInfoAsync())
             {
                 throw new InvalidOperationException("Failed to initialize MQTT configuration from OTA server");
-            }            // 初始化音频编解码器
-            _audioCodec = new OpusAudioCodec();            
+            }            
+              // 初始化音频编解码器 - 暂时使用Concentus进行测试
+            _audioCodec = new OpusSharpAudioCodec();
+            
             // 初始化音频录制和播放
             if (config.EnableVoice)
             {
@@ -439,12 +440,10 @@ public class VoiceChatService : IVoiceChatService
                 if (CurrentState != DeviceState.Speaking)
                 {
                     await StartSpeakingAsync();
-                }
-
-                if (_audioPlayer != null && _audioCodec != null && _config != null)
+                }                if (_audioPlayer != null && _audioCodec != null && _config != null)
                 {
-                    var pcmData = _audioCodec.Decode(message.AudioData, _config.AudioSampleRate, _config.AudioChannels);
-                    await _audioPlayer.PlayAsync(pcmData, _config.AudioSampleRate, _config.AudioChannels);
+                    var pcmData = _audioCodec.Decode(message.AudioData, _config.AudioOutputSampleRate, _config.AudioChannels);
+                    await _audioPlayer.PlayAsync(pcmData, _config.AudioOutputSampleRate, _config.AudioChannels);
                 }
 
                 // 注意：不要在这里立即停止播放，因为可能还有更多音频数据要来
@@ -535,11 +534,9 @@ public class VoiceChatService : IVoiceChatService
                 if (CurrentState != DeviceState.Speaking)
                 {
                     await StartSpeakingAsync();
-                }
-
-                // 解码并播放音频数据
-                var pcmData = _audioCodec.Decode(audioData, _config.AudioSampleRate, _config.AudioChannels);
-                await _audioPlayer.PlayAsync(pcmData, _config.AudioSampleRate, _config.AudioChannels);
+                }                // 解码并播放音频数据 - 使用输出采样率
+                var pcmData = _audioCodec.Decode(audioData, _config.AudioOutputSampleRate, _config.AudioChannels);
+                await _audioPlayer.PlayAsync(pcmData, _config.AudioOutputSampleRate, _config.AudioChannels);
 
                 // 注意：不要在这里立即停止播放，因为可能还有更多音频数据要来
                 // 播放完成应该由播放器的PlaybackStopped事件或者明确的停止指令来触发
