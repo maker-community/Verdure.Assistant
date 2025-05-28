@@ -9,7 +9,8 @@ namespace XiaoZhi.Core.Services;
 /// Opus音频编解码器实现
 /// </summary>
 public class OpusAudioCodec : IAudioCodec
-{    private OpusEncoder? _encoder;
+{    
+    private OpusEncoder? _encoder;
     private OpusDecoder? _decoder;
     private readonly object _lock = new();
     private int _currentSampleRate;
@@ -70,8 +71,7 @@ public class OpusAudioCodec : IAudioCodec
                 return Array.Empty<byte>();
             }
         }
-    }    
-    
+    }        
     public byte[] Decode(byte[] encodedData, int sampleRate, int channels)
     {
         lock (_lock)
@@ -85,7 +85,8 @@ public class OpusAudioCodec : IAudioCodec
             }
 
             try
-            {                // 计算帧大小 (采样数，不是字节数)
+            {
+                // 计算帧大小 (采样数，不是字节数)
                 int frameSize = sampleRate * 60 / 1000; // 60ms帧
                 
                 // 解码为16位PCM数据
@@ -93,27 +94,29 @@ public class OpusAudioCodec : IAudioCodec
                 ReadOnlySpan<byte> opusSpan = new ReadOnlySpan<byte>(encodedData);
                 Span<short> outputSpan = new Span<short>(pcmShorts);
                 
-                int decodedSamples = _decoder.Decode(opusSpan, outputSpan, frameSize, false);
+                int decodedSamples = _decoder.Decode(opusSpan, outputSpan, frameSize);
                 
                 if (decodedSamples > 0)
                 {
-                    // 转换为字节数组
+                    // 转换为字节数组 - 使用更高效的方法
                     byte[] pcmBytes = new byte[decodedSamples * channels * 2];
-                    for (int i = 0; i < decodedSamples * channels; i++)
-                    {
-                        byte[] shortBytes = BitConverter.GetBytes(pcmShorts[i]);
-                        pcmBytes[i * 2] = shortBytes[0];
-                        pcmBytes[i * 2 + 1] = shortBytes[1];
-                    }
+                    Buffer.BlockCopy(pcmShorts, 0, pcmBytes, 0, decodedSamples * channels * 2);
                     return pcmBytes;
                 }
                 
-                return Array.Empty<byte>();
+                // 返回静音数据而不是空数组，保持音频流连续性
+                int silenceFrameSize = frameSize * channels * 2;
+                byte[] silenceData = new byte[silenceFrameSize];
+                return silenceData;
             }
             catch (Exception ex)
             {
                 System.Console.WriteLine($"Opus解码失败: {ex.Message}");
-                return Array.Empty<byte>();
+                
+                // 返回静音数据而不是空数组，保持音频流连续性
+                int frameSize = sampleRate * 60 / 1000; // 60ms帧
+                byte[] silenceData = new byte[frameSize * channels * 2];
+                return silenceData;
             }
         }
     }

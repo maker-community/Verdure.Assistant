@@ -149,9 +149,7 @@ public class PortAudioPlayer : IAudioPlayer
         {
             System.Console.WriteLine($"停止音频播放时出错: {ex.Message}");
         }
-    }
-
-    private StreamCallbackResult OnAudioDataRequested(
+    }    private StreamCallbackResult OnAudioDataRequested(
         IntPtr input,
         IntPtr output,
         uint frameCount,
@@ -170,18 +168,19 @@ public class PortAudioPlayer : IAudioPlayer
                     if (_audioQueue.Count > 0)
                     {
                         audioData = _audioQueue.Dequeue();
+                        _emptyFrameCount = 0; // 重置空帧计数
                     }
                 }
 
                 if (audioData != null)
                 {
-                    // 计算要复制的数据大小
+                    // 计算要复制的数据大小 (16位音频 = 2字节/样本)
                     int bytesToCopy = Math.Min(audioData.Length, (int)(frameCount * _channels * 2));
                     
-                    // 复制数据到输出缓冲区
+                    // 直接复制数据到输出缓冲区
                     System.Runtime.InteropServices.Marshal.Copy(audioData, 0, output, bytesToCopy);
 
-                    // 如果数据不足，用静音填充
+                    // 如果数据不足，用静音填充剩余部分
                     if (bytesToCopy < frameCount * _channels * 2)
                     {
                         var remainingBytes = (int)(frameCount * _channels * 2) - bytesToCopy;
@@ -196,11 +195,14 @@ public class PortAudioPlayer : IAudioPlayer
                 }
                 else
                 {
-                    // 没有更多数据，播放静音但不立即停止
+                    // 没有更多数据，播放静音
                     var silenceBuffer = new byte[frameCount * _channels * 2];
                     System.Runtime.InteropServices.Marshal.Copy(silenceBuffer, 0, output, silenceBuffer.Length);
                     
-                    // 继续播放，等待更多数据或明确的停止指令
+                    _emptyFrameCount++;
+                    
+                    // 如果连续播放静音超过阈值，保持继续但不立即停止
+                    // 让定时器来处理播放完成的逻辑
                     return StreamCallbackResult.Continue;
                 }
             }
@@ -210,7 +212,7 @@ public class PortAudioPlayer : IAudioPlayer
         catch (Exception ex)
         {
             System.Console.WriteLine($"音频播放回调错误: {ex.Message}");
-            return StreamCallbackResult.Abort;
+            return StreamCallbackResult.Continue; // 继续而不是中止，避免音频流断开
         }
     }
 
