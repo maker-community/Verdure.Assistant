@@ -121,7 +121,8 @@ public static class WebSocketProtocol
         var message = new ListenMessage
         {
             SessionId = sessionId,
-            State = "detect"
+            State = "detect",
+            Text = wakeWord
         };
 
         return JsonSerializer.Serialize(message, JsonOptions);
