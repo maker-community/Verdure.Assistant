@@ -139,12 +139,11 @@ public class VoiceChatService : IVoiceChatService
             }            
             
             _communicationClient.MessageReceived += OnMessageReceived;
-            _communicationClient.ConnectionStateChanged += OnConnectionStateChanged;
-
-            // 订阅WebSocket专有的TTS状态变化事件
+            _communicationClient.ConnectionStateChanged += OnConnectionStateChanged;            // 订阅WebSocket专有的TTS状态变化事件
             if (_communicationClient is WebSocketClient wsClient)
             {
                 wsClient.TtsStateChanged += OnTtsStateChanged;
+                wsClient.AudioDataReceived += OnWebSocketAudioDataReceived;
             }
 
             // 连接到服务器
@@ -500,7 +499,35 @@ public class VoiceChatService : IVoiceChatService
         catch (Exception ex)
         {
             _logger?.LogError(ex, "处理TTS状态变化失败");
-            ErrorOccurred?.Invoke(this, $"处理TTS状态变化失败: {ex.Message}");
+            ErrorOccurred?.Invoke(this, $"处理TTS状态变化失败: {ex.Message}");        }
+    }
+
+    /// <summary>
+    /// 处理WebSocket接收到的音频数据事件
+    /// </summary>
+    private async void OnWebSocketAudioDataReceived(object? sender, byte[] audioData)
+    {
+        try
+        {
+            _logger?.LogDebug("收到WebSocket音频数据，长度: {Length}", audioData.Length);
+
+            if (_audioPlayer != null && _audioCodec != null && _config != null)
+            {
+                // 切换到说话状态
+                await StartSpeakingAsync();
+
+                // 解码并播放音频数据
+                var pcmData = _audioCodec.Decode(audioData, _config.AudioSampleRate, _config.AudioChannels);
+                await _audioPlayer.PlayAsync(pcmData, _config.AudioSampleRate, _config.AudioChannels);
+
+                // 播放完成后切换回空闲状态
+                await StopSpeakingAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "处理WebSocket音频数据失败");
+            ErrorOccurred?.Invoke(this, $"处理WebSocket音频数据失败: {ex.Message}");
         }
     }
 
