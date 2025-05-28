@@ -17,7 +17,7 @@ namespace XiaoZhi.WinUI.Views
     {
         private readonly ILogger<EmotionManager>? _logger;
         private readonly Dictionary<string, string> _emotionPaths = new();
-        private readonly Dictionary<string, string> _emotionEmojis = new();
+        private Dictionary<string, string> _emotionEmojis = new();
         private bool _isInitialized = false;
 
         public EmotionManager()
