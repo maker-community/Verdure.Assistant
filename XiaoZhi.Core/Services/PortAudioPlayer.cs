@@ -17,7 +17,8 @@ public class PortAudioPlayer : IAudioPlayer
 
     public event EventHandler? PlaybackStopped;
 
-    public bool IsPlaying => _isPlaying;    public async Task InitializeAsync(int sampleRate, int channels)
+    public bool IsPlaying => _isPlaying;    
+    public async Task InitializeAsync(int sampleRate, int channels)
     {
         _sampleRate = sampleRate;
         _channels = channels;
@@ -25,7 +26,8 @@ public class PortAudioPlayer : IAudioPlayer
         try
         {
             // 初始化PortAudio
-            PortAudio.Initialize();            // 获取默认输出设备
+            PortAudio.Initialize();            
+            // 获取默认输出设备
             var defaultOutputDevice = PortAudio.DefaultOutputDevice;
             if (defaultOutputDevice == -1)
                 throw new InvalidOperationException("未找到音频输出设备");
