@@ -16,17 +16,20 @@ public class PortAudioRecorder : IAudioRecorder
     public event EventHandler<byte[]>? DataAvailable;
     public event EventHandler? RecordingStopped;
 
-    public bool IsRecording => _isRecording;    public async Task StartRecordingAsync(int sampleRate, int channels)
+    public bool IsRecording => _isRecording;    
+    public async Task StartRecordingAsync(int sampleRate, int channels)
     {
         if (_isRecording) return;
 
         try
         {
             // 初始化PortAudio
-            PortAudio.Initialize();            // 获取默认输入设备
+            PortAudio.Initialize();            
+            // 获取默认输入设备
             var defaultInputDevice = PortAudio.DefaultInputDevice;
             if (defaultInputDevice == -1)
-                throw new InvalidOperationException("未找到音频输入设备");// 配置音频流参数
+                throw new InvalidOperationException("未找到音频输入设备");
+            // 配置音频流参数
             var inputParameters = new StreamParameters
             {
                 device = defaultInputDevice,
@@ -56,7 +59,8 @@ public class PortAudioRecorder : IAudioRecorder
             _isRecording = false;
             throw new Exception($"启动音频录制失败: {ex.Message}", ex);
         }
-    }    public async Task StopRecordingAsync()
+    }    
+    public async Task StopRecordingAsync()
     {
         if (!_isRecording) return;
 
