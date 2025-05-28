@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml;
 using XiaoZhi.Core.Interfaces;
 using XiaoZhi.Core.Services;
 using XiaoZhi.WinUI.Views;
+using XiaoZhi.WinUI.ViewModels;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -29,6 +30,7 @@ namespace XiaoZhi.WinUI
         /// </summary>
         public App()
         {
+            this.InitializeComponent();
         }
 
         /// <summary>
@@ -41,9 +43,7 @@ namespace XiaoZhi.WinUI
             _host = CreateHostBuilder().Build();
             _host.StartAsync();
 
-            MainWindow = new Window();
-            MainWindow.Content = new MainPage();
-            MainWindow.Title = "小智语音聊天";
+            MainWindow = new Views.MainWindow();
             MainWindow.Activate();
         }
 
@@ -56,7 +56,12 @@ namespace XiaoZhi.WinUI
                     {
                         builder.AddConsole();
                         builder.SetMinimumLevel(LogLevel.Information);
-                    });                    // Register core services
+                    });
+                    
+                    // Register ViewModels
+                    services.AddTransient<MainWindowViewModel>();
+                    
+                    // Register core services
                     services.AddSingleton<IVerificationService, VerificationService>();
                     services.AddSingleton<IConfigurationService, ConfigurationService>();
                     services.AddSingleton<IAudioRecorder, PortAudioRecorder>();

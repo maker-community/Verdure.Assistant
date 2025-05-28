@@ -9,9 +9,9 @@ using XiaoZhi.Core.Services;
 
 namespace XiaoZhi.WinUI.ViewModels;
 
-public partial class MainViewModel : ObservableObject
+public partial class MainWindowViewModel : ObservableObject
 {
-    private readonly ILogger<MainViewModel> _logger;
+    private readonly ILogger<MainWindowViewModel> _logger;
     private IVoiceChatService? _voiceChatService;
     
     [ObservableProperty]
@@ -35,9 +35,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _useWebSocket = true;
 
-    public ObservableCollection<ChatMessage> Messages { get; } = new();
-
-    public MainViewModel(ILogger<MainViewModel> logger)
+    public ObservableCollection<ChatMessage> Messages { get; } = new();    public MainWindowViewModel(ILogger<MainWindowViewModel> logger)
     {
         _logger = logger;
     }
