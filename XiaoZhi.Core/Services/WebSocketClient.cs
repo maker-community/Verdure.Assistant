@@ -148,9 +148,8 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     {
         if (!_isConnected || _webSocket?.State != WebSocketState.Open)
             throw new InvalidOperationException("WebSocket未连接");
-
-        var json = JsonSerializer.Serialize(voiceMessage);
-        await SendTextAsync(json);
+   
+        await SendAudioAsync(voiceMessage.Data);
     }
 
     /// <summary>

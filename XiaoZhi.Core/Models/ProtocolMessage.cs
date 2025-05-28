@@ -81,6 +81,18 @@ public class TtsMessage : ProtocolMessage
 }
 
 /// <summary>
+/// Stt状态消息
+/// </summary>
+public class SttMessage : ProtocolMessage
+{
+    public override string Type => "stt";
+
+    [JsonPropertyName("text")]
+    public string? Text { get; set; }
+}
+
+
+/// <summary>
 /// 中止消息
 /// </summary>
 public class AbortMessage : ProtocolMessage

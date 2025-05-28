@@ -331,11 +331,12 @@ public static class WebSocketProtocol
                 "hello" => JsonSerializer.Deserialize<HelloMessage>(json, JsonOptions),
                 "listen" => JsonSerializer.Deserialize<ListenMessage>(json, JsonOptions),
                 "tts" => JsonSerializer.Deserialize<TtsMessage>(json, JsonOptions),
+                "stt" => JsonSerializer.Deserialize<SttMessage>(json, JsonOptions),
                 "abort" => JsonSerializer.Deserialize<AbortMessage>(json, JsonOptions),
                 "iot" => JsonSerializer.Deserialize<IotMessage>(json, JsonOptions),
                 "llm" => JsonSerializer.Deserialize<LlmMessage>(json, JsonOptions),
                 "goodbye" => JsonSerializer.Deserialize<GoodbyeMessage>(json, JsonOptions),
-                _ => JsonSerializer.Deserialize<GenericProtocolMessage>(json, JsonOptions)
+                _ => null
             };
         }
         catch (JsonException)
