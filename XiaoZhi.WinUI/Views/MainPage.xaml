@@ -7,83 +7,101 @@
     xmlns:local="using:XiaoZhi.WinUI"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
-    
+
     <Grid Margin="20">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- 标题和连接状态 -->
+        <!--  标题和连接状态  -->
         <StackPanel Grid.Row="0" Margin="0,0,0,20">
-            <TextBlock Text="小智语音聊天客户端" 
-                       FontSize="28" 
-                       FontWeight="Bold" 
-                       HorizontalAlignment="Center" 
-                       Margin="0,0,0,10"/>
-            
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
-                <TextBlock Text="连接状态:" VerticalAlignment="Center"/>
-                <TextBlock x:Name="ConnectionStatusText" 
-                           Text="未连接" 
-                           VerticalAlignment="Center"/>
-                
-                <Button x:Name="ConnectButton"
-                        Content="连接"
-                        Click="ConnectButton_Click"
-                        Margin="10,0,0,0"/>
-                
-                <Button x:Name="DisconnectButton"
-                        Content="断开连接"
-                        Click="DisconnectButton_Click"
-                        IsEnabled="False"
-                        Margin="5,0,0,0"/>
+            <TextBlock
+                Margin="0,0,0,10"
+                HorizontalAlignment="Center"
+                FontSize="28"
+                FontWeight="Bold"
+                Text="小智语音聊天客户端" />
+
+            <StackPanel
+                HorizontalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="10">
+                <TextBlock VerticalAlignment="Center" Text="连接状态:" />
+                <TextBlock
+                    x:Name="ConnectionStatusText"
+                    VerticalAlignment="Center"
+                    Text="未连接" />
+
+                <Button
+                    x:Name="ConnectButton"
+                    Margin="10,0,0,0"
+                    Click="ConnectButton_Click"
+                    Content="连接" />
+
+                <Button
+                    x:Name="DisconnectButton"
+                    Margin="5,0,0,0"
+                    Click="DisconnectButton_Click"
+                    Content="断开连接"
+                    IsEnabled="False" />
             </StackPanel>
         </StackPanel>
 
-        <!-- 控制面板 -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="15" Margin="0,0,0,20">
-            <ToggleSwitch x:Name="EnableVoiceChatToggle"
-                          Header="启用语音对话" 
-                          IsOn="True"
-                          IsEnabled="False"/>
-            
-            <Button x:Name="VoiceChatButton"
-                    Content="开始语音对话"
-                    Click="VoiceChatButton_Click"
-                    IsEnabled="False"
-                    MinWidth="120"/>
+        <!--  控制面板  -->
+        <StackPanel
+            Grid.Row="1"
+            Margin="0,0,0,20"
+            HorizontalAlignment="Center"
+            Orientation="Horizontal"
+            Spacing="15">
+            <ToggleSwitch
+                x:Name="EnableVoiceChatToggle"
+                Header="启用语音对话"
+                IsEnabled="False"
+                IsOn="True" />
+
+            <Button
+                x:Name="VoiceChatButton"
+                MinWidth="120"
+                Click="VoiceChatButton_Click"
+                Content="开始语音对话"
+                IsEnabled="False" />
         </StackPanel>
 
-        <!-- 消息列表 -->
-        <ScrollViewer Grid.Row="2" 
-                      Margin="0,0,0,20"
-                      ZoomMode="Disabled"
-                      VerticalScrollBarVisibility="Auto"
-                      VerticalScrollMode="Auto">
-            <ListView x:Name="MessagesListView"
-                      SelectionMode="None">
+        <!--  消息列表  -->
+        <ScrollViewer
+            Grid.Row="2"
+            Margin="0,0,0,20"
+            VerticalScrollBarVisibility="Auto"
+            VerticalScrollMode="Auto"
+            ZoomMode="Disabled">
+            <ListView x:Name="MessagesListView" SelectionMode="None">
                 <ListView.ItemTemplate>
                     <DataTemplate>
-                        <Border x:Name="MessageBorder"
-                                CornerRadius="10"
-                                Padding="15,10"
-                                Margin="0,5">
+                        <Border
+                            x:Name="MessageBorder"
+                            Margin="0,5"
+                            Padding="15,10"
+                            CornerRadius="10">
                             <StackPanel>
-                                <TextBlock x:Name="RoleText"
-                                           FontSize="12"
-                                           Opacity="0.8"
-                                           Margin="0,0,0,5"/>
-                                <TextBlock x:Name="ContentText"
-                                           TextWrapping="Wrap"
-                                           FontSize="14"/>
-                                <TextBlock x:Name="TimestampText"
-                                           FontSize="10"
-                                           Opacity="0.6"
-                                           HorizontalAlignment="Right"
-                                           Margin="0,5,0,0"/>
+                                <TextBlock
+                                    x:Name="RoleText"
+                                    Margin="0,0,0,5"
+                                    FontSize="12"
+                                    Opacity="0.8" />
+                                <TextBlock
+                                    x:Name="ContentText"
+                                    FontSize="14"
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    x:Name="TimestampText"
+                                    Margin="0,5,0,0"
+                                    HorizontalAlignment="Right"
+                                    FontSize="10"
+                                    Opacity="0.6" />
                             </StackPanel>
                         </Border>
                     </DataTemplate>
@@ -91,26 +109,28 @@
             </ListView>
         </ScrollViewer>
 
-        <!-- 消息输入 -->
+        <!--  消息输入  -->
         <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            
-            <TextBox x:Name="MessageTextBox"
-                     Grid.Column="0"
-                     PlaceholderText="输入消息..."
-                     IsEnabled="False"
-                     KeyDown="MessageTextBox_KeyDown"/>
-            
-            <Button x:Name="SendButton"
-                    Grid.Column="1"
-                    Content="发送"
-                    Click="SendButton_Click"
-                    IsEnabled="False"
-                    Margin="10,0,0,0"
-                    MinWidth="80"/>
+
+            <TextBox
+                x:Name="MessageTextBox"
+                Grid.Column="0"
+                IsEnabled="False"
+                KeyDown="MessageTextBox_KeyDown"
+                PlaceholderText="输入消息..." />
+
+            <Button
+                x:Name="SendButton"
+                Grid.Column="1"
+                MinWidth="80"
+                Margin="10,0,0,0"
+                Click="SendButton_Click"
+                Content="发送"
+                IsEnabled="False" />
         </Grid>
     </Grid>
 </Page>
