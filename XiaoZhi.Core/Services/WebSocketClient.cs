@@ -20,12 +20,12 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     private readonly ILogger? _logger;
     private bool _isConnected;
     private string? _sessionId;
-    private readonly TaskCompletionSource<bool> _helloReceived = new();
-
+    private readonly TaskCompletionSource<bool> _helloReceived = new();    
     public event EventHandler<ChatMessage>? MessageReceived;
     public event EventHandler<bool>? ConnectionStateChanged;
     public event EventHandler<ProtocolMessage>? ProtocolMessageReceived;
     public event EventHandler<byte[]>? AudioDataReceived;
+    public event EventHandler<TtsMessage>? TtsStateChanged;
 
     public bool IsConnected => _isConnected;
     public string? SessionId => _sessionId;
@@ -424,14 +424,15 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     {
         _logger?.LogInformation("收到服务器Goodbye消息，准备断开连接");
         await DisconnectAsync();
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// 处理TTS消息
     /// </summary>
     private async Task HandleTtsMessageAsync(TtsMessage message)
     {
         _logger?.LogDebug("收到TTS消息，状态: {State}，文本: {Text}", message.State, message.Text);
+        
+        // 触发TTS状态变化事件
+        TtsStateChanged?.Invoke(this, message);
         
         // 可以在这里添加TTS状态处理逻辑
         switch (message.State?.ToLowerInvariant())

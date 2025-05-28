@@ -136,10 +136,14 @@ public class VoiceChatService : IVoiceChatService
                 {
                     throw new InvalidOperationException("MQTT configuration not available");
                 }
-            }
-
-            _communicationClient.MessageReceived += OnMessageReceived;
+            }            _communicationClient.MessageReceived += OnMessageReceived;
             _communicationClient.ConnectionStateChanged += OnConnectionStateChanged;
+
+            // 订阅WebSocket专有的TTS状态变化事件
+            if (_communicationClient is WebSocketClient wsClient)
+            {
+                wsClient.TtsStateChanged += OnTtsStateChanged;
+            }
 
             // 连接到服务器
             await _communicationClient.ConnectAsync();
@@ -190,9 +194,7 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogError(ex, "Failed to toggle chat state");
             ErrorOccurred?.Invoke(this, $"Failed to toggle chat state: {ex.Message}");
         }
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Start listening mode
     /// </summary>
     private async Task StartListeningAsync()
@@ -202,6 +204,15 @@ public class VoiceChatService : IVoiceChatService
         try
         {
             CurrentState = DeviceState.Listening;
+
+            // Send start listen message first before starting audio recording
+            if (_communicationClient is WebSocketClient wsClient)
+            {
+                // Determine listening mode based on KeepListening setting
+                var mode = KeepListening ? ListeningMode.AutoStop : ListeningMode.Manual;
+                await wsClient.SendStartListenAsync(mode);
+                _logger?.LogDebug("Sent start listen message with mode: {Mode}", mode);
+            }
 
             if (_config?.EnableVoice == true && _audioRecorder != null)
             {
@@ -217,9 +228,7 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogError(ex, "Failed to start listening");
             ErrorOccurred?.Invoke(this, $"Failed to start listening: {ex.Message}");
         }
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Stop listening with specific reason
     /// </summary>
     private async Task StopListeningAsync(AbortReason reason = AbortReason.None)
@@ -229,6 +238,13 @@ public class VoiceChatService : IVoiceChatService
         try
         {
             _lastAbortReason = reason;
+
+            // Send stop listen message first
+            if (_communicationClient is WebSocketClient wsClient)
+            {
+                await wsClient.SendStopListenAsync();
+                _logger?.LogDebug("Sent stop listen message");
+            }
 
             if (_audioRecorder != null)
             {
@@ -440,6 +456,49 @@ public class VoiceChatService : IVoiceChatService
                 // 连接断开时自动停止语音对话
                 _ = Task.Run(() => StopVoiceChatAsync());
             }
+        }
+    }
+
+    /// <summary>
+    /// 处理TTS状态变化事件
+    /// </summary>
+    private async void OnTtsStateChanged(object? sender, TtsMessage message)
+    {
+        try
+        {
+            _logger?.LogDebug("收到TTS状态变化: {State}, 文本: {Text}", message.State, message.Text);
+
+            switch (message.State?.ToLowerInvariant())
+            {
+                case "start":
+                    // TTS开始播放时，从监听状态切换到说话状态
+                    if (CurrentState == DeviceState.Listening)
+                    {
+                        await StartSpeakingAsync();
+                    }
+                    break;
+
+                case "stop":
+                    // TTS停止播放时，从说话状态切换回空闲或监听状态
+                    if (CurrentState == DeviceState.Speaking)
+                    {
+                        await StopSpeakingAsync();
+                    }
+                    break;
+
+                case "sentence_start":
+                    _logger?.LogDebug("TTS句子开始: {Text}", message.Text);
+                    break;
+
+                case "sentence_end":
+                    _logger?.LogDebug("TTS句子结束");
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "处理TTS状态变化失败");
+            ErrorOccurred?.Invoke(this, $"处理TTS状态变化失败: {ex.Message}");
         }
     }
 
