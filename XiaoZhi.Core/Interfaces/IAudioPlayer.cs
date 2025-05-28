@@ -6,6 +6,11 @@ namespace XiaoZhi.Core.Interfaces;
 public interface IAudioPlayer
 {
     /// <summary>
+    /// 播放完成事件
+    /// </summary>
+    event EventHandler? PlaybackStopped;
+
+    /// <summary>
     /// 播放音频数据
     /// </summary>
     /// <param name="audioData">音频数据</param>

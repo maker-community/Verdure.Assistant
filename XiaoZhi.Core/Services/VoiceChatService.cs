@@ -107,8 +107,7 @@ public class VoiceChatService : IVoiceChatService
             {
                 throw new InvalidOperationException("Failed to initialize MQTT configuration from OTA server");
             }            // 初始化音频编解码器
-            _audioCodec = new OpusAudioCodec();
-
+            _audioCodec = new OpusAudioCodec();            
             // 初始化音频录制和播放
             if (config.EnableVoice)
             {
@@ -116,7 +115,9 @@ public class VoiceChatService : IVoiceChatService
                 _audioPlayer = new PortAudioPlayer();
 
                 _audioRecorder.DataAvailable += OnAudioDataReceived;
-            }            // 初始化通信客户端
+                _audioPlayer.PlaybackStopped += OnAudioPlaybackStopped;
+            }
+            // 初始化通信客户端
             if (config.UseWebSocket)
             {
                 _communicationClient = new WebSocketClient(_configurationService, _logger);
@@ -380,9 +381,7 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogError(ex, "发送文本消息失败");
             ErrorOccurred?.Invoke(this, $"发送文本消息失败: {ex.Message}");
         }
-    }
-
-    private async void OnAudioDataReceived(object? sender, byte[] audioData)
+    }    private async void OnAudioDataReceived(object? sender, byte[] audioData)
     {
         if (!_isVoiceChatActive || _communicationClient == null || _audioCodec == null || _config == null)
             return;
@@ -410,7 +409,24 @@ public class VoiceChatService : IVoiceChatService
         }
     }
 
-    private async void OnMessageReceived(object? sender, ChatMessage message)
+    /// <summary>
+    /// 处理音频播放完成事件
+    /// </summary>
+    private async void OnAudioPlaybackStopped(object? sender, EventArgs e)
+    {
+        try
+        {
+            // 当音频播放完成时，如果在说话状态，切换回空闲状态
+            if (CurrentState == DeviceState.Speaking)
+            {
+                await StopSpeakingAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "处理音频播放完成事件失败");
+        }
+    }private async void OnMessageReceived(object? sender, ChatMessage message)
     {
         try
         {
@@ -419,7 +435,11 @@ public class VoiceChatService : IVoiceChatService
             // Start speaking mode when receiving audio response
             if (message.AudioData != null)
             {
-                await StartSpeakingAsync();
+                // 如果不在说话状态，切换到说话状态
+                if (CurrentState != DeviceState.Speaking)
+                {
+                    await StartSpeakingAsync();
+                }
 
                 if (_audioPlayer != null && _audioCodec != null && _config != null)
                 {
@@ -427,8 +447,8 @@ public class VoiceChatService : IVoiceChatService
                     await _audioPlayer.PlayAsync(pcmData, _config.AudioSampleRate, _config.AudioChannels);
                 }
 
-                // Finish speaking and potentially restart listening
-                await StopSpeakingAsync();
+                // 注意：不要在这里立即停止播放，因为可能还有更多音频数据要来
+                // 播放完成应该由播放器的PlaybackStopped事件或者明确的停止指令来触发
             }
 
             _logger?.LogInformation("收到消息: {Type} - {Content}", message.Type, message.Content);
@@ -500,9 +520,7 @@ public class VoiceChatService : IVoiceChatService
         {
             _logger?.LogError(ex, "处理TTS状态变化失败");
             ErrorOccurred?.Invoke(this, $"处理TTS状态变化失败: {ex.Message}");        }
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// 处理WebSocket接收到的音频数据事件
     /// </summary>
     private async void OnWebSocketAudioDataReceived(object? sender, byte[] audioData)
@@ -513,15 +531,18 @@ public class VoiceChatService : IVoiceChatService
 
             if (_audioPlayer != null && _audioCodec != null && _config != null)
             {
-                // 切换到说话状态
-                await StartSpeakingAsync();
+                // 如果不在说话状态，切换到说话状态
+                if (CurrentState != DeviceState.Speaking)
+                {
+                    await StartSpeakingAsync();
+                }
 
                 // 解码并播放音频数据
                 var pcmData = _audioCodec.Decode(audioData, _config.AudioSampleRate, _config.AudioChannels);
                 await _audioPlayer.PlayAsync(pcmData, _config.AudioSampleRate, _config.AudioChannels);
 
-                // 播放完成后切换回空闲状态
-                await StopSpeakingAsync();
+                // 注意：不要在这里立即停止播放，因为可能还有更多音频数据要来
+                // 播放完成应该由播放器的PlaybackStopped事件或者明确的停止指令来触发
             }
         }
         catch (Exception ex)

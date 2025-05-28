@@ -7,17 +7,44 @@ namespace XiaoZhi.Core.Services;
 /// PortAudioSharp2实现的音频播放器
 /// </summary>
 public class PortAudioPlayer : IAudioPlayer
-{
-    private PortAudioSharp.Stream? _outputStream;
+{    private PortAudioSharp.Stream? _outputStream;
     private bool _isPlaying;
     private readonly Queue<byte[]> _audioQueue = new();
     private readonly object _lock = new();
     private int _sampleRate;
     private int _channels;
+    private int _emptyFrameCount = 0; // 空帧计数器
+    private const int MaxEmptyFrames = 50; // 最大空帧数（约1秒的静音后停止）
+    private DateTime _lastDataTime = DateTime.Now;
+    private readonly Timer _playbackTimer;
 
     public event EventHandler? PlaybackStopped;
 
-    public bool IsPlaying => _isPlaying;    
+    public bool IsPlaying => _isPlaying;
+
+    public PortAudioPlayer()
+    {
+        // 创建定时器来检测播放完成（类似Python中的延迟状态变更）
+        _playbackTimer = new Timer(CheckPlaybackCompletion, null, Timeout.Infinite, Timeout.Infinite);
+    }
+
+    private void CheckPlaybackCompletion(object? state)
+    {
+        lock (_lock)
+        {
+            // 如果队列为空且距离最后一次接收数据超过1秒，认为播放完成
+            if (_isPlaying && _audioQueue.Count == 0 && 
+                (DateTime.Now - _lastDataTime).TotalMilliseconds > 1000)
+            {
+                Task.Run(async () => 
+                {
+                    await StopAsync();
+                    PlaybackStopped?.Invoke(this, EventArgs.Empty);
+                });
+            }
+        }
+    }
+
     public async Task InitializeAsync(int sampleRate, int channels)
     {
         _sampleRate = sampleRate;
@@ -73,12 +100,16 @@ public class PortAudioPlayer : IAudioPlayer
             lock (_lock)
             {
                 _audioQueue.Enqueue(audioData);
+                _lastDataTime = DateTime.Now; // 更新最后接收数据的时间
             }
 
             if (!_isPlaying && _outputStream != null)
             {
                 _outputStream.Start();
                 _isPlaying = true;
+                
+                // 启动定时器检测播放完成
+                _playbackTimer.Change(500, 500); // 每500ms检查一次
             }
 
             await Task.CompletedTask;
@@ -87,12 +118,17 @@ public class PortAudioPlayer : IAudioPlayer
         {
             System.Console.WriteLine($"播放音频时出错: {ex.Message}");
         }
-    }    public async Task StopAsync()
+    }
+
+    public async Task StopAsync()
     {
         if (!_isPlaying) return;
 
         try
         {
+            // 停止定时器
+            _playbackTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            
             _outputStream?.Stop();
             _outputStream?.Close();
             _outputStream?.Dispose();
@@ -106,7 +142,6 @@ public class PortAudioPlayer : IAudioPlayer
             }
 
             _isPlaying = false;
-            PlaybackStopped?.Invoke(this, EventArgs.Empty);
 
             await Task.CompletedTask;
         }
@@ -161,13 +196,12 @@ public class PortAudioPlayer : IAudioPlayer
                 }
                 else
                 {
-                    // 没有更多数据，播放静音
+                    // 没有更多数据，播放静音但不立即停止
                     var silenceBuffer = new byte[frameCount * _channels * 2];
                     System.Runtime.InteropServices.Marshal.Copy(silenceBuffer, 0, output, silenceBuffer.Length);
                     
-                    // 如果队列为空，停止播放
-                    Task.Run(async () => await StopAsync());
-                    return StreamCallbackResult.Complete;
+                    // 继续播放，等待更多数据或明确的停止指令
+                    return StreamCallbackResult.Continue;
                 }
             }
 
@@ -182,6 +216,7 @@ public class PortAudioPlayer : IAudioPlayer
 
     public void Dispose()
     {
+        _playbackTimer?.Dispose();
         StopAsync().Wait();
     }
 }
