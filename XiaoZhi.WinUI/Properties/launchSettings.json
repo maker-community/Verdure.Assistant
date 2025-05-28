@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "XiaoZhi.WinUI (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "XiaoZhi.WinUI (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
