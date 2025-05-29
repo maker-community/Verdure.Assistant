@@ -42,22 +42,12 @@ public sealed partial class MainWindow : Window
 
         // 绑定事件
         BindEvents();
-    }
-
-    private void InitializeServices()
+    }    private void InitializeServices()
     {
         try
         {
             _voiceChatService = App.GetService<IVoiceChatService>();
-            if (_voiceChatService != null)
-            {
-                // 订阅事件
-                _voiceChatService.DeviceStateChanged += OnDeviceStateChanged;
-                _voiceChatService.VoiceChatStateChanged += OnVoiceChatStateChanged;
-                _voiceChatService.MessageReceived += OnMessageReceived;
-                _voiceChatService.ErrorOccurred += OnErrorOccurred;
-                _voiceChatService.ListeningModeChanged += OnListeningModeChanged;
-            }
+            // Note: Event registration is now handled in ConnectButton_Click to avoid duplicate registrations
         }
         catch (Exception ex)
         {
@@ -174,12 +164,10 @@ public sealed partial class MainWindow : Window
         TtsText.Text = text;
     }    private void UpdateUIForDeviceState(DeviceState state)
     {
-        _isConnected = state != DeviceState.Idle;
-
-        // 更新连接状态UI
-        UpdateConnectionUI();
-
-        // 根据状态更新UI
+        // DeviceState.Idle means connected but idle, not disconnected!
+        // Only update connection status UI, don't change _isConnected flag here
+        
+        // 根据状态更新UI表情
         switch (state)
         {
             case DeviceState.Idle:
