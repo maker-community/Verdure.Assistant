@@ -7,8 +7,18 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
+    <Page.Resources>
+        <Style x:Key="SettingsExpanderStyle" TargetType="Expander">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="BorderBrush" Value="{ThemeResource DividerStrokeColorDefaultBrush}" />
+            <Setter Property="Padding" Value="0,0,0,8" />
+        </Style>
+    </Page.Resources>
+
     <ScrollViewer Padding="20" VerticalScrollBarVisibility="Auto">
-        <StackPanel MaxWidth="600" Spacing="20">
+        <StackPanel MaxWidth="600" Spacing="16">
 
             <!--  Page Title  -->
             <TextBlock
@@ -18,8 +28,14 @@
                 Text="设置" />
 
             <!--  Wake Word Settings  -->
-            <Expander Header="唤醒词设置" IsExpanded="True">
-                <StackPanel Padding="0,12,0,0" Spacing="12">
+            <Expander
+                Header="唤醒词设置"
+                IsExpanded="True"
+                Style="{StaticResource SettingsExpanderStyle}">
+                <StackPanel
+                    Padding="0,12,0,0"
+                    HorizontalAlignment="Stretch"
+                    Spacing="12">
                     <ToggleSwitch
                         x:Name="WakeWordToggle"
                         Header="启用唤醒词唤醒"
@@ -35,8 +51,14 @@
             </Expander>
 
             <!--  Device Settings  -->
-            <Expander Header="设备设置" IsExpanded="True">
-                <StackPanel Padding="0,12,0,0" Spacing="12">
+            <Expander
+                Header="设备设置"
+                IsExpanded="True"
+                Style="{StaticResource SettingsExpanderStyle}">
+                <StackPanel
+                    Padding="0,12,0,0"
+                    HorizontalAlignment="Stretch"
+                    Spacing="12">
                     <TextBox
                         x:Name="DeviceIdTextBox"
                         Header="Device ID"
@@ -118,8 +140,14 @@
             </Expander>
 
             <!--  Audio Settings  -->
-            <Expander Header="音频设置" IsExpanded="False">
-                <StackPanel Padding="0,12,0,0" Spacing="12">
+            <Expander
+                Header="音频设置"
+                IsExpanded="False"
+                Style="{StaticResource SettingsExpanderStyle}">
+                <StackPanel
+                    Padding="0,12,0,0"
+                    HorizontalAlignment="Stretch"
+                    Spacing="12">
                     <Slider
                         x:Name="DefaultVolumeSlider"
                         Header="默认音量"
@@ -155,8 +183,14 @@
             </Expander>
 
             <!--  Application Settings  -->
-            <Expander Header="应用程序设置" IsExpanded="False">
-                <StackPanel Padding="0,12,0,0" Spacing="12">
+            <Expander
+                Header="应用程序设置"
+                IsExpanded="False"
+                Style="{StaticResource SettingsExpanderStyle}">
+                <StackPanel
+                    Padding="0,12,0,0"
+                    HorizontalAlignment="Stretch"
+                    Spacing="12">
                     <ToggleSwitch
                         x:Name="AutoStartToggle"
                         Header="开机自启动"
@@ -184,8 +218,14 @@
             </Expander>
 
             <!--  Advanced Settings  -->
-            <Expander Header="高级设置" IsExpanded="False">
-                <StackPanel Padding="0,12,0,0" Spacing="12">
+            <Expander
+                Header="高级设置"
+                IsExpanded="False"
+                Style="{StaticResource SettingsExpanderStyle}">
+                <StackPanel
+                    Padding="0,12,0,0"
+                    HorizontalAlignment="Stretch"
+                    Spacing="12">
                     <NumberBox
                         x:Name="ConnectionTimeoutNumberBox"
                         Header="连接超时时间 (秒)"
@@ -229,8 +269,14 @@
             </Expander>
 
             <!--  About Section  -->
-            <Expander Header="关于" IsExpanded="False">
-                <StackPanel Padding="0,12,0,0" Spacing="12">
+            <Expander
+                Header="关于"
+                IsExpanded="False"
+                Style="{StaticResource SettingsExpanderStyle}">
+                <StackPanel
+                    Padding="0,12,0,0"
+                    HorizontalAlignment="Stretch"
+                    Spacing="12">
                     <TextBlock
                         FontSize="16"
                         FontWeight="SemiBold"

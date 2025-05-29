@@ -40,54 +40,54 @@ namespace XiaoZhi.WinUI.Views
             try
             {
                 // Load wake word settings
-                var wakeWordEnabled = _localSettings.Values["WakeWordEnabled"] as bool? ?? false;
+                var wakeWordEnabled = _localSettings?.Values["WakeWordEnabled"] as bool? ?? false;
                 WakeWordToggle.IsOn = wakeWordEnabled;
 
-                var wakeWords = _localSettings.Values["WakeWords"] as string ?? "小智,小智同学";
+                var wakeWords = _localSettings?.Values["WakeWords"] as string ?? "小智,小智同学";
                 WakeWordsTextBox.Text = wakeWords;
 
                 // Load device settings
-                var deviceId = _localSettings.Values["DeviceId"] as string ?? "";
+                var deviceId = _localSettings?.Values["DeviceId"] as string ?? "";
                 DeviceIdTextBox.Text = deviceId;
 
                 // Load server settings
-                var wsAddress = _localSettings.Values["WsAddress"] as string ?? "ws://localhost:8765";
+                var wsAddress = _localSettings?.Values["WsAddress"] as string ?? "ws://localhost:8765";
                 WsAddressTextBox.Text = wsAddress;
 
-                var wsToken = _localSettings.Values["WsToken"] as string ?? "";
+                var wsToken = _localSettings?.Values["WsToken"] as string ?? "";
                 WsTokenTextBox.Text = wsToken;
 
                 // Load audio settings
-                var defaultVolume = _localSettings.Values["DefaultVolume"] as double? ?? 50.0;
+                var defaultVolume = _localSettings?.Values["DefaultVolume"] as double? ?? 50.0;
                 DefaultVolumeSlider.Value = defaultVolume;
 
-                var autoAdjustVolume = _localSettings.Values["AutoAdjustVolume"] as bool? ?? true;
+                var autoAdjustVolume = _localSettings?.Values["AutoAdjustVolume"] as bool? ?? true;
                 AutoAdjustVolumeToggle.IsOn = autoAdjustVolume;
 
-                var audioInputDevice = _localSettings.Values["AudioInputDevice"] as string ?? "";
+                var audioInputDevice = _localSettings?.Values["AudioInputDevice"] as string ?? "";
                 AudioInputDeviceTextBox.Text = audioInputDevice;
 
-                var audioOutputDevice = _localSettings.Values["AudioOutputDevice"] as string ?? "";
+                var audioOutputDevice = _localSettings?.Values["AudioOutputDevice"] as string ?? "";
                 AudioOutputDeviceTextBox.Text = audioOutputDevice;
 
                 // Load application settings
-                var autoStart = _localSettings.Values["AutoStart"] as bool? ?? false;
+                var autoStart = _localSettings?.Values["AutoStart"] as bool? ?? false;
                 AutoStartToggle.IsOn = autoStart;
 
-                var minimizeToTray = _localSettings.Values["MinimizeToTray"] as bool? ?? true;
+                var minimizeToTray = _localSettings?.Values["MinimizeToTray"] as bool? ?? true;
                 MinimizeToTrayToggle.IsOn = minimizeToTray;
 
-                var enableLogging = _localSettings.Values["EnableLogging"] as bool? ?? true;
+                var enableLogging = _localSettings?.Values["EnableLogging"] as bool? ?? true;
                 EnableLoggingToggle.IsOn = enableLogging;
 
                 // Load advanced settings
-                var connectionTimeout = _localSettings.Values["ConnectionTimeout"] as double? ?? 10.0;
+                var connectionTimeout = _localSettings?.Values["ConnectionTimeout"] as double? ?? 10.0;
                 ConnectionTimeoutNumberBox.Value = connectionTimeout;
 
-                var audioSampleRate = _localSettings.Values["AudioSampleRate"] as double? ?? 16000.0;
+                var audioSampleRate = _localSettings?.Values["AudioSampleRate"] as double? ?? 16000.0;
                 AudioSampleRateNumberBox.Value = audioSampleRate;
 
-                var audioChannels = _localSettings.Values["AudioChannels"] as double? ?? 1.0;
+                var audioChannels = _localSettings?.Values["AudioChannels"] as double? ?? 1.0;
                 AudioChannelsNumberBox.Value = audioChannels;
 
                 await LoadAudioDevicesAsync();
@@ -173,7 +173,7 @@ namespace XiaoZhi.WinUI.Views
 
         private void DefaultVolumeSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
         {
-            if (sender is Slider slider)
+            if (sender is Slider slider && _localSettings != null)
             {
                 _localSettings.Values["DefaultVolume"] = slider.Value;
             }
