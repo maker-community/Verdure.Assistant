@@ -78,44 +78,43 @@ public sealed partial class HomePage : Page
             _voiceChatService.MessageReceived += OnMessageReceived;
             _voiceChatService.ErrorOccurred += OnErrorOccurred;
         }
-    }
-
+    }    
     #region 事件处理
 
     private void OnDeviceStateChanged(object? sender, DeviceState state)
     {
         this.DispatcherQueue.TryEnqueue(() =>
         {
-            UpdateConnectionState(state == DeviceState.Listening || state == DeviceState.Speaking);
+            // Don't update connection state based on device state!
+            // DeviceState.Idle means "connected but idle", not "disconnected"
+            // Connection state should only be managed by actual connection/disconnection events
             
             switch (state)
             {
                 case DeviceState.Listening:
                     StatusText.Text = "状态: 监听中";
-                    ConnectionStatusText.Text = "在线";
-                    ConnectionIndicator.Background = Application.Current.Resources["SystemFillColorSuccessBrush"] as Microsoft.UI.Xaml.Media.Brush;
+                    // Update emotion/visual indicators but don't touch connection state
+                    SetEmotion("listening");
                     break;
                 case DeviceState.Speaking:
                     StatusText.Text = "状态: 播放中";
-                    ConnectionStatusText.Text = "在线";
-                    ConnectionIndicator.Background = Application.Current.Resources["SystemFillColorSuccessBrush"] as Microsoft.UI.Xaml.Media.Brush;
+                    // Update emotion/visual indicators but don't touch connection state
+                    SetEmotion("speaking");
                     break;
                 case DeviceState.Connecting:
                     StatusText.Text = "状态: 连接中";
-                    ConnectionStatusText.Text = "连接中";
-                    ConnectionIndicator.Background = Application.Current.Resources["SystemFillColorCautionBrush"] as Microsoft.UI.Xaml.Media.Brush;
+                    // Update emotion/visual indicators but don't touch connection state
+                    SetEmotion("thinking");
                     break;
                 case DeviceState.Idle:
                 default:
                     StatusText.Text = "状态: 待机";
-                    ConnectionStatusText.Text = _isConnected ? "在线" : "离线";
-                    ConnectionIndicator.Background = _isConnected ? 
-                        Application.Current.Resources["SystemFillColorSuccessBrush"] as Microsoft.UI.Xaml.Media.Brush :
-                        Application.Current.Resources["SystemFillColorCriticalBrush"] as Microsoft.UI.Xaml.Media.Brush;
+                    // Update emotion/visual indicators but don't touch connection state
+                    SetEmotion("neutral");
                     break;
             }
         });
-    }    private void OnVoiceChatStateChanged(object? sender, bool isActive)
+    }private void OnVoiceChatStateChanged(object? sender, bool isActive)
     {
         this.DispatcherQueue.TryEnqueue(() =>
         {
