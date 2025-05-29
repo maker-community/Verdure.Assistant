@@ -245,12 +245,27 @@ public sealed partial class MainWindow : Window
         {
             _logger?.LogError(ex, "Failed to stop listening");
         }
-    }
-
-    private void ManualButton_PointerCaptureLost(object sender, PointerEventArgs e)
+    }    private void ManualButton_PointerCaptureLost(object sender, PointerEventArgs e)
     {
-        // 当失去指针捕获时也停止监听
-        ManualButton_PointerReleased(sender, null);
+        // 当失去指针捕获时也停止监听 - 直接调用停止逻辑而不依赖PointerReleased
+        _ = Task.Run(async () =>
+        {
+            if (!_isConnected || _voiceChatService == null) return;
+
+            try
+            {
+                await _voiceChatService.StopVoiceChatAsync();
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    ManualButtonText.Text = "按住后说话";
+                    SetEmotion("neutral");
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to stop listening on capture lost");
+            }
+        });
     }
 
     private async void AutoButton_Click(object sender, RoutedEventArgs e)
@@ -354,43 +369,85 @@ public sealed partial class MainWindow : Window
                     break;
             }
         }
-    }
-
-    private async void ConnectButton_Click(object sender, RoutedEventArgs e)
+    }    private async void ConnectButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_voiceChatService != null && !_voiceChatService.IsConnected)
+        if (_voiceChatService != null && _voiceChatService.IsConnected) return;
+
+        try
         {
-            try
+            ConnectButton.IsEnabled = false;
+            UpdateStatusText("连接中...");
+
+            _voiceChatService = App.GetService<IVoiceChatService>();
+            
+            if (_voiceChatService == null)
             {
-                // Initialize and connect - this should be handled in your configuration
-                UpdateStatusText("连接中...");
-                //ConnectButton.IsEnabled = false;
+                throw new InvalidOperationException("VoiceChatService not available from DI container");
             }
-            catch (Exception ex)
+            
+            // 注册事件处理器
+            _voiceChatService.MessageReceived += OnMessageReceived;
+            _voiceChatService.VoiceChatStateChanged += OnVoiceChatStateChanged;
+            _voiceChatService.ErrorOccurred += OnErrorOccurred;
+
+            // 创建配置
+            var config = new XiaoZhiConfig
             {
-                _logger?.LogError(ex, "Failed to connect");
+                ServerUrl = "ws://localhost:8080/ws",
+                UseWebSocket = true,
+                EnableVoice = true,
+                AudioSampleRate = 16000,
+                AudioChannels = 1,
+                AudioFormat = "opus"
+            };
+
+            await _voiceChatService.InitializeAsync(config);
+            
+            if (_voiceChatService.IsConnected)
+            {
+                UpdateStatusText("已连接");
+                ConnectButton.IsEnabled = false;
+                DisconnectButton.IsEnabled = true;
+            }
+            else
+            {
                 UpdateStatusText("连接失败");
-                //ConnectButton.IsEnabled = true;
+                ConnectButton.IsEnabled = true;
+                DisconnectButton.IsEnabled = false;
             }
         }
-    }
-
-    private async void DisconnectButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (_voiceChatService != null && _voiceChatService.IsConnected)
+        catch (Exception ex)
         {
-            try
+            _logger?.LogError(ex, "Failed to connect");
+            UpdateStatusText("连接失败");
+            ConnectButton.IsEnabled = true;
+            DisconnectButton.IsEnabled = false;
+        }
+    }    private async void DisconnectButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_voiceChatService == null || !_voiceChatService.IsConnected) return;
+
+        try
+        {
+            DisconnectButton.IsEnabled = false;
+            
+            if (_voiceChatService.IsVoiceChatActive)
             {
                 await _voiceChatService.StopVoiceChatAsync();
-                // Disconnect logic would go here
-                UpdateStatusText("已断开");
-                //ConnectButton.IsEnabled = true;
-                //DisconnectButton.IsEnabled = false;
             }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to disconnect");
-            }
+            
+            _voiceChatService.Dispose();
+            _voiceChatService = null;
+            
+            UpdateStatusText("已断开");
+            ConnectButton.IsEnabled = true;
+            DisconnectButton.IsEnabled = false;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to disconnect");
+            UpdateStatusText("断开失败");
+            DisconnectButton.IsEnabled = true;
         }
     }
 
@@ -408,13 +465,11 @@ public sealed partial class MainWindow : Window
                 _logger?.LogError(ex, "Failed to send message");
             }
         }
-    }
-
-    private async void MessageTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
+    }    private void MessageTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (e.Key == Windows.System.VirtualKey.Enter)
         {
-            SendButton_Click(sender, null);
+            SendButton_Click(sender, new RoutedEventArgs());
         }
     }
 

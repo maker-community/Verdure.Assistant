@@ -330,15 +330,16 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
-
-                            <!--  Connection Controls  -->
-                            <!--<UniformGrid
-                                Grid.Row="0"
-                                Margin="0,0,0,15"
-                                Columns="2">
+                            </Grid.RowDefinitions>                            <!--  Connection Controls  -->
+                            <Grid Grid.Row="0" Margin="0,0,0,15">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                
                                 <Button
                                     x:Name="ConnectButton"
+                                    Grid.Column="0"
                                     Height="36"
                                     Margin="0,0,5,0"
                                     Click="ConnectButton_Click"
@@ -354,17 +355,17 @@
 
                                 <Button
                                     x:Name="DisconnectButton"
+                                    Grid.Column="1"
                                     Height="36"
                                     Margin="5,0,0,0"
                                     Click="DisconnectButton_Click"
-                                    IsEnabled="False"
-                                    Style="{ThemeResource SubtleButtonStyle}">
+                                    IsEnabled="False">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <FontIcon FontSize="16" Glyph="&#xE711;" />
                                         <TextBlock Text="断开" />
                                     </StackPanel>
                                 </Button>
-                            </UniformGrid>-->
+                            </Grid>
 
                             <!--  Text Input  -->
                             <Grid Grid.Row="1" Margin="0,0,0,15">
