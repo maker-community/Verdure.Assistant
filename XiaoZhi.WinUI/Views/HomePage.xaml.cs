@@ -18,7 +18,8 @@ namespace XiaoZhi.WinUI.Views;
 /// 首页 - 语音对话界面
 /// </summary>
 public sealed partial class HomePage : Page
-{    private readonly ILogger<HomePage>? _logger;
+{    
+    private readonly ILogger<HomePage>? _logger;
     private readonly IVoiceChatService? _voiceChatService;
     private readonly EmotionManager? _emotionManager;
     private InterruptManager? _interruptManager;
@@ -29,12 +30,12 @@ public sealed partial class HomePage : Page
     public HomePage()
     {
         this.InitializeComponent();
-        
-        try
+          try
         {
             _logger = App.GetService<ILogger<HomePage>>();
             _voiceChatService = App.GetService<IVoiceChatService>();
             _emotionManager = App.GetService<EmotionManager>();
+            _interruptManager = App.GetService<InterruptManager>();
         }
         catch (Exception ex)
         {
@@ -63,9 +64,8 @@ public sealed partial class HomePage : Page
 
         // 设置初始表情
         SetEmotion("neutral");
-    }
-
-    private void BindEvents()
+    }    
+    private async void BindEvents()
     {
         // 页面事件
         this.Unloaded += HomePage_Unloaded;
@@ -78,7 +78,28 @@ public sealed partial class HomePage : Page
             _voiceChatService.MessageReceived += OnMessageReceived;
             _voiceChatService.ErrorOccurred += OnErrorOccurred;
         }
-    }    
+
+        // 初始化和绑定InterruptManager事件
+        if (_interruptManager != null)
+        {           
+            try
+            {
+                await _interruptManager.InitializeAsync();
+                _interruptManager.InterruptTriggered += OnInterruptTriggered;
+                _logger?.LogInformation("InterruptManager initialized successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to initialize InterruptManager");
+            }
+        }
+    }
+
+    private void OnInterruptTriggered(object? sender, InterruptEventArgs e)
+    {
+        //throw new NotImplementedException();
+    }
+
     #region 事件处理
 
     private void OnDeviceStateChanged(object? sender, DeviceState state)
@@ -478,7 +499,8 @@ public sealed partial class HomePage : Page
             _logger?.LogError(ex, "Failed to stop manual voice chat");
             AddMessage($"停止录音失败: {ex.Message}", true);
         }
-    }    private async void AutoButton_Click(object sender, RoutedEventArgs e)
+    }   
+    private async void AutoButton_Click(object sender, RoutedEventArgs e)
     {
         if (_voiceChatService == null || !_isConnected) return;
 
@@ -587,6 +609,42 @@ public sealed partial class HomePage : Page
             VolumeSlider.Value = 0;
             MuteIcon.Glyph = "\uE74F"; // Mute icon
         }
+    }  
+    
+    #endregion
+
+    #region 中断处理
+
+    private async void OnInterruptRequested(object? sender, string reason)
+    {
+        this.DispatcherQueue.TryEnqueue(async () =>
+        {
+            try
+            {
+                _logger?.LogInformation($"Interrupt requested: {reason}");
+                
+                // 如果正在说话或监听，立即停止
+                if (_isListening && _voiceChatService != null)
+                {
+                    await _voiceChatService.StopVoiceChatAsync();
+                    _logger?.LogInformation("Voice chat stopped due to interrupt");
+                }
+                
+                // 更新UI状态
+                TtsText.Text = $"已中断: {reason}";
+                SetEmotion("neutral");
+                
+                // 如果是在自动模式，重置按钮状态
+                if (_isAutoMode && AutoButtonText != null)
+                {
+                    AutoButtonText.Text = "开始对话";
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error handling interrupt request");
+            }
+        });
     }
 
     #endregion
