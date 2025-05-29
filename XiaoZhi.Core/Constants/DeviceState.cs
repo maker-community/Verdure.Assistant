@@ -45,9 +45,7 @@ namespace XiaoZhi.Core.Constants
         /// 手动控制
         /// </summary>
         Manual
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// 中止原因枚举，对应Python中的AbortReason
     /// </summary>
     public enum AbortReason
@@ -63,8 +61,33 @@ namespace XiaoZhi.Core.Constants
         WakeWordDetected,
 
         /// <summary>
-        /// 用户中断
+        /// 用户中断（手动点击按钮）
         /// </summary>
-        UserInterruption
+        UserInterruption,
+
+        /// <summary>
+        /// 语音中断（VAD检测到用户说话）
+        /// </summary>
+        VoiceInterruption,
+
+        /// <summary>
+        /// 键盘中断（F3快捷键）
+        /// </summary>
+        KeyboardInterruption,
+
+        /// <summary>
+        /// 系统错误导致的中断
+        /// </summary>
+        SystemError,
+
+        /// <summary>
+        /// 网络连接中断
+        /// </summary>
+        NetworkError,
+
+        /// <summary>
+        /// 音频设备错误
+        /// </summary>
+        AudioDeviceError
     }
 }

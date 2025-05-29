@@ -8,82 +8,96 @@ using XiaoZhi.WinUI.Services;
 using XiaoZhi.Core.Services;
 using XiaoZhi.Core.Interfaces;
 
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
+namespace XiaoZhi.WinUI;
 
-namespace XiaoZhi.WinUI
+/// <summary>
+/// Provides application-specific behavior to supplement the default Application class.
+/// </summary>
+public partial class App : Application
 {
+    private IHost? _host;
+
     /// <summary>
-    /// Provides application-specific behavior to supplement the default Application class.
+    /// Gets the main window instance
     /// </summary>
-    public partial class App : Application
+    public static Window? MainWindow { get; private set; }
+
+    /// <summary>
+    /// Initializes the singleton application object.  This is the first line of authored code
+    /// executed, and as such is the logical equivalent of main() or WinMain().
+    /// </summary>
+    public App()
     {
-        private IHost? _host;
-        
-        /// <summary>
-        /// Gets the main window instance
-        /// </summary>
-        public static Window? MainWindow { get; private set; }
+        InitializeComponent();
+    }
 
-        /// <summary>
-        /// Initializes the singleton application object.  This is the first line of authored code
-        /// executed, and as such is the logical equivalent of main() or WinMain().
-        /// </summary>
-        public App()
+    /// <summary>
+    /// Invoked when the application is launched.
+    /// </summary>
+    /// <param name="args">Details about the launch request and process.</param>
+    protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
+    {
+        // Configure services
+        _host = Host.CreateDefaultBuilder()
+            .ConfigureServices(ConfigureServices)
+            .Build();
+
+        // Start the host
+        _ = _host.StartAsync();
+
+        MainWindow = new MainWindow();
+        MainWindow.Activate();
+    }
+    private void ConfigureServices(IServiceCollection services)
+    {
+        // Logging
+        services.AddLogging(builder =>
         {
-            this.InitializeComponent();
-        }
+            builder.AddConsole();
+            builder.AddDebug();
+            builder.SetMinimumLevel(LogLevel.Information);
+        });
 
-        /// <summary>
-        /// Invoked when the application is launched.
-        /// </summary>
-        /// <param name="args">Details about the launch request and process.</param>
-        protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
+        // Core services
+        services.AddSingleton<IVerificationService, VerificationService>();
+        services.AddSingleton<IConfigurationService, ConfigurationService>();
+
+        // Audio services
+        services.AddSingleton<IAudioRecorder, NAudioRecorder>();
+        services.AddSingleton<IAudioPlayer, NAudioPlayer>();
+        services.AddSingleton<IAudioCodec, OpusAudioCodec>();
+
+        // Communication services
+        services.AddSingleton<ICommunicationClient, MqttNetClient>(provider =>
         {
-            // Build and start the host
-            _host = CreateHostBuilder().Build();
-            _host.StartAsync();
+            var logger = provider.GetService<ILogger<MqttNetClient>>();
+            return new MqttNetClient("localhost", 1883, "winui-client", "xiaozhi/chat", logger);
+        });
 
-            MainWindow = new Views.MainWindow();
-            MainWindow.Activate();
-        }
+        // Voice chat service
+        services.AddSingleton<IVoiceChatService, VoiceChatService>();
 
-        private static IHostBuilder CreateHostBuilder() =>
-            Host.CreateDefaultBuilder()
-                .ConfigureServices((context, services) =>
-                {
-                    // Configure logging
-                    services.AddLogging(builder =>
-                    {
-                        builder.AddConsole();
-                        builder.SetMinimumLevel(LogLevel.Information);
-                    });
-                    
-                    // Register ViewModels
-                    services.AddTransient<MainWindowViewModel>();                    // Register core services
-                    services.AddSingleton<IVerificationService, VerificationService>();
-                    services.AddSingleton<IConfigurationService, ConfigurationService>();
-                    services.AddSingleton<IAudioRecorder, NAudioRecorder>();
-                    services.AddSingleton<IAudioPlayer, NAudioPlayer>(provider =>
-                    {
-                        var logger = provider.GetService<ILogger<NAudioPlayer>>();
-                        return new NAudioPlayer(logger);
-                    });
-                    services.AddSingleton<IAudioCodec, OpusAudioCodec>();
-                    services.AddSingleton<ICommunicationClient, MqttNetClient>(provider =>
-                    {
-                        var logger = provider.GetService<ILogger<MqttNetClient>>();
-                        return new MqttNetClient("localhost", 1883, "winui-client", "xiaozhi/chat", logger);
-                    });
-                    services.AddSingleton<IVoiceChatService, VoiceChatService>();
-                });
+        // Interrupt manager and related services
+        services.AddSingleton<InterruptManager>();
 
-        /// <summary>
-        /// Gets a service of the specified type from the dependency injection container
-        /// </summary>
-        public static T? GetService<T>() where T : class
-        {
-            return ((App)Current)?._host?.Services.GetService<T>();
-        }
+        // Emotion Manager
+        services.AddSingleton<EmotionManager>();
+
+        // ViewModels
+        //services.AddTransient<HomePageViewModel>();
+        //services.AddTransient<MainViewModel>();
+
+        // Views
+        services.AddTransient<HomePage>();
+        services.AddTransient<SettingsPage>();
+        services.AddTransient<MainWindow>();
+    }
+
+    /// <summary>
+    /// Gets a service of the specified type from the dependency injection container
+    /// </summary>
+    public static T? GetService<T>() where T : class
+    {
+        return ((App)Current)?._host?.Services.GetService<T>();
     }
 }
