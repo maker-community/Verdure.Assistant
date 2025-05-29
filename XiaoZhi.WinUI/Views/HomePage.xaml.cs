@@ -62,7 +62,7 @@ public sealed partial class HomePage : Page
         SwitchToManualMode();
 
         // 设置初始表情
-        _ = SetEmotion("neutral");
+        SetEmotion("neutral");
     }
 
     private void BindEvents()
@@ -115,14 +115,25 @@ public sealed partial class HomePage : Page
                     break;
             }
         });
-    }
-
-    private void OnVoiceChatStateChanged(object? sender, bool isActive)
+    }    private void OnVoiceChatStateChanged(object? sender, bool isActive)
     {
         this.DispatcherQueue.TryEnqueue(() =>
         {
             _isListening = isActive;
             UpdateUIForVoiceChatState(isActive);
+            
+            // Update auto button text when in auto mode
+            if (_isAutoMode && AutoButtonText != null)
+            {
+                if (_voiceChatService?.KeepListening == true && _isListening)
+                {
+                    AutoButtonText.Text = "停止对话";
+                }
+                else if (_voiceChatService?.KeepListening == false || !_isListening)
+                {
+                    AutoButtonText.Text = "开始对话";
+                }
+            }
         });
     }
 
@@ -230,12 +241,12 @@ public sealed partial class HomePage : Page
         if (isActive)
         {
             ShowMicrophoneVisualizer(true);
-            _ = SetEmotion("listening");
+            SetEmotion("listening");
         }
         else
         {
             ShowMicrophoneVisualizer(false);
-            _ = SetEmotion("neutral");
+            SetEmotion("neutral");
         }
     }
 
@@ -245,15 +256,25 @@ public sealed partial class HomePage : Page
         if (ManualButton != null) ManualButton.Visibility = Visibility.Visible;
         if (AutoButton != null) AutoButton.Visibility = Visibility.Collapsed;
         if (ModeToggleText != null) ModeToggleText.Text = "手动对话";
-    }
-
-    private void SwitchToAutoMode()
+    }    private void SwitchToAutoMode()
     {
         _isAutoMode = true;
         if (ManualButton != null) ManualButton.Visibility = Visibility.Collapsed;
         if (AutoButton != null) AutoButton.Visibility = Visibility.Visible;
         if (ModeToggleText != null) ModeToggleText.Text = "自动对话";
-        if (AutoButtonText != null) AutoButtonText.Text = _isListening ? "停止对话" : "开始对话";
+        
+        // Update button text based on current listening state and auto mode
+        if (AutoButtonText != null) 
+        {
+            if (_voiceChatService?.KeepListening == true && _isListening)
+            {
+                AutoButtonText.Text = "停止对话";
+            }
+            else
+            {
+                AutoButtonText.Text = "开始对话";
+            }
+        }
     }
 
     private void UpdateModeUI(bool isAutoMode)
@@ -318,15 +339,14 @@ public sealed partial class HomePage : Page
         {
             VolumeText.Text = $"{(int)value}%";
         }
-    }
-
-    private async Task SetEmotion(string emotionName)
+    }    
+    private void SetEmotion(string emotionName)
     {
         try
         {
             if (_emotionManager != null && DefaultEmotionText != null)
             {
-                var emoji =  _emotionManager.GetEmotionEmoji(emotionName);
+                var emoji = _emotionManager.GetEmotionEmoji(emotionName);
                 DefaultEmotionText.Text = emoji;
             }
         }
@@ -444,9 +464,7 @@ public sealed partial class HomePage : Page
             _logger?.LogError(ex, "Failed to stop manual voice chat");
             AddMessage($"停止录音失败: {ex.Message}", true);
         }
-    }
-
-    private async void AutoButton_Click(object sender, RoutedEventArgs e)
+    }    private async void AutoButton_Click(object sender, RoutedEventArgs e)
     {
         if (_voiceChatService == null || !_isConnected) return;
 
@@ -454,13 +472,17 @@ public sealed partial class HomePage : Page
         {
             if (!_isListening)
             {
-                await _voiceChatService.StartVoiceChatAsync();
+                // Enable auto mode and start the conversation
+                _voiceChatService.KeepListening = true;
+                await _voiceChatService.ToggleChatStateAsync();
                 AutoButtonText.Text = "停止对话";
                 AddMessage("自动对话已开始");
             }
             else
             {
-                await _voiceChatService.StopVoiceChatAsync();
+                // Disable auto mode and stop the conversation
+                _voiceChatService.KeepListening = false;
+                await _voiceChatService.ToggleChatStateAsync();
                 AutoButtonText.Text = "开始对话";
                 AddMessage("自动对话已停止");
             }
@@ -477,11 +499,10 @@ public sealed partial class HomePage : Page
         try
         {
             if (_voiceChatService != null && _isListening)
-            {
-                await _voiceChatService.StopVoiceChatAsync();
+            {                await _voiceChatService.StopVoiceChatAsync();
                 AddMessage("已中断当前操作");
                 TtsText.Text = "待命";
-                await SetEmotion("neutral");
+                SetEmotion("neutral");
             }
         }
         catch (Exception ex)
