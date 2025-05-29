@@ -93,11 +93,121 @@ public sealed partial class HomePage : Page
                 _logger?.LogError(ex, "Failed to initialize InterruptManager");
             }
         }
+    }    
+    private async void OnInterruptTriggered(object? sender, InterruptEventArgs e)
+    {
+        try
+        {
+            _logger?.LogInformation("Interrupt triggered: {Reason} - {Description}", e.Reason, e.Description);
+
+            this.DispatcherQueue.TryEnqueue(async () =>
+            {
+                try
+                {
+                    await HandleInterrupt(e.Reason, e.Description);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Failed to handle interrupt in UI thread");
+                    AddMessage($"处理打断时出错: {ex.Message}", true);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to process interrupt event");
+        }
     }
 
-    private void OnInterruptTriggered(object? sender, InterruptEventArgs e)
+    private async Task HandleInterrupt(AbortReason reason, string description)
     {
-        //throw new NotImplementedException();
+        if (_voiceChatService == null)
+        {
+            _logger?.LogWarning("VoiceChatService is null, cannot handle interrupt");
+            return;
+        }
+
+        var currentState = _voiceChatService.CurrentState;
+        _logger?.LogInformation("Handling interrupt {Reason} in state {State}", reason, currentState);
+
+        // Add user feedback message
+        AddMessage($"[打断] {description}", false);
+
+        switch (reason)
+        {
+            case AbortReason.VoiceInterruption:
+                // VAD detected user speech during AI response - abort speaking
+                if (currentState == DeviceState.Speaking)
+                {
+                    await _voiceChatService.StopVoiceChatAsync();
+                    _logger?.LogInformation("Voice chat stopped due to voice interruption");
+                    
+                    // Auto-restart listening if in auto mode (like py-xiaozhi)
+                    if (_voiceChatService.KeepListening)
+                    {
+                        // Brief delay then restart listening (matches py-xiaozhi pattern)
+                        await Task.Delay(200);
+                        if (_voiceChatService.CurrentState == DeviceState.Idle)
+                        {
+                            await _voiceChatService.StartVoiceChatAsync();
+                            _logger?.LogInformation("Auto-restarted listening after voice interrupt");
+                        }
+                    }
+                }
+                break;
+
+            case AbortReason.KeyboardInterruption:
+            case AbortReason.UserInterruption:
+                // F3 key or manual interrupt - handle based on current state
+                switch (currentState)
+                {
+                    case DeviceState.Speaking:
+                        // Abort current speaking
+                        await _voiceChatService.StopVoiceChatAsync();
+                        _logger?.LogInformation("Voice chat stopped due to user interrupt");
+                        break;
+
+                    case DeviceState.Listening:
+                        // Stop listening
+                        await _voiceChatService.StopVoiceChatAsync();
+                        _logger?.LogInformation("Listening stopped due to user interrupt");
+                        break;
+
+                    case DeviceState.Idle:
+                        // If in auto mode, this might toggle chat state (like py-xiaozhi F3 behavior)
+                        if (_isAutoMode)
+                        {
+                            await _voiceChatService.ToggleChatStateAsync();
+                            _logger?.LogInformation("Toggled chat state due to user interrupt in idle");
+                        }
+                        break;
+                }
+                break;
+
+            case AbortReason.WakeWordDetected:
+                // Wake word detected - handle like py-xiaozhi wake word behavior
+                switch (currentState)
+                {
+                    case DeviceState.Speaking:
+                        // Abort speaking and start listening
+                        await _voiceChatService.StopVoiceChatAsync();
+                        await Task.Delay(100); // Brief pause
+                        await _voiceChatService.StartVoiceChatAsync();
+                        _logger?.LogInformation("Switched from speaking to listening due to wake word");
+                        break;
+
+                    case DeviceState.Idle:
+                        // Start listening
+                        await _voiceChatService.StartVoiceChatAsync();
+                        _logger?.LogInformation("Started listening due to wake word");
+                        break;
+                }
+                break;
+
+            default:
+                _logger?.LogWarning("Unhandled interrupt reason: {Reason}", reason);
+                break;
+        }
     }
 
     #region 事件处理
