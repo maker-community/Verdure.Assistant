@@ -2,10 +2,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
-using XiaoZhi.Core.Interfaces;
-using XiaoZhi.Core.Services;
 using XiaoZhi.WinUI.Views;
 using XiaoZhi.WinUI.ViewModels;
+using XiaoZhi.WinUI.Services;
+using XiaoZhi.Core.Services;
+using XiaoZhi.Core.Interfaces;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -59,15 +60,14 @@ namespace XiaoZhi.WinUI
                     });
                     
                     // Register ViewModels
-                    services.AddTransient<MainWindowViewModel>();
-                      // Register core services
+                    services.AddTransient<MainWindowViewModel>();                    // Register core services
                     services.AddSingleton<IVerificationService, VerificationService>();
                     services.AddSingleton<IConfigurationService, ConfigurationService>();
-                    services.AddSingleton<IAudioRecorder, PortAudioRecorder>();
-                    services.AddSingleton<IAudioPlayer, PortAudioPlayer>(provider =>
+                    services.AddSingleton<IAudioRecorder, NAudioRecorder>();
+                    services.AddSingleton<IAudioPlayer, NAudioPlayer>(provider =>
                     {
-                        var logger = provider.GetService<ILogger<PortAudioPlayer>>();
-                        return new PortAudioPlayer(logger);
+                        var logger = provider.GetService<ILogger<NAudioPlayer>>();
+                        return new NAudioPlayer(logger);
                     });
                     services.AddSingleton<IAudioCodec, OpusAudioCodec>();
                     services.AddSingleton<ICommunicationClient, MqttNetClient>(provider =>
