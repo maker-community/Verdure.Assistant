@@ -18,12 +18,10 @@ namespace XiaoZhi.WinUI.Views
         private IVoiceChatService? _voiceChatService;
         private readonly ObservableCollection<ChatMessageItem> _messages = new();
         private bool _isConnected = false;
-        private bool _isVoiceChatActive = false;
-
-        public MainPage()
+        private bool _isVoiceChatActive = false;        public MainPage()
         {
             this.InitializeComponent();
-            MessagesListView.ItemsSource = _messages;
+            this.MessagesListView.ItemsSource = _messages;
         }
 
         private async void ConnectButton_Click(object sender, RoutedEventArgs e)
@@ -209,9 +207,7 @@ namespace XiaoZhi.WinUI.Views
             {
                 AddSystemMessage($"错误: {error}");
             });
-        }
-
-        private void UpdateConnectionUI()
+        }        private void UpdateConnectionUI()
         {
             ConnectButton.IsEnabled = !_isConnected;
             DisconnectButton.IsEnabled = _isConnected;
@@ -219,6 +215,19 @@ namespace XiaoZhi.WinUI.Views
             VoiceChatButton.IsEnabled = _isConnected;
             MessageTextBox.IsEnabled = _isConnected;
             SendButton.IsEnabled = _isConnected;
+            
+            // 更新连接状态文本
+            if (_isConnected)
+            {
+                ConnectionStatusText.Text = "已连接";
+            }
+            else
+            {
+                ConnectionStatusText.Text = "未连接";
+                // 重置语音对话状态
+                _isVoiceChatActive = false;
+                UpdateVoiceChatUI();
+            }
         }
 
         private void UpdateVoiceChatUI()

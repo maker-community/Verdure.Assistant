@@ -20,13 +20,10 @@ public sealed partial class MainWindow : Window
 {
     private readonly ILogger<MainWindow>? _logger;
     private IVoiceChatService? _voiceChatService;
-    private EmotionManager? _emotionManager;
-
-    // UI 状态
+    private EmotionManager? _emotionManager;    // UI 状态
     private bool _isAutoMode = false;
     private bool _isConnected = false;
     private bool _isListening = false;
-    private bool _isSpeaking = false;
 
     public MainWindow()
     {
@@ -175,11 +172,12 @@ public sealed partial class MainWindow : Window
     private void UpdateTtsText(string text)
     {
         TtsText.Text = text;
-    }
-
-    private void UpdateUIForDeviceState(DeviceState state)
+    }    private void UpdateUIForDeviceState(DeviceState state)
     {
         _isConnected = state != DeviceState.Idle;
+
+        // 更新连接状态UI
+        UpdateConnectionUI();
 
         // 根据状态更新UI
         switch (state)
@@ -208,6 +206,70 @@ public sealed partial class MainWindow : Window
         else
         {
             SetEmotion("neutral");
+        }
+    }
+
+    private void UpdateConnectionUI()
+    {
+        // 更新连接指示器
+        if (ConnectionIndicator != null)
+        {
+            var brush = _isConnected 
+                ? App.Current.Resources["SystemFillColorSuccessBrush"] as Microsoft.UI.Xaml.Media.Brush
+                : App.Current.Resources["SystemFillColorCriticalBrush"] as Microsoft.UI.Xaml.Media.Brush;
+            
+            if (brush != null)
+            {
+                ConnectionIndicator.Background = brush;
+            }
+        }
+
+        // 更新连接状态文本
+        if (ConnectionStatusText != null)
+        {
+            ConnectionStatusText.Text = _isConnected ? "在线" : "离线";
+        }
+
+        // 更新按钮状态
+        if (ConnectButton != null)
+        {
+            ConnectButton.IsEnabled = !_isConnected;
+        }
+        
+        if (DisconnectButton != null)
+        {
+            DisconnectButton.IsEnabled = _isConnected;
+        }
+
+        // 更新其他控件状态
+        if (ManualButton != null)
+        {
+            ManualButton.IsEnabled = _isConnected;
+        }
+        
+        if (AutoButton != null)
+        {
+            AutoButton.IsEnabled = _isConnected;
+        }
+        
+        if (AbortButton != null)
+        {
+            AbortButton.IsEnabled = _isConnected;
+        }
+        
+        if (ModeToggleButton != null)
+        {
+            ModeToggleButton.IsEnabled = _isConnected;
+        }
+        
+        if (MessageTextBox != null)
+        {
+            MessageTextBox.IsEnabled = _isConnected;
+        }
+        
+        if (SendButton != null)
+        {
+            SendButton.IsEnabled = _isConnected;
         }
     }
 
@@ -377,6 +439,10 @@ public sealed partial class MainWindow : Window
         {
             ConnectButton.IsEnabled = false;
             UpdateStatusText("连接中...");
+            
+            // 更新连接状态
+            _isConnected = false;
+            UpdateConnectionUI();
 
             _voiceChatService = App.GetService<IVoiceChatService>();
             
@@ -389,6 +455,8 @@ public sealed partial class MainWindow : Window
             _voiceChatService.MessageReceived += OnMessageReceived;
             _voiceChatService.VoiceChatStateChanged += OnVoiceChatStateChanged;
             _voiceChatService.ErrorOccurred += OnErrorOccurred;
+            _voiceChatService.DeviceStateChanged += OnDeviceStateChanged;
+            _voiceChatService.ListeningModeChanged += OnListeningModeChanged;
 
             // 创建配置
             var config = new XiaoZhiConfig
@@ -403,25 +471,29 @@ public sealed partial class MainWindow : Window
 
             await _voiceChatService.InitializeAsync(config);
             
-            if (_voiceChatService.IsConnected)
+            // 更新连接状态
+            _isConnected = _voiceChatService.IsConnected;
+            
+            if (_isConnected)
             {
                 UpdateStatusText("已连接");
-                ConnectButton.IsEnabled = false;
-                DisconnectButton.IsEnabled = true;
+                SetEmotion("happy");
             }
             else
             {
                 UpdateStatusText("连接失败");
-                ConnectButton.IsEnabled = true;
-                DisconnectButton.IsEnabled = false;
+                SetEmotion("sad");
             }
+            
+            UpdateConnectionUI();
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to connect");
             UpdateStatusText("连接失败");
-            ConnectButton.IsEnabled = true;
-            DisconnectButton.IsEnabled = false;
+            _isConnected = false;
+            UpdateConnectionUI();
+            SetEmotion("sad");
         }
     }    private async void DisconnectButton_Click(object sender, RoutedEventArgs e)
     {
@@ -430,18 +502,46 @@ public sealed partial class MainWindow : Window
         try
         {
             DisconnectButton.IsEnabled = false;
+            UpdateStatusText("断开中...");
             
             if (_voiceChatService.IsVoiceChatActive)
             {
                 await _voiceChatService.StopVoiceChatAsync();
             }
             
+            // 清理事件订阅
+            _voiceChatService.MessageReceived -= OnMessageReceived;
+            _voiceChatService.VoiceChatStateChanged -= OnVoiceChatStateChanged;
+            _voiceChatService.ErrorOccurred -= OnErrorOccurred;
+            _voiceChatService.DeviceStateChanged -= OnDeviceStateChanged;
+            _voiceChatService.ListeningModeChanged -= OnListeningModeChanged;
+            
             _voiceChatService.Dispose();
             _voiceChatService = null;
+              // 重置所有状态
+            _isConnected = false;
+            _isListening = false;
             
+            // 重置UI到初始状态
             UpdateStatusText("已断开");
-            ConnectButton.IsEnabled = true;
-            DisconnectButton.IsEnabled = false;
+            UpdateTtsText("待命");
+            SetEmotion("neutral");
+            
+            // 重置按钮文本
+            if (ManualButtonText != null)
+            {
+                ManualButtonText.Text = "按住后说话";
+            }
+            
+            if (AutoButtonText != null)
+            {
+                AutoButtonText.Text = "开始对话";
+            }
+            
+            // 切换回手动模式
+            SwitchToManualMode();
+            
+            UpdateConnectionUI();
         }
         catch (Exception ex)
         {
