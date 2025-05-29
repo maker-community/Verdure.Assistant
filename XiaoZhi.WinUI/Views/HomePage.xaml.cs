@@ -114,7 +114,8 @@ public sealed partial class HomePage : Page
                     break;
             }
         });
-    }private void OnVoiceChatStateChanged(object? sender, bool isActive)
+    }
+    private void OnVoiceChatStateChanged(object? sender, bool isActive)
     {
         this.DispatcherQueue.TryEnqueue(() =>
         {
@@ -357,8 +358,7 @@ public sealed partial class HomePage : Page
 
     #endregion
 
-    #region 按钮事件处理
-
+    #region 按钮事件处理    
     private async void ConnectButton_Click(object sender, RoutedEventArgs e)
     {
         if (_isConnected || _voiceChatService == null) return;
@@ -381,12 +381,27 @@ public sealed partial class HomePage : Page
                 AudioFormat = "opus"
             };
             await _voiceChatService.InitializeAsync(config);
-            AddMessage("连接成功");
+            
+            // Use the service's IsConnected property to determine actual connection state
+            bool isConnected = _voiceChatService.IsConnected;
+            UpdateConnectionState(isConnected);
+            
+            if (isConnected)
+            {
+                AddMessage("连接成功");
+                StatusText.Text = "状态: 已连接";
+            }
+            else
+            {
+                AddMessage("连接失败: 服务未连接", true);
+                ConnectButton.IsEnabled = true;
+            }
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to connect to voice chat service");
             AddMessage($"连接失败: {ex.Message}", true);
+            UpdateConnectionState(false);
             ConnectButton.IsEnabled = true;
         }
     }
