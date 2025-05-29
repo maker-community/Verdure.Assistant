@@ -55,20 +55,52 @@
             Grid.Row="1"
             Margin="0,0,0,20"
             HorizontalAlignment="Center"
-            Orientation="Horizontal"
+            Orientation="Vertical"
             Spacing="15">
-            <ToggleSwitch
-                x:Name="EnableVoiceChatToggle"
-                Header="启用语音对话"
-                IsEnabled="False"
-                IsOn="True" />
 
-            <Button
-                x:Name="VoiceChatButton"
-                MinWidth="120"
-                Click="VoiceChatButton_Click"
-                Content="开始语音对话"
-                IsEnabled="False" />
+            <!--  第一行：连接和基本语音控制  -->
+            <StackPanel
+                HorizontalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="15">
+                <ToggleSwitch
+                    x:Name="EnableVoiceChatToggle"
+                    Header="启用语音对话"
+                    IsEnabled="False"
+                    IsOn="True" />
+
+                <Button
+                    x:Name="VoiceChatButton"
+                    MinWidth="120"
+                    Click="VoiceChatButton_Click"
+                    Content="开始语音对话"
+                    IsEnabled="False" />
+            </StackPanel>
+
+            <!--  第二行：自动对话模式控制  -->
+            <StackPanel
+                HorizontalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="15">
+                <ToggleSwitch
+                    x:Name="AutoDialogueToggle"
+                    Header="自动对话模式"
+                    IsEnabled="False"
+                    Toggled="AutoDialogueToggle_Toggled" />
+
+                <Button
+                    x:Name="ToggleChatStateButton"
+                    MinWidth="120"
+                    Click="ToggleChatStateButton_Click"
+                    Content="切换对话状态"
+                    IsEnabled="False" />
+
+                <TextBlock
+                    x:Name="DeviceStateText"
+                    VerticalAlignment="Center"
+                    FontWeight="SemiBold"
+                    Text="状态: 未连接" />
+            </StackPanel>
         </StackPanel>
 
         <!--  消息列表  -->
@@ -82,26 +114,27 @@
                 <ListView.ItemTemplate>
                     <DataTemplate>
                         <Border
-                            x:Name="MessageBorder"
                             Margin="0,5"
                             Padding="15,10"
+                            HorizontalAlignment="{Binding MessageAlignment}"
+                            Background="{Binding BackgroundBrush}"
                             CornerRadius="10">
                             <StackPanel>
                                 <TextBlock
-                                    x:Name="RoleText"
                                     Margin="0,0,0,5"
                                     FontSize="12"
-                                    Opacity="0.8" />
+                                    Opacity="0.8"
+                                    Text="{Binding DisplayRole}" />
                                 <TextBlock
-                                    x:Name="ContentText"
                                     FontSize="14"
+                                    Text="{Binding Content}"
                                     TextWrapping="Wrap" />
                                 <TextBlock
-                                    x:Name="TimestampText"
                                     Margin="0,5,0,0"
                                     HorizontalAlignment="Right"
                                     FontSize="10"
-                                    Opacity="0.6" />
+                                    Opacity="0.6"
+                                    Text="{Binding TimeString}" />
                             </StackPanel>
                         </Border>
                     </DataTemplate>
