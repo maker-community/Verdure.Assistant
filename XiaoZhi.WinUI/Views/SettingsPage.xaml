@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="XiaoZhi.WinUI.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <ScrollViewer Padding="20" VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="600" Spacing="20">
+
+            <!--  Page Title  -->
+            <TextBlock
+                Margin="0,0,0,10"
+                FontSize="24"
+                FontWeight="Bold"
+                Text="设置" />
+
+            <!--  Wake Word Settings  -->
+            <Expander Header="唤醒词设置" IsExpanded="True">
+                <StackPanel Padding="0,12,0,0" Spacing="12">
+                    <ToggleSwitch
+                        x:Name="WakeWordToggle"
+                        Header="启用唤醒词唤醒"
+                        IsOn="False"
+                        Toggled="WakeWordToggle_Toggled" />
+
+                    <TextBox
+                        x:Name="WakeWordsTextBox"
+                        Header="唤醒词 (多个唤醒词请用英文逗号 ',' 分隔)"
+                        PlaceholderText="例如: 小智,小智同学"
+                        Text="" />
+                </StackPanel>
+            </Expander>
+
+            <!--  Device Settings  -->
+            <Expander Header="设备设置" IsExpanded="True">
+                <StackPanel Padding="0,12,0,0" Spacing="12">
+                    <TextBox
+                        x:Name="DeviceIdTextBox"
+                        Header="Device ID"
+                        PlaceholderText="输入设备ID" />
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock
+                            Grid.Row="0"
+                            Grid.ColumnSpan="2"
+                            Margin="0,0,0,8"
+                            Text="OTA地址:" />
+
+                        <ComboBox
+                            x:Name="OtaProtocolComboBox"
+                            Grid.Row="1"
+                            Grid.Column="0"
+                            MinWidth="100"
+                            Margin="0,0,8,0"
+                            SelectedIndex="0">
+                            <ComboBoxItem Content="https://" />
+                            <ComboBoxItem Content="http://" />
+                        </ComboBox>
+
+                        <TextBox
+                            x:Name="OtaAddressTextBox"
+                            Grid.Row="1"
+                            Grid.Column="1"
+                            PlaceholderText="输入OTA服务器地址" />
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock
+                            Grid.Row="0"
+                            Grid.ColumnSpan="2"
+                            Margin="0,12,0,8"
+                            Text="WebSocket地址:" />
+
+                        <ComboBox
+                            x:Name="WsProtocolComboBox"
+                            Grid.Row="1"
+                            Grid.Column="0"
+                            MinWidth="100"
+                            Margin="0,0,8,0"
+                            SelectedIndex="0">
+                            <ComboBoxItem Content="wss://" />
+                            <ComboBoxItem Content="ws://" />
+                        </ComboBox>
+
+                        <TextBox
+                            x:Name="WsAddressTextBox"
+                            Grid.Row="1"
+                            Grid.Column="1"
+                            PlaceholderText="输入WebSocket服务器地址" />
+                    </Grid>
+
+                    <TextBox
+                        x:Name="WsTokenTextBox"
+                        Header="Access Token"
+                        PlaceholderText="输入访问令牌" />
+                </StackPanel>
+            </Expander>
+
+            <!--  Audio Settings  -->
+            <Expander Header="音频设置" IsExpanded="False">
+                <StackPanel Padding="0,12,0,0" Spacing="12">
+                    <Slider
+                        x:Name="DefaultVolumeSlider"
+                        Header="默认音量"
+                        Maximum="100"
+                        Minimum="0"
+                        ValueChanged="DefaultVolumeSlider_ValueChanged"
+                        Value="80" />
+
+                    <ToggleSwitch
+                        x:Name="AutoAdjustVolumeToggle"
+                        Header="自动调节音量"
+                        IsOn="True" />
+
+                    <TextBox
+                        x:Name="AudioInputDeviceTextBox"
+                        Header="音频输入设备"
+                        IsReadOnly="True"
+                        PlaceholderText="默认音频输入设备" />
+
+                    <TextBox
+                        x:Name="AudioOutputDeviceTextBox"
+                        Header="音频输出设备"
+                        IsReadOnly="True"
+                        PlaceholderText="默认音频输出设备" />
+
+                    <Button x:Name="RefreshAudioDevicesButton" Click="RefreshAudioDevicesButton_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon FontSize="16" Glyph="&#xE72C;" />
+                            <TextBlock Text="刷新音频设备" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Expander>
+
+            <!--  Application Settings  -->
+            <Expander Header="应用程序设置" IsExpanded="False">
+                <StackPanel Padding="0,12,0,0" Spacing="12">
+                    <ToggleSwitch
+                        x:Name="AutoStartToggle"
+                        Header="开机自启动"
+                        IsOn="False" />
+
+                    <ToggleSwitch
+                        x:Name="MinimizeToTrayToggle"
+                        Header="最小化到系统托盘"
+                        IsOn="True" />
+
+                    <ToggleSwitch
+                        x:Name="EnableLoggingToggle"
+                        Header="启用详细日志"
+                        IsOn="True" />
+
+                    <ComboBox
+                        x:Name="ThemeComboBox"
+                        Header="应用主题"
+                        SelectedIndex="0">
+                        <ComboBoxItem Content="跟随系统" />
+                        <ComboBoxItem Content="浅色" />
+                        <ComboBoxItem Content="深色" />
+                    </ComboBox>
+                </StackPanel>
+            </Expander>
+
+            <!--  Advanced Settings  -->
+            <Expander Header="高级设置" IsExpanded="False">
+                <StackPanel Padding="0,12,0,0" Spacing="12">
+                    <NumberBox
+                        x:Name="ConnectionTimeoutNumberBox"
+                        Header="连接超时时间 (秒)"
+                        Maximum="60"
+                        Minimum="5"
+                        Value="30" />
+
+                    <NumberBox
+                        x:Name="AudioSampleRateNumberBox"
+                        Header="音频采样率 (Hz)"
+                        Maximum="48000"
+                        Minimum="8000"
+                        Value="16000" />
+
+                    <NumberBox
+                        x:Name="AudioChannelsNumberBox"
+                        Header="音频声道数"
+                        Maximum="2"
+                        Minimum="1"
+                        Value="1" />
+
+                    <ComboBox
+                        x:Name="AudioCodecComboBox"
+                        Header="音频编码格式"
+                        SelectedIndex="0">
+                        <ComboBoxItem Content="Opus" />
+                        <ComboBoxItem Content="PCM" />
+                        <ComboBoxItem Content="AAC" />
+                    </ComboBox>
+
+                    <Button
+                        x:Name="ResetToDefaultsButton"
+                        Click="ResetToDefaultsButton_Click"
+                        Style="{ThemeResource DefaultButtonStyle}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon FontSize="16" Glyph="&#xE777;" />
+                            <TextBlock Text="恢复默认设置" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Expander>
+
+            <!--  About Section  -->
+            <Expander Header="关于" IsExpanded="False">
+                <StackPanel Padding="0,12,0,0" Spacing="12">
+                    <TextBlock
+                        FontSize="16"
+                        FontWeight="SemiBold"
+                        Text="小智AI客户端" />
+                    <TextBlock Text="版本: 1.0.0" />
+                    <TextBlock Text="基于 Windows App SDK 开发" />
+                    <HyperlinkButton Content="查看源代码" NavigateUri="https://github.com/your-repo" />
+                    <HyperlinkButton Content="报告问题" NavigateUri="https://github.com/your-repo/issues" />
+                </StackPanel>
+            </Expander>
+
+            <!--  Action Buttons  -->
+            <StackPanel
+                Margin="0,20,0,0"
+                Orientation="Horizontal"
+                Spacing="12">
+                <Button
+                    x:Name="SaveSettingsButton"
+                    Click="SaveSettingsButton_Click"
+                    Style="{ThemeResource AccentButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontSize="16" Glyph="&#xE74E;" />
+                        <TextBlock Text="保存设置" />
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="ExportSettingsButton" Click="ExportSettingsButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontSize="16" Glyph="&#xE74C;" />
+                        <TextBlock Text="导出设置" />
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="ImportSettingsButton" Click="ImportSettingsButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontSize="16" Glyph="&#xE8B5;" />
+                        <TextBlock Text="导入设置" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Page>
