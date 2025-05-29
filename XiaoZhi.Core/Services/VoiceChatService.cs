@@ -161,29 +161,34 @@ public class VoiceChatService : IVoiceChatService
             ErrorOccurred?.Invoke(this, $"初始化失败: {ex.Message}");
             throw;
         }
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Toggle chat state for auto conversation mode (equivalent to Python toggle_chat_state)
     /// </summary>
     public async Task ToggleChatStateAsync()
     {
         try
         {
+            _logger?.LogInformation("Toggling chat state from {CurrentState}", CurrentState);
+            
             switch (CurrentState)
             {
                 case DeviceState.Idle:
                     if (KeepListening)
                     {
+                        // When starting auto mode, set keep listening and start listening
+                        // This matches Python's behavior in toggle_chat_state_impl
                         await StartListeningAsync();
                     }
                     break;
 
                 case DeviceState.Listening:
+                    // Stop current listening session
                     await StopListeningAsync(AbortReason.UserInterruption);
                     break;
 
                 case DeviceState.Speaking:
+                    // Abort current speaking and potentially restart listening if in auto mode
+                    // This matches Python's abort_speaking behavior
                     await StopSpeakingAsync();
                     break;
 
@@ -197,7 +202,7 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogError(ex, "Failed to toggle chat state");
             ErrorOccurred?.Invoke(this, $"Failed to toggle chat state: {ex.Message}");
         }
-    }    /// <summary>
+    }/// <summary>
     /// Start listening mode
     /// </summary>
     private async Task StartListeningAsync()
@@ -298,9 +303,7 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogError(ex, "Failed to start speaking");
             ErrorOccurred?.Invoke(this, $"Failed to start speaking: {ex.Message}");
         }
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Stop speaking mode
     /// </summary>
     private async Task StopSpeakingAsync()
@@ -317,11 +320,29 @@ public class VoiceChatService : IVoiceChatService
             CurrentState = DeviceState.Idle;
             _logger?.LogInformation("Stopped speaking");
 
-            // Auto restart listening if in keep listening mode
+            // Auto restart listening if in keep listening mode - more sophisticated delay like Python
             if (KeepListening)
             {
-                await Task.Delay(200); // Brief pause before restarting
-                await StartListeningAsync();
+                // Give audio system time to fully complete playback (similar to Python's delayed_state_change)
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        // Wait a bit longer to ensure audio buffers are clear (like Python's audio queue wait)
+                        await Task.Delay(500);
+                        
+                        // Only restart if we're still in idle state and keep listening is still enabled
+                        if (CurrentState == DeviceState.Idle && KeepListening)
+                        {
+                            await StartListeningAsync();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Failed to auto-restart listening");
+                        ErrorOccurred?.Invoke(this, $"Failed to auto-restart listening: {ex.Message}");
+                    }
+                });
             }
         }
         catch (Exception ex)

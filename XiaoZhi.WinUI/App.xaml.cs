@@ -60,12 +60,15 @@ namespace XiaoZhi.WinUI
                     
                     // Register ViewModels
                     services.AddTransient<MainWindowViewModel>();
-                    
-                    // Register core services
+                      // Register core services
                     services.AddSingleton<IVerificationService, VerificationService>();
                     services.AddSingleton<IConfigurationService, ConfigurationService>();
                     services.AddSingleton<IAudioRecorder, PortAudioRecorder>();
-                    services.AddSingleton<IAudioPlayer, PortAudioPlayer>();
+                    services.AddSingleton<IAudioPlayer, PortAudioPlayer>(provider =>
+                    {
+                        var logger = provider.GetService<ILogger<PortAudioPlayer>>();
+                        return new PortAudioPlayer(logger);
+                    });
                     services.AddSingleton<IAudioCodec, OpusAudioCodec>();
                     services.AddSingleton<ICommunicationClient, MqttNetClient>(provider =>
                     {

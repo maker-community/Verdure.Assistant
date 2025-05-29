@@ -1,5 +1,6 @@
 using PortAudioSharp;
 using XiaoZhi.Core.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace XiaoZhi.Core.Services;
 
@@ -17,33 +18,49 @@ public class PortAudioPlayer : IAudioPlayer
     private const int MaxEmptyFrames = 50; // 最大空帧数（约1秒的静音后停止）
     private DateTime _lastDataTime = DateTime.Now;
     private readonly Timer _playbackTimer;
+    private readonly ILogger<PortAudioPlayer>? _logger;
 
     public event EventHandler? PlaybackStopped;
 
-    public bool IsPlaying => _isPlaying;
-
-    public PortAudioPlayer()
+    public bool IsPlaying => _isPlaying;    public PortAudioPlayer(ILogger<PortAudioPlayer>? logger = null)
     {
+        _logger = logger;
         // 创建定时器来检测播放完成（类似Python中的延迟状态变更）
         _playbackTimer = new Timer(CheckPlaybackCompletion, null, Timeout.Infinite, Timeout.Infinite);
-    }
-
-    private void CheckPlaybackCompletion(object? state)
+    }private void CheckPlaybackCompletion(object? state)
     {
         lock (_lock)
         {
-            // 如果队列为空且距离最后一次接收数据超过1秒，认为播放完成
-            if (_isPlaying && _audioQueue.Count == 0 && 
-                (DateTime.Now - _lastDataTime).TotalMilliseconds > 1000)
+            // Check if playback should be considered complete (similar to Python's queue monitoring)
+            if (_isPlaying && _audioQueue.Count == 0)
             {
-                Task.Run(async () => 
+                // More conservative timing - wait longer to ensure all audio is played
+                var timeSinceLastData = (DateTime.Now - _lastDataTime).TotalMilliseconds;
+                var shouldStop = timeSinceLastData > 1500; // Increased from 1000ms to 1500ms
+                
+                if (shouldStop)
                 {
-                    await StopAsync();
-                    PlaybackStopped?.Invoke(this, EventArgs.Empty);
-                });
+                    _logger?.LogDebug("Playback completion detected - no data for {TimeSinceLastData}ms", timeSinceLastData);
+                    
+                    // Stop timer first to prevent multiple triggers
+                    _playbackTimer.Change(Timeout.Infinite, Timeout.Infinite);
+                    
+                    Task.Run(async () => 
+                    {
+                        try
+                        {
+                            await StopAsync();
+                            PlaybackStopped?.Invoke(this, EventArgs.Empty);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Console.WriteLine($"Error in playback completion handler: {ex.Message}");
+                        }
+                    });
+                }
             }
         }
-    }    public async Task InitializeAsync(int sampleRate, int channels)
+    }public async Task InitializeAsync(int sampleRate, int channels)
     {
         _sampleRate = sampleRate;
         _channels = channels;

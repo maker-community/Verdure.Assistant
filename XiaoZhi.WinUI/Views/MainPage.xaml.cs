@@ -6,7 +6,6 @@ using System.Collections.ObjectModel;
 using XiaoZhi.Core.Interfaces;
 using XiaoZhi.Core.Models;
 using XiaoZhi.Core.Services;
-using XiaoZhi.Core.Constants;
 using XiaoZhi.WinUI.ViewModels;
 
 namespace XiaoZhi.WinUI.Views
@@ -19,8 +18,7 @@ namespace XiaoZhi.WinUI.Views
         private IVoiceChatService? _voiceChatService;
         private readonly ObservableCollection<ChatMessageItem> _messages = new();
         private bool _isConnected = false;
-        private bool _isVoiceChatActive = false;
-        private bool _isAutoDialogueMode = false;        public MainPage()
+        private bool _isVoiceChatActive = false; public MainPage()
         {
             this.InitializeComponent();
             this.MessagesListView.ItemsSource = _messages;
@@ -28,23 +26,22 @@ namespace XiaoZhi.WinUI.Views
 
         private async void ConnectButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_isConnected) return;            try
+            if (_isConnected) return; try
             {
                 ConnectButton.IsEnabled = false;
                 ConnectionStatusText.Text = "连接中...";
 
                 _voiceChatService = App.GetService<IVoiceChatService>();
-                
+
                 if (_voiceChatService == null)
                 {
                     throw new InvalidOperationException("VoiceChatService not available from DI container");
                 }
-                
+
                 // 注册事件处理器
                 _voiceChatService.MessageReceived += OnMessageReceived;
                 _voiceChatService.VoiceChatStateChanged += OnVoiceChatStateChanged;
                 _voiceChatService.ErrorOccurred += OnErrorOccurred;
-                _voiceChatService.DeviceStateChanged += OnDeviceStateChanged;
 
                 // 创建配置
                 var config = new XiaoZhiConfig
@@ -58,10 +55,10 @@ namespace XiaoZhi.WinUI.Views
                 };
 
                 await _voiceChatService.InitializeAsync(config);
-                
+
                 _isConnected = _voiceChatService.IsConnected;
                 UpdateConnectionUI();
-                
+
                 if (_isConnected)
                 {
                     ConnectionStatusText.Text = "已连接";
@@ -94,14 +91,14 @@ namespace XiaoZhi.WinUI.Views
                 {
                     await _voiceChatService?.StopVoiceChatAsync()!;
                 }
-                
+
                 _voiceChatService?.Dispose();
                 _voiceChatService = null;
-                
+
                 _isConnected = false;
                 _isVoiceChatActive = false;
                 UpdateConnectionUI();
-                
+
                 ConnectionStatusText.Text = "已断开";
                 AddSystemMessage("已断开连接");
             }
@@ -177,7 +174,7 @@ namespace XiaoZhi.WinUI.Views
             try
             {
                 await _voiceChatService.SendTextMessageAsync(messageText);
-                
+
                 // 添加用户消息到界面
                 AddMessage("user", messageText);
             }
@@ -202,55 +199,16 @@ namespace XiaoZhi.WinUI.Views
                 _isVoiceChatActive = isActive;
                 UpdateVoiceChatUI();
             });
-        }        private void OnErrorOccurred(object? sender, string error)
+        }
+
+        private void OnErrorOccurred(object? sender, string error)
         {
             DispatcherQueue.TryEnqueue(() =>
             {
                 AddSystemMessage($"错误: {error}");
             });
         }
-
-        private void OnDeviceStateChanged(object? sender, Core.Constants.DeviceState deviceState)
-        {
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                UpdateDeviceStateUI(deviceState);
-            });
-        }
-
-        private void AutoDialogueToggle_Toggled(object sender, RoutedEventArgs e)
-        {
-            if (_voiceChatService == null || !_isConnected) return;
-
-            _isAutoDialogueMode = AutoDialogueToggle.IsOn;
-            _voiceChatService.KeepListening = _isAutoDialogueMode;
-            
-            UpdateAutoDialogueUI();
-            
-            if (_isAutoDialogueMode)
-            {
-                AddSystemMessage("自动对话模式已启用");
-            }
-            else
-            {
-                AddSystemMessage("自动对话模式已禁用");
-            }
-        }
-
-        private async void ToggleChatStateButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (_voiceChatService == null || !_isConnected) return;
-
-            try
-            {
-                await _voiceChatService.ToggleChatStateAsync();
-                AddSystemMessage("对话状态已切换");
-            }
-            catch (Exception ex)
-            {
-                AddSystemMessage($"切换对话状态失败: {ex.Message}");
-            }
-        }        private void UpdateConnectionUI()
+        private void UpdateConnectionUI()
         {
             ConnectButton.IsEnabled = !_isConnected;
             DisconnectButton.IsEnabled = _isConnected;
@@ -258,11 +216,7 @@ namespace XiaoZhi.WinUI.Views
             VoiceChatButton.IsEnabled = _isConnected;
             MessageTextBox.IsEnabled = _isConnected;
             SendButton.IsEnabled = _isConnected;
-            
-            // 更新自动对话控件状态
-            AutoDialogueToggle.IsEnabled = _isConnected;
-            ToggleChatStateButton.IsEnabled = _isConnected && _isAutoDialogueMode;
-            
+
             // 更新连接状态文本
             if (_isConnected)
             {
@@ -273,10 +227,7 @@ namespace XiaoZhi.WinUI.Views
                 ConnectionStatusText.Text = "未连接";
                 // 重置语音对话状态
                 _isVoiceChatActive = false;
-                _isAutoDialogueMode = false;
-                AutoDialogueToggle.IsOn = false;
                 UpdateVoiceChatUI();
-                UpdateAutoDialogueUI();
             }
         }
 
@@ -293,34 +244,6 @@ namespace XiaoZhi.WinUI.Views
             }
         }
 
-        private void UpdateAutoDialogueUI()
-        {
-            ToggleChatStateButton.IsEnabled = _isConnected && _isAutoDialogueMode;
-            
-            if (_isAutoDialogueMode)
-            {
-                ToggleChatStateButton.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.LightGreen);
-            }
-            else
-            {
-                ToggleChatStateButton.ClearValue(Button.BackgroundProperty);
-            }
-        }
-
-        private void UpdateDeviceStateUI(Core.Constants.DeviceState deviceState)
-        {
-            var stateText = deviceState switch
-            {
-                Core.Constants.DeviceState.Idle => "空闲",
-                Core.Constants.DeviceState.Connecting => "连接中",
-                Core.Constants.DeviceState.Listening => "监听中",
-                Core.Constants.DeviceState.Speaking => "播放中",
-                _ => "未知"
-            };
-            
-            DeviceStateText.Text = $"状态: {stateText}";
-        }
-
         private void AddMessage(string role, string content)
         {
             var item = new ChatMessageItem
@@ -330,21 +253,83 @@ namespace XiaoZhi.WinUI.Views
                 Timestamp = DateTime.Now,
                 IsUser = role == "user"
             };
-            
+
             _messages.Add(item);
-            
+
             // 滚动到底部
             if (_messages.Count > 0)
             {
                 MessagesListView.ScrollIntoView(_messages.Last());
             }
         }
-
         private void AddSystemMessage(string message)
         {
             AddMessage("system", message);
         }
-    }
+
+        private async void AutoDialogueToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_voiceChatService == null || !_isConnected) return;
+
+            try
+            {
+                var toggle = sender as ToggleSwitch;
+                if (toggle != null)
+                {
+                    _voiceChatService.KeepListening = toggle.IsOn;
+
+                    if (toggle.IsOn)
+                    {
+                        AddSystemMessage("自动对话模式已启用");
+                        // 更新ToggleChatStateButton文本
+                        if (ToggleChatStateButton != null)
+                        {
+                            ToggleChatStateButton.Content = "开始自动对话";
+                            ToggleChatStateButton.IsEnabled = true;
+                        }
+                    }
+                    else
+                    {
+                        AddSystemMessage("自动对话模式已禁用");
+                        // 停止当前对话状态
+                        if (_voiceChatService.IsVoiceChatActive)
+                        {
+                            await _voiceChatService.StopVoiceChatAsync();
+                        }
+                        // 更新ToggleChatStateButton文本
+                        if (ToggleChatStateButton != null)
+                        {
+                            ToggleChatStateButton.Content = "切换对话状态";
+                            ToggleChatStateButton.IsEnabled = false;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AddSystemMessage($"切换自动对话模式失败: {ex.Message}");
+            }
+        }
+
+        private async void ToggleChatStateButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_voiceChatService == null || !_isConnected) return;
+
+            try
+            {
+                await _voiceChatService.ToggleChatStateAsync();
+
+                if (_voiceChatService.KeepListening)
+                {
+                    AddSystemMessage("对话状态已切换");
+                }
+            }
+            catch (Exception ex)
+            {
+                AddSystemMessage($"切换对话状态失败: {ex.Message}");
+            }
+        }
+    }    
 
     // 消息项模型，用于界面绑定
     public class ChatMessageItem
