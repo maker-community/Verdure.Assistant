@@ -1,16 +1,9 @@
-using System;
-using System.Threading.Tasks;
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Input;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using XiaoZhi.Core.Services;
+using Microsoft.UI.Xaml.Input;
+using XiaoZhi.Core.Constants;
 using XiaoZhi.Core.Interfaces;
 using XiaoZhi.Core.Models;
-using XiaoZhi.Core.Constants;
-using XiaoZhi.WinUI.ViewModels;
-using Microsoft.UI.Input;
+using XiaoZhi.Core.Services;
 
 namespace XiaoZhi.WinUI.Views;
 
@@ -18,7 +11,7 @@ namespace XiaoZhi.WinUI.Views;
 /// 首页 - 语音对话界面
 /// </summary>
 public sealed partial class HomePage : Page
-{    
+{
     private readonly ILogger<HomePage>? _logger;
     private readonly IVoiceChatService? _voiceChatService;
     private readonly EmotionManager? _emotionManager;
@@ -30,7 +23,7 @@ public sealed partial class HomePage : Page
     public HomePage()
     {
         this.InitializeComponent();
-          try
+        try
         {
             _logger = App.GetService<ILogger<HomePage>>();
             _voiceChatService = App.GetService<IVoiceChatService>();
@@ -64,7 +57,7 @@ public sealed partial class HomePage : Page
 
         // 设置初始表情
         SetEmotion("neutral");
-    }    
+    }
     private async void BindEvents()
     {
         // 页面事件
@@ -81,7 +74,7 @@ public sealed partial class HomePage : Page
 
         // 初始化和绑定InterruptManager事件
         if (_interruptManager != null)
-        {           
+        {
             try
             {
                 await _interruptManager.InitializeAsync();
@@ -93,8 +86,8 @@ public sealed partial class HomePage : Page
                 _logger?.LogError(ex, "Failed to initialize InterruptManager");
             }
         }
-    }    
-    private async void OnInterruptTriggered(object? sender, InterruptEventArgs e)
+    }
+    private void OnInterruptTriggered(object? sender, InterruptEventArgs e)
     {
         try
         {
@@ -141,7 +134,7 @@ public sealed partial class HomePage : Page
                 {
                     await _voiceChatService.StopVoiceChatAsync();
                     _logger?.LogInformation("Voice chat stopped due to voice interruption");
-                    
+
                     // Auto-restart listening if in auto mode (like py-xiaozhi)
                     if (_voiceChatService.KeepListening)
                     {
@@ -219,7 +212,7 @@ public sealed partial class HomePage : Page
             // Don't update connection state based on device state!
             // DeviceState.Idle means "connected but idle", not "disconnected"
             // Connection state should only be managed by actual connection/disconnection events
-            
+
             switch (state)
             {
                 case DeviceState.Listening:
@@ -252,7 +245,7 @@ public sealed partial class HomePage : Page
         {
             _isListening = isActive;
             UpdateUIForVoiceChatState(isActive);
-            
+
             // Update auto button text when in auto mode
             if (_isAutoMode && AutoButtonText != null)
             {
@@ -278,9 +271,9 @@ public sealed partial class HomePage : Page
                 "assistant" => $"小智: {message.Content}",
                 _ => message.Content
             };
-            
+
             AddMessage(displayText, false);
-            
+
             // 如果是助手消息，更新TTS文本
             if (message.Role == "assistant")
             {
@@ -305,11 +298,11 @@ public sealed partial class HomePage : Page
     private void UpdateConnectionState(bool connected)
     {
         _isConnected = connected;
-        
+
         // 更新连接状态指示器
         if (ConnectionIndicator != null)
         {
-            var brush = connected ? 
+            var brush = connected ?
                 Application.Current.Resources["SystemFillColorSuccessBrush"] as Microsoft.UI.Xaml.Media.Brush :
                 Application.Current.Resources["SystemFillColorCriticalBrush"] as Microsoft.UI.Xaml.Media.Brush;
             if (brush != null)
@@ -329,7 +322,7 @@ public sealed partial class HomePage : Page
         {
             ConnectButton.IsEnabled = !connected;
         }
-        
+
         if (DisconnectButton != null)
         {
             DisconnectButton.IsEnabled = connected;
@@ -340,17 +333,17 @@ public sealed partial class HomePage : Page
         {
             ManualButton.IsEnabled = connected;
         }
-        
+
         if (AutoButton != null)
         {
             AutoButton.IsEnabled = connected;
         }
-        
+
         if (AbortButton != null)
         {
             AbortButton.IsEnabled = connected;
         }
-        
+
         if (ModeToggleButton != null)
         {
             ModeToggleButton.IsEnabled = connected;
@@ -360,7 +353,7 @@ public sealed partial class HomePage : Page
         {
             MessageTextBox.IsEnabled = connected;
         }
-        
+
         if (SendButton != null)
         {
             SendButton.IsEnabled = connected;
@@ -387,15 +380,16 @@ public sealed partial class HomePage : Page
         if (ManualButton != null) ManualButton.Visibility = Visibility.Visible;
         if (AutoButton != null) AutoButton.Visibility = Visibility.Collapsed;
         if (ModeToggleText != null) ModeToggleText.Text = "手动对话";
-    }    private void SwitchToAutoMode()
+    }
+    private void SwitchToAutoMode()
     {
         _isAutoMode = true;
         if (ManualButton != null) ManualButton.Visibility = Visibility.Collapsed;
         if (AutoButton != null) AutoButton.Visibility = Visibility.Visible;
         if (ModeToggleText != null) ModeToggleText.Text = "自动对话";
-        
+
         // Update button text based on current listening state and auto mode
-        if (AutoButtonText != null) 
+        if (AutoButtonText != null)
         {
             if (_voiceChatService?.KeepListening == true && _isListening)
             {
@@ -411,7 +405,7 @@ public sealed partial class HomePage : Page
     private void UpdateModeUI(bool isAutoMode)
     {
         _isAutoMode = isAutoMode;
-        
+
         if (isAutoMode)
         {
             SwitchToAutoMode();
@@ -445,21 +439,21 @@ public sealed partial class HomePage : Page
             Text = message,
             Margin = new Thickness(0, 4, 0, 4),
             TextWrapping = TextWrapping.Wrap,
-            Foreground = isError ? 
+            Foreground = isError ?
                 Application.Current.Resources["SystemFillColorCriticalBrush"] as Microsoft.UI.Xaml.Media.Brush :
                 Application.Current.Resources["TextFillColorPrimaryBrush"] as Microsoft.UI.Xaml.Media.Brush
         };
 
         // 如果已经有默认消息，清除它
-        if (MessagesPanel.Children.Count > 0 && 
-            MessagesPanel.Children[0] is TextBlock defaultMsg && 
+        if (MessagesPanel.Children.Count > 0 &&
+            MessagesPanel.Children[0] is TextBlock defaultMsg &&
             defaultMsg.Text.Contains("等待对话开始"))
         {
             MessagesPanel.Children.Clear();
         }
 
         MessagesPanel.Children.Add(textBlock);
-        
+
         // 滚动到底部
         MessagesScrollViewer.ChangeView(null, MessagesScrollViewer.ScrollableHeight, null);
     }
@@ -470,7 +464,7 @@ public sealed partial class HomePage : Page
         {
             VolumeText.Text = $"{(int)value}%";
         }
-    }    
+    }
     private void SetEmotion(string emotionName)
     {
         try
@@ -512,11 +506,18 @@ public sealed partial class HomePage : Page
                 AudioFormat = "opus"
             };
             await _voiceChatService.InitializeAsync(config);
-            
+
+            // Set up wake word detector coordination (matches py-xiaozhi behavior)
+            if (_interruptManager != null)
+            {
+                _voiceChatService.SetInterruptManager(_interruptManager);
+                _logger?.LogInformation("Wake word detector coordination enabled");
+            }
+
             // Use the service's IsConnected property to determine actual connection state
             bool isConnected = _voiceChatService.IsConnected;
             UpdateConnectionState(isConnected);
-            
+
             if (isConnected)
             {
                 AddMessage("连接成功");
@@ -544,7 +545,7 @@ public sealed partial class HomePage : Page
         try
         {
             DisconnectButton.IsEnabled = false;
-            
+
             // 停止当前语音对话
             if (_isListening)
             {
@@ -609,7 +610,7 @@ public sealed partial class HomePage : Page
             _logger?.LogError(ex, "Failed to stop manual voice chat");
             AddMessage($"停止录音失败: {ex.Message}", true);
         }
-    }   
+    }
     private async void AutoButton_Click(object sender, RoutedEventArgs e)
     {
         if (_voiceChatService == null || !_isConnected) return;
@@ -645,7 +646,8 @@ public sealed partial class HomePage : Page
         try
         {
             if (_voiceChatService != null && _isListening)
-            {                await _voiceChatService.StopVoiceChatAsync();
+            {
+                await _voiceChatService.StopVoiceChatAsync();
                 AddMessage("已中断当前操作");
                 TtsText.Text = "待命";
                 SetEmotion("neutral");
@@ -696,7 +698,7 @@ public sealed partial class HomePage : Page
     {
         var value = e.NewValue;
         if (value < 0) return;
-        
+
         UpdateVolumeText(value);
         // Note: IVoiceChatService doesn't have SetVolume method
         // if (_voiceChatService != null)
@@ -708,7 +710,7 @@ public sealed partial class HomePage : Page
     private void MuteButton_Click(object sender, RoutedEventArgs e)
     {
         var isMuted = VolumeSlider.Value == 0;
-        
+
         if (isMuted)
         {
             VolumeSlider.Value = 80;
@@ -719,42 +721,6 @@ public sealed partial class HomePage : Page
             VolumeSlider.Value = 0;
             MuteIcon.Glyph = "\uE74F"; // Mute icon
         }
-    }  
-    
-    #endregion
-
-    #region 中断处理
-
-    private async void OnInterruptRequested(object? sender, string reason)
-    {
-        this.DispatcherQueue.TryEnqueue(async () =>
-        {
-            try
-            {
-                _logger?.LogInformation($"Interrupt requested: {reason}");
-                
-                // 如果正在说话或监听，立即停止
-                if (_isListening && _voiceChatService != null)
-                {
-                    await _voiceChatService.StopVoiceChatAsync();
-                    _logger?.LogInformation("Voice chat stopped due to interrupt");
-                }
-                
-                // 更新UI状态
-                TtsText.Text = $"已中断: {reason}";
-                SetEmotion("neutral");
-                
-                // 如果是在自动模式，重置按钮状态
-                if (_isAutoMode && AutoButtonText != null)
-                {
-                    AutoButtonText.Text = "开始对话";
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Error handling interrupt request");
-            }
-        });
     }
 
     #endregion

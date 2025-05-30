@@ -18,9 +18,9 @@ class Program
     {
         // 创建主机
         var host = CreateHostBuilder(args).Build();
-        
-        _logger = host.Services.GetRequiredService<ILogger<Program>>();
+          _logger = host.Services.GetRequiredService<ILogger<Program>>();
         _voiceChatService = host.Services.GetRequiredService<IVoiceChatService>();
+        var interruptManager = host.Services.GetRequiredService<InterruptManager>();
 
         // 加载配置
         _config = LoadConfiguration();
@@ -40,6 +40,10 @@ class Program
 
             // 初始化服务
             await _voiceChatService.InitializeAsync(_config);
+            
+            // Set up wake word detector coordination (matches py-xiaozhi behavior)
+            _voiceChatService.SetInterruptManager(interruptManager);
+            await interruptManager.InitializeAsync();
             
             System.Console.WriteLine($"已连接到服务器: {(_config.UseWebSocket ? _config.ServerUrl : $"{_config.MqttBroker}:{_config.MqttPort}")}");
             System.Console.WriteLine();
@@ -65,11 +69,13 @@ class Program
                     // Set Debug as the minimum level, can be overridden by appsettings.json
                     builder.SetMinimumLevel(LogLevel.Debug);
                 });
-                
-                // Register services with dependency injection
+                  // Register services with dependency injection
                 services.AddSingleton<IVerificationService, VerificationService>();
                 services.AddSingleton<IConfigurationService, ConfigurationService>();
                 services.AddSingleton<IVoiceChatService, VoiceChatService>();
+                
+                // Add InterruptManager for wake word detector coordination
+                services.AddSingleton<InterruptManager>();
 
             });
 

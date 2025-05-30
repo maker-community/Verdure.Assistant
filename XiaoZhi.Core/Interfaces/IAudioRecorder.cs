@@ -4,7 +4,8 @@ namespace XiaoZhi.Core.Interfaces;
 /// 音频录制接口
 /// </summary>
 public interface IAudioRecorder
-{    /// <summary>
+{    
+    /// <summary>
     /// 音频数据接收事件
     /// </summary>
     event EventHandler<byte[]>? DataAvailable;

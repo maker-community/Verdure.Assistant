@@ -1,6 +1,7 @@
 using System;
 using XiaoZhi.Core.Models;
 using XiaoZhi.Core.Constants;
+using XiaoZhi.Core.Services;
 
 namespace XiaoZhi.Core.Interfaces;
 
@@ -79,10 +80,15 @@ public interface IVoiceChatService : IDisposable
     /// <summary>
     /// 当前设备状态
     /// </summary>
-    DeviceState CurrentState { get; }
-
+    DeviceState CurrentState { get; }    
     /// <summary>
     /// 当前监听模式
     /// </summary>
     ListeningMode CurrentListeningMode { get; }
+
+    /// <summary>
+    /// Set interrupt manager for wake word detector coordination
+    /// This enables py-xiaozhi-like wake word detector pause/resume behavior
+    /// </summary>
+    void SetInterruptManager(InterruptManager interruptManager);
 }

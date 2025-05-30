@@ -45,7 +45,9 @@ namespace XiaoZhi.Core.Constants
         /// 手动控制
         /// </summary>
         Manual
-    }    /// <summary>
+    }    
+
+    /// <summary>
     /// 中止原因枚举，对应Python中的AbortReason
     /// </summary>
     public enum AbortReason

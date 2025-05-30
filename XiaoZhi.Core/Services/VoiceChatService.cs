@@ -9,7 +9,7 @@ namespace XiaoZhi.Core.Services;
 /// 语音聊天服务实现
 /// </summary>
 public class VoiceChatService : IVoiceChatService
-{
+{    
     private readonly ILogger<VoiceChatService>? _logger;
     private readonly IConfigurationService _configurationService;
     private ICommunicationClient? _communicationClient;
@@ -25,6 +25,9 @@ public class VoiceChatService : IVoiceChatService
     private ListeningMode _listeningMode = ListeningMode.Manual;
     private bool _keepListening = false;
     private AbortReason _lastAbortReason = AbortReason.None;
+
+    // Wake word detector coordination (matches py-xiaozhi behavior)
+    private InterruptManager? _interruptManager;
 
     public event EventHandler<bool>? VoiceChatStateChanged;
     public event EventHandler<ChatMessage>? MessageReceived;
@@ -58,8 +61,7 @@ public class VoiceChatService : IVoiceChatService
                 }
             }
         }
-    }
-
+    }    
     public DeviceState CurrentState
     {
         get => _currentState;
@@ -70,8 +72,60 @@ public class VoiceChatService : IVoiceChatService
                 var previousState = _currentState;
                 _currentState = value;
                 _logger?.LogInformation("Device state changed from {PreviousState} to {CurrentState}", previousState, value);
+                
+                // Wake word detector coordination (matches py-xiaozhi behavior)
+                CoordinateWakeWordDetector(value);
+                
                 DeviceStateChanged?.Invoke(this, value);
             }
+        }
+    }
+
+    /// <summary>
+    /// Coordinate wake word detector state based on device state changes
+    /// Matches py-xiaozhi behavior: pause during Listening, resume during Speaking/Idle
+    /// </summary>
+    private void CoordinateWakeWordDetector(DeviceState newState)
+    {
+        if (_interruptManager == null)
+        {
+            // If no InterruptManager is set, skip coordination (fallback for apps that don't use it)
+            return;
+        }
+
+        try
+        {
+            switch (newState)
+            {
+                case DeviceState.Listening:
+                    // Pause wake word detector during user input (matches py-xiaozhi behavior)
+                    // This prevents conflicts between user speech input and wake word detection
+                    _interruptManager.PauseVAD();
+                    _logger?.LogDebug("Wake word detector paused during Listening state");
+                    break;
+
+                case DeviceState.Speaking:
+                case DeviceState.Idle:
+                    // Resume wake word detector during Speaking/Idle states (matches py-xiaozhi behavior)
+                    // This allows interrupt detection during AI speaking and auto-activation during idle
+                    _interruptManager.ResumeVAD();
+                    _logger?.LogDebug("Wake word detector resumed during {State} state", newState);
+                    break;
+
+                case DeviceState.Connecting:
+                    // Keep wake word detector paused during connection state
+                    _interruptManager.PauseVAD();
+                    _logger?.LogDebug("Wake word detector paused during Connecting state");
+                    break;
+
+                default:
+                    _logger?.LogWarning("Unknown device state: {State}", newState);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to coordinate wake word detector for state {State}", newState);
         }
     }
 
@@ -87,12 +141,21 @@ public class VoiceChatService : IVoiceChatService
                 ListeningModeChanged?.Invoke(this, value);
             }
         }
-    }
-
+    }    
     public VoiceChatService(IConfigurationService configurationService, ILogger<VoiceChatService>? logger = null)
     {
         _configurationService = configurationService;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Set the interrupt manager for wake word detector coordination
+    /// This enables py-xiaozhi-like wake word detector pause/resume behavior
+    /// </summary>
+    public void SetInterruptManager(InterruptManager interruptManager)
+    {
+        _interruptManager = interruptManager;
+        _logger?.LogInformation("InterruptManager set for wake word detector coordination");
     }
 
     public async Task InitializeAsync(XiaoZhiConfig config)
@@ -141,7 +204,8 @@ public class VoiceChatService : IVoiceChatService
             }            
             
             _communicationClient.MessageReceived += OnMessageReceived;
-            _communicationClient.ConnectionStateChanged += OnConnectionStateChanged;            // 订阅WebSocket专有的TTS状态变化事件
+            _communicationClient.ConnectionStateChanged += OnConnectionStateChanged;            
+            // 订阅WebSocket专有的TTS状态变化事件
             if (_communicationClient is WebSocketClient wsClient)
             {
                 wsClient.TtsStateChanged += OnTtsStateChanged;
@@ -161,7 +225,8 @@ public class VoiceChatService : IVoiceChatService
             ErrorOccurred?.Invoke(this, $"初始化失败: {ex.Message}");
             throw;
         }
-    }    /// <summary>
+    }    
+    /// <summary>
     /// Toggle chat state for auto conversation mode (equivalent to Python toggle_chat_state)
     /// </summary>
     public async Task ToggleChatStateAsync()
@@ -202,7 +267,8 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogError(ex, "Failed to toggle chat state");
             ErrorOccurred?.Invoke(this, $"Failed to toggle chat state: {ex.Message}");
         }
-    }/// <summary>
+    }
+    /// <summary>
     /// Start listening mode
     /// </summary>
     private async Task StartListeningAsync()
@@ -236,7 +302,8 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogError(ex, "Failed to start listening");
             ErrorOccurred?.Invoke(this, $"Failed to start listening: {ex.Message}");
         }
-    }    /// <summary>
+    }    
+    /// <summary>
     /// Stop listening with specific reason
     /// </summary>
     private async Task StopListeningAsync(AbortReason reason = AbortReason.None)
@@ -303,7 +370,8 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogError(ex, "Failed to start speaking");
             ErrorOccurred?.Invoke(this, $"Failed to start speaking: {ex.Message}");
         }
-    }    /// <summary>
+    }    
+    /// <summary>
     /// Stop speaking mode
     /// </summary>
     private async Task StopSpeakingAsync()
@@ -555,7 +623,8 @@ public class VoiceChatService : IVoiceChatService
                 if (CurrentState != DeviceState.Speaking)
                 {
                     await StartSpeakingAsync();
-                }                // 解码并播放音频数据 - 使用输出采样率
+                }                
+                // 解码并播放音频数据 - 使用输出采样率
                 var pcmData = _audioCodec.Decode(audioData, _config.AudioOutputSampleRate, _config.AudioChannels);
                 await _audioPlayer.PlayAsync(pcmData, _config.AudioOutputSampleRate, _config.AudioChannels);
 
