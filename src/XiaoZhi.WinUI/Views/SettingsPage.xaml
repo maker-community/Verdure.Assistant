@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="XiaoZhi.WinUI.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Page.Resources>
+        <Style x:Key="SettingsExpanderStyle" TargetType="Expander">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="BorderBrush" Value="{ThemeResource DividerStrokeColorDefaultBrush}" />
+            <Setter Property="Padding" Value="0,0,0,8" />
+        </Style>
+    </Page.Resources>
+
+    <ScrollViewer Padding="20" VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="600" Spacing="16">
+            <!--  Page Title  -->
+            <TextBlock
+                x:Uid="SettingsPageTitle"
+                Margin="0,0,0,10"
+                FontSize="24"
+                FontWeight="Bold" />
+            <!--  Wake Word Settings  -->
+            <Expander
+                x:Uid="WakeWordSettings"
+                IsExpanded="True"
+                Style="{StaticResource SettingsExpanderStyle}">
+                <StackPanel
+                    Padding="0,12,0,0"
+                    HorizontalAlignment="Stretch"
+                    Spacing="12">
+                    <ToggleSwitch
+                        x:Name="WakeWordToggle"
+                        x:Uid="WakeWordToggle"
+                        IsOn="False"
+                        Toggled="WakeWordToggle_Toggled" />
+                    <TextBox
+                        x:Name="WakeWordsTextBox"
+                        x:Uid="WakeWordsTextBox"
+                        Text="" />
+                </StackPanel>
+            </Expander>
+            <!--  Device Settings  -->
+            <Expander
+                x:Uid="DeviceSettings"
+                IsExpanded="True"
+                Style="{StaticResource SettingsExpanderStyle}">
+                <StackPanel
+                    Padding="0,12,0,0"
+                    HorizontalAlignment="Stretch"
+                    Spacing="12">
+                    <TextBox x:Name="DeviceIdTextBox" x:Uid="DeviceIdTextBox" />
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock
+                            x:Uid="OtaAddressLabel"
+                            Grid.Row="0"
+                            Grid.ColumnSpan="2"
+                            Margin="0,0,0,8" />
+
+                        <ComboBox
+                            x:Name="OtaProtocolComboBox"
+                            Grid.Row="1"
+                            Grid.Column="0"
+                            MinWidth="100"
+                            Margin="0,0,8,0"
+                            SelectedIndex="0">
+                            <ComboBoxItem Content="https://" />
+                            <ComboBoxItem Content="http://" />
+                        </ComboBox>
+                        <TextBox
+                            x:Name="OtaAddressTextBox"
+                            x:Uid="OtaAddressTextBox"
+                            Grid.Row="1"
+                            Grid.Column="1" />
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock
+                            x:Uid="WebSocketAddressLabel"
+                            Grid.Row="0"
+                            Grid.ColumnSpan="2"
+                            Margin="0,12,0,8" />
+
+                        <ComboBox
+                            x:Name="WsProtocolComboBox"
+                            Grid.Row="1"
+                            Grid.Column="0"
+                            MinWidth="100"
+                            Margin="0,0,8,0"
+                            SelectedIndex="0">
+                            <ComboBoxItem Content="wss://" />
+                            <ComboBoxItem Content="ws://" />
+                        </ComboBox>
+                        <TextBox
+                            x:Name="WsAddressTextBox"
+                            x:Uid="WsAddressTextBox"
+                            Grid.Row="1"
+                            Grid.Column="1" />
+                    </Grid>
+
+                    <TextBox x:Name="WsTokenTextBox" x:Uid="WsTokenTextBox" />
+                </StackPanel>
+            </Expander>
+            <!--  Audio Settings  -->
+            <Expander
+                x:Uid="AudioSettings"
+                IsExpanded="False"
+                Style="{StaticResource SettingsExpanderStyle}">
+                <StackPanel
+                    Padding="0,12,0,0"
+                    HorizontalAlignment="Stretch"
+                    Spacing="12">
+                    <Slider
+                        x:Name="DefaultVolumeSlider"
+                        x:Uid="DefaultVolumeSlider"
+                        Maximum="100"
+                        Minimum="0"
+                        ValueChanged="DefaultVolumeSlider_ValueChanged"
+                        Value="80" />
+                    <ToggleSwitch
+                        x:Name="AutoAdjustVolumeToggle"
+                        x:Uid="AutoAdjustVolumeToggle"
+                        IsOn="True" />
+                    <TextBox
+                        x:Name="AudioInputDeviceTextBox"
+                        x:Uid="AudioInputDeviceTextBox"
+                        IsReadOnly="True" />
+                    <TextBox
+                        x:Name="AudioOutputDeviceTextBox"
+                        x:Uid="AudioOutputDeviceTextBox"
+                        IsReadOnly="True" />
+                    <Button x:Name="RefreshAudioDevicesButton" Click="RefreshAudioDevicesButton_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon FontSize="16" Glyph="&#xE72C;" />
+                            <TextBlock x:Uid="RefreshAudioDevicesButton" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Expander>
+            <!--  Application Settings  -->
+            <Expander
+                x:Uid="ApplicationSettings"
+                IsExpanded="False"
+                Style="{StaticResource SettingsExpanderStyle}">
+                <StackPanel
+                    Padding="0,12,0,0"
+                    HorizontalAlignment="Stretch"
+                    Spacing="12">
+                    <ToggleSwitch
+                        x:Name="AutoStartToggle"
+                        x:Uid="AutoStartToggle"
+                        IsOn="False" />
+                    <ToggleSwitch
+                        x:Name="MinimizeToTrayToggle"
+                        x:Uid="MinimizeToTrayToggle"
+                        IsOn="True" />
+                    <ToggleSwitch
+                        x:Name="EnableLoggingToggle"
+                        x:Uid="EnableLoggingToggle"
+                        IsOn="True" />
+                    <ComboBox
+                        x:Name="ThemeComboBox"
+                        x:Uid="ThemeComboBox"
+                        SelectedIndex="0">
+                        <ComboBoxItem x:Uid="ThemeComboBoxFollowSystem" />
+                        <ComboBoxItem x:Uid="ThemeComboBoxLight" />
+                        <ComboBoxItem x:Uid="ThemeComboBoxDark" />
+                    </ComboBox>
+                </StackPanel>
+            </Expander>
+            <!--  Advanced Settings  -->
+            <Expander
+                x:Uid="AdvancedSettings"
+                IsExpanded="False"
+                Style="{StaticResource SettingsExpanderStyle}">
+                <StackPanel
+                    Padding="0,12,0,0"
+                    HorizontalAlignment="Stretch"
+                    Spacing="12">
+                    <NumberBox
+                        x:Name="ConnectionTimeoutNumberBox"
+                        x:Uid="ConnectionTimeoutNumberBox"
+                        Maximum="60"
+                        Minimum="5"
+                        Value="30" />
+                    <NumberBox
+                        x:Name="AudioSampleRateNumberBox"
+                        x:Uid="AudioSampleRateNumberBox"
+                        Maximum="48000"
+                        Minimum="8000"
+                        Value="16000" />
+                    <NumberBox
+                        x:Name="AudioChannelsNumberBox"
+                        x:Uid="AudioChannelsNumberBox"
+                        Maximum="2"
+                        Minimum="1"
+                        Value="1" />
+                    <ComboBox
+                        x:Name="AudioCodecComboBox"
+                        x:Uid="AudioCodecComboBox"
+                        SelectedIndex="0">
+                        <ComboBoxItem Content="Opus" />
+                        <ComboBoxItem Content="PCM" />
+                        <ComboBoxItem Content="AAC" />
+                    </ComboBox>
+                    <Button
+                        x:Name="ResetToDefaultsButton"
+                        Click="ResetToDefaultsButton_Click"
+                        Style="{ThemeResource DefaultButtonStyle}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon FontSize="16" Glyph="&#xE777;" />
+                            <TextBlock x:Uid="ResetToDefaultsButton" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Expander>
+            <!--  About Section  -->
+            <Expander
+                x:Uid="AboutSection"
+                IsExpanded="False"
+                Style="{StaticResource SettingsExpanderStyle}">
+                <StackPanel
+                    Padding="0,12,0,0"
+                    HorizontalAlignment="Stretch"
+                    Spacing="12">
+                    <TextBlock x:Uid="AboutSectionVersion" />
+                    <TextBlock x:Uid="AboutSectionFramework" />
+                    <HyperlinkButton x:Uid="AboutSectionSourceCode" NavigateUri="https://github.com/your-repo" />
+                    <HyperlinkButton x:Uid="AboutSectionReportIssue" NavigateUri="https://github.com/your-repo/issues" />
+                </StackPanel>
+            </Expander>
+
+            <!--  Action Buttons  -->
+            <StackPanel
+                Margin="0,20,0,0"
+                Orientation="Horizontal"
+                Spacing="12">
+                <Button
+                    x:Name="SaveSettingsButton"
+                    Click="SaveSettingsButton_Click"
+                    Style="{ThemeResource AccentButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontSize="16" Glyph="&#xE74E;" />
+                        <TextBlock x:Uid="SaveSettingsButton" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="ExportSettingsButton" Click="ExportSettingsButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontSize="16" Glyph="&#xE74C;" />
+                        <TextBlock x:Uid="ExportSettingsButton" />
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="ImportSettingsButton" Click="ImportSettingsButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontSize="16" Glyph="&#xE8B5;" />
+                        <TextBlock x:Uid="ImportSettingsButton" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Page>
