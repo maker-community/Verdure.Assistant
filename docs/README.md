@@ -28,7 +28,7 @@
 ## 🔗 外部资源
 
 - [.NET 9.0 文档](https://docs.microsoft.com/dotnet/)
-- [WinUI 3 文档](https://docs.microsoft.com/windows/winui/)
+- [WinUI 3 文档](https://learn.microsoft.com/zh-cn/windows/apps/windows-app-sdk/)
 - [Opus 音频编解码](https://opus-codec.org/)
 
 ## 📝 文档贡献

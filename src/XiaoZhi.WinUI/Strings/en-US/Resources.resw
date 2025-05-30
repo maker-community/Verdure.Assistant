@@ -390,4 +390,7 @@
   <data name="ApplicationSettings.Header" xml:space="preserve">
     <value>Application Settings</value>
   </data>
+  <data name="AppDisplayName" xml:space="preserve">
+    <value>Verdure Assistant</value>
+  </data>
 </root>
