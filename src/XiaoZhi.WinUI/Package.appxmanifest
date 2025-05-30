@@ -15,8 +15,8 @@
   <mp:PhoneIdentity PhoneProductId="a3e89e4d-021b-450b-8e47-5d43d16b3504" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
-    <DisplayName>XiaoZhi.WinUI</DisplayName>
-    <PublisherDisplayName>User Name</PublisherDisplayName>
+    <DisplayName>verdure.assistant</DisplayName>
+    <PublisherDisplayName>Verdure Hiro</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
@@ -34,12 +34,11 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
-        DisplayName="XiaoZhi.WinUI"
-        Description="XiaoZhi.WinUI"
+        DisplayName="ms-resource:AppDisplayName"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
-        Square44x44Logo="Assets\Square44x44Logo.png">
-        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+        Square44x44Logo="Assets\Square44x44Logo.png" Description="ms-resource:AppDisplayName">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png"  Square71x71Logo="Assets\SmallTile.png" Square310x310Logo="Assets\LargeTile.png"/>
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
       </uap:VisualElements>
     </Application>

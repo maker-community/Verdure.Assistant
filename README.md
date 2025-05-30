@@ -5,17 +5,17 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/yourusername/xiaozhi-dotnet/releases/latest">
-    <img src="https://img.shields.io/github/v/release/yourusername/xiaozhi-dotnet?style=flat-square&logo=github&color=blue" alt="Release"/>
+  <a href="https://github.com/maker-community/xiaozhi-dotnet/releases/latest">
+    <img src="https://img.shields.io/github/v/release/maker-community/xiaozhi-dotnet?style=flat-square&logo=github&color=blue" alt="Release"/>
   </a>
-  <a href="https://github.com/yourusername/xiaozhi-dotnet/actions">
-    <img src="https://img.shields.io/github/actions/workflow/status/yourusername/xiaozhi-dotnet/build.yml?style=flat-square&logo=github" alt="Build Status"/>
+  <a href="https://github.com/maker-community/xiaozhi-dotnet/actions">
+    <img src="https://img.shields.io/github/actions/workflow/status/maker-community/xiaozhi-dotnet/build.yml?style=flat-square&logo=github" alt="Build Status"/>
   </a>
   <a href="https://opensource.org/licenses/MIT">
     <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License: MIT"/>
   </a>
-  <a href="https://github.com/yourusername/xiaozhi-dotnet/stargazers">
-    <img src="https://img.shields.io/github/stars/yourusername/xiaozhi-dotnet?style=flat-square&logo=github" alt="Stars"/>
+  <a href="https://github.com/maker-community/xiaozhi-dotnet/stargazers">
+    <img src="https://img.shields.io/github/stars/maker-community/xiaozhi-dotnet?style=flat-square&logo=github" alt="Stars"/>
   </a>
 </p>
 
@@ -132,7 +132,7 @@ xiaozhi-dotnet/
 
 1. **克隆仓库**
    ```bash
-   git clone https://github.com/yourusername/xiaozhi-dotnet.git
+   git clone https://github.com/maker-community/xiaozhi-dotnet.git
    cd xiaozhi-dotnet
    ```
 
@@ -433,14 +433,15 @@ ENTRYPOINT ["./XiaoZhi.Console"]
 
 ## 🙏 致谢
 
-- 感谢 [py-xiaozhi](samples/py-xiaozhi/) 项目提供的参考实现
+- 感谢 [py-xiaozhi](https://github.com/huangjunsen0406/py-xiaozhi) 项目提供的参考实现
+- 感谢 [xiaozhi-sharp](https://github.com/GreenShadeZhang/xiaozhi-sharp) 项目提供的参考实现
 - 感谢所有贡献者的努力
 - 感谢开源社区的支持
 
 ## 📞 联系我们
 
-- **GitHub Issues** - [提交问题或建议](https://github.com/yourusername/xiaozhi-dotnet/issues)
-- **GitHub Discussions** - [参与讨论](https://github.com/yourusername/xiaozhi-dotnet/discussions)
+- **GitHub Issues** - [提交问题或建议](https://github.com/maker-community/xiaozhi-dotnet/issues)
+- **GitHub Discussions** - [参与讨论](https://github.com/ymaker-community/xiaozhi-dotnet/discussions)
 
 ---
 
