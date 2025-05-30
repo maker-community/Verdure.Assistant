@@ -19,17 +19,15 @@
 
     <ScrollViewer Padding="20" VerticalScrollBarVisibility="Auto">
         <StackPanel MaxWidth="600" Spacing="16">
-
             <!--  Page Title  -->
             <TextBlock
+                x:Uid="SettingsPage_Title"
                 Margin="0,0,0,10"
                 FontSize="24"
-                FontWeight="Bold"
-                Text="设置" />
-
+                FontWeight="Bold" />
             <!--  Wake Word Settings  -->
             <Expander
-                Header="唤醒词设置"
+                x:Uid="WakeWordSettings_Header"
                 IsExpanded="True"
                 Style="{StaticResource SettingsExpanderStyle}">
                 <StackPanel
@@ -38,31 +36,26 @@
                     Spacing="12">
                     <ToggleSwitch
                         x:Name="WakeWordToggle"
-                        Header="启用唤醒词唤醒"
+                        x:Uid="WakeWordToggle"
                         IsOn="False"
                         Toggled="WakeWordToggle_Toggled" />
 
                     <TextBox
                         x:Name="WakeWordsTextBox"
-                        Header="唤醒词 (多个唤醒词请用英文逗号 ',' 分隔)"
-                        PlaceholderText="例如: 小智,小智同学"
+                        x:Uid="WakeWordsTextBox"
                         Text="" />
                 </StackPanel>
             </Expander>
-
             <!--  Device Settings  -->
             <Expander
-                Header="设备设置"
+                x:Uid="DeviceSettings_Header"
                 IsExpanded="True"
                 Style="{StaticResource SettingsExpanderStyle}">
                 <StackPanel
                     Padding="0,12,0,0"
                     HorizontalAlignment="Stretch"
                     Spacing="12">
-                    <TextBox
-                        x:Name="DeviceIdTextBox"
-                        Header="Device ID"
-                        PlaceholderText="输入设备ID" />
+                    <TextBox x:Name="DeviceIdTextBox" x:Uid="DeviceIdTextBox" />
 
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -75,10 +68,10 @@
                         </Grid.RowDefinitions>
 
                         <TextBlock
+                            x:Uid="OtaAddress_Label"
                             Grid.Row="0"
                             Grid.ColumnSpan="2"
-                            Margin="0,0,0,8"
-                            Text="OTA地址:" />
+                            Margin="0,0,0,8" />
 
                         <ComboBox
                             x:Name="OtaProtocolComboBox"
@@ -90,12 +83,11 @@
                             <ComboBoxItem Content="https://" />
                             <ComboBoxItem Content="http://" />
                         </ComboBox>
-
                         <TextBox
                             x:Name="OtaAddressTextBox"
+                            x:Uid="OtaAddressTextBox"
                             Grid.Row="1"
-                            Grid.Column="1"
-                            PlaceholderText="输入OTA服务器地址" />
+                            Grid.Column="1" />
                     </Grid>
 
                     <Grid>
@@ -107,12 +99,11 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-
                         <TextBlock
+                            x:Uid="WebSocketAddress_Label"
                             Grid.Row="0"
                             Grid.ColumnSpan="2"
-                            Margin="0,12,0,8"
-                            Text="WebSocket地址:" />
+                            Margin="0,12,0,8" />
 
                         <ComboBox
                             x:Name="WsProtocolComboBox"
@@ -124,24 +115,19 @@
                             <ComboBoxItem Content="wss://" />
                             <ComboBoxItem Content="ws://" />
                         </ComboBox>
-
                         <TextBox
                             x:Name="WsAddressTextBox"
+                            x:Uid="WsAddressTextBox"
                             Grid.Row="1"
-                            Grid.Column="1"
-                            PlaceholderText="输入WebSocket服务器地址" />
+                            Grid.Column="1" />
                     </Grid>
 
-                    <TextBox
-                        x:Name="WsTokenTextBox"
-                        Header="Access Token"
-                        PlaceholderText="输入访问令牌" />
+                    <TextBox x:Name="WsTokenTextBox" x:Uid="WsTokenTextBox" />
                 </StackPanel>
             </Expander>
-
             <!--  Audio Settings  -->
             <Expander
-                Header="音频设置"
+                x:Uid="AudioSettings_Header"
                 IsExpanded="False"
                 Style="{StaticResource SettingsExpanderStyle}">
                 <StackPanel
@@ -150,7 +136,7 @@
                     Spacing="12">
                     <Slider
                         x:Name="DefaultVolumeSlider"
-                        Header="默认音量"
+                        x:Uid="DefaultVolumeSlider"
                         Maximum="100"
                         Minimum="0"
                         ValueChanged="DefaultVolumeSlider_ValueChanged"
@@ -158,33 +144,29 @@
 
                     <ToggleSwitch
                         x:Name="AutoAdjustVolumeToggle"
-                        Header="自动调节音量"
+                        x:Uid="AutoAdjustVolumeToggle"
                         IsOn="True" />
 
                     <TextBox
                         x:Name="AudioInputDeviceTextBox"
-                        Header="音频输入设备"
-                        IsReadOnly="True"
-                        PlaceholderText="默认音频输入设备" />
+                        x:Uid="AudioInputDeviceTextBox"
+                        IsReadOnly="True" />
 
                     <TextBox
                         x:Name="AudioOutputDeviceTextBox"
-                        Header="音频输出设备"
-                        IsReadOnly="True"
-                        PlaceholderText="默认音频输出设备" />
-
+                        x:Uid="AudioOutputDeviceTextBox"
+                        IsReadOnly="True" />
                     <Button x:Name="RefreshAudioDevicesButton" Click="RefreshAudioDevicesButton_Click">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon FontSize="16" Glyph="&#xE72C;" />
-                            <TextBlock Text="刷新音频设备" />
+                            <TextBlock x:Uid="RefreshAudioDevicesButton_Content" />
                         </StackPanel>
                     </Button>
                 </StackPanel>
             </Expander>
-
             <!--  Application Settings  -->
             <Expander
-                Header="应用程序设置"
+                x:Uid="ApplicationSettings_Header"
                 IsExpanded="False"
                 Style="{StaticResource SettingsExpanderStyle}">
                 <StackPanel
@@ -193,33 +175,32 @@
                     Spacing="12">
                     <ToggleSwitch
                         x:Name="AutoStartToggle"
-                        Header="开机自启动"
+                        x:Uid="AutoStartToggle"
                         IsOn="False" />
 
                     <ToggleSwitch
                         x:Name="MinimizeToTrayToggle"
-                        Header="最小化到系统托盘"
+                        x:Uid="MinimizeToTrayToggle"
                         IsOn="True" />
 
                     <ToggleSwitch
                         x:Name="EnableLoggingToggle"
-                        Header="启用详细日志"
+                        x:Uid="EnableLoggingToggle"
                         IsOn="True" />
 
                     <ComboBox
                         x:Name="ThemeComboBox"
-                        Header="应用主题"
+                        x:Uid="ThemeComboBox"
                         SelectedIndex="0">
-                        <ComboBoxItem Content="跟随系统" />
-                        <ComboBoxItem Content="浅色" />
-                        <ComboBoxItem Content="深色" />
+                        <ComboBoxItem x:Uid="ThemeComboBox_FollowSystem" />
+                        <ComboBoxItem x:Uid="ThemeComboBox_Light" />
+                        <ComboBoxItem x:Uid="ThemeComboBox_Dark" />
                     </ComboBox>
                 </StackPanel>
             </Expander>
-
             <!--  Advanced Settings  -->
             <Expander
-                Header="高级设置"
+                x:Uid="AdvancedSettings_Header"
                 IsExpanded="False"
                 Style="{StaticResource SettingsExpanderStyle}">
                 <StackPanel
@@ -228,49 +209,47 @@
                     Spacing="12">
                     <NumberBox
                         x:Name="ConnectionTimeoutNumberBox"
-                        Header="连接超时时间 (秒)"
+                        x:Uid="ConnectionTimeoutNumberBox"
                         Maximum="60"
                         Minimum="5"
                         Value="30" />
 
                     <NumberBox
                         x:Name="AudioSampleRateNumberBox"
-                        Header="音频采样率 (Hz)"
+                        x:Uid="AudioSampleRateNumberBox"
                         Maximum="48000"
                         Minimum="8000"
                         Value="16000" />
 
                     <NumberBox
                         x:Name="AudioChannelsNumberBox"
-                        Header="音频声道数"
+                        x:Uid="AudioChannelsNumberBox"
                         Maximum="2"
                         Minimum="1"
                         Value="1" />
 
                     <ComboBox
                         x:Name="AudioCodecComboBox"
-                        Header="音频编码格式"
+                        x:Uid="AudioCodecComboBox"
                         SelectedIndex="0">
                         <ComboBoxItem Content="Opus" />
                         <ComboBoxItem Content="PCM" />
                         <ComboBoxItem Content="AAC" />
                     </ComboBox>
-
                     <Button
                         x:Name="ResetToDefaultsButton"
                         Click="ResetToDefaultsButton_Click"
                         Style="{ThemeResource DefaultButtonStyle}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon FontSize="16" Glyph="&#xE777;" />
-                            <TextBlock Text="恢复默认设置" />
+                            <TextBlock x:Uid="ResetToDefaultsButton_Content" />
                         </StackPanel>
                     </Button>
                 </StackPanel>
             </Expander>
-
             <!--  About Section  -->
             <Expander
-                Header="关于"
+                x:Uid="AboutSection_Header"
                 IsExpanded="False"
                 Style="{StaticResource SettingsExpanderStyle}">
                 <StackPanel
@@ -278,13 +257,13 @@
                     HorizontalAlignment="Stretch"
                     Spacing="12">
                     <TextBlock
+                        x:Uid="AboutSection_AppName"
                         FontSize="16"
-                        FontWeight="SemiBold"
-                        Text="小智AI客户端" />
-                    <TextBlock Text="版本: 1.0.0" />
-                    <TextBlock Text="基于 Windows App SDK 开发" />
-                    <HyperlinkButton Content="查看源代码" NavigateUri="https://github.com/your-repo" />
-                    <HyperlinkButton Content="报告问题" NavigateUri="https://github.com/your-repo/issues" />
+                        FontWeight="SemiBold" />
+                    <TextBlock x:Uid="AboutSection_Version" />
+                    <TextBlock x:Uid="AboutSection_Framework" />
+                    <HyperlinkButton x:Uid="AboutSection_SourceCode" NavigateUri="https://github.com/your-repo" />
+                    <HyperlinkButton x:Uid="AboutSection_ReportIssue" NavigateUri="https://github.com/your-repo/issues" />
                 </StackPanel>
             </Expander>
 
@@ -299,21 +278,21 @@
                     Style="{ThemeResource AccentButtonStyle}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon FontSize="16" Glyph="&#xE74E;" />
-                        <TextBlock Text="保存设置" />
+                        <TextBlock x:Uid="SaveSettingsButton_Content" />
                     </StackPanel>
                 </Button>
 
                 <Button x:Name="ExportSettingsButton" Click="ExportSettingsButton_Click">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon FontSize="16" Glyph="&#xE74C;" />
-                        <TextBlock Text="导出设置" />
+                        <TextBlock x:Uid="ExportSettingsButton_Content" />
                     </StackPanel>
                 </Button>
 
                 <Button x:Name="ImportSettingsButton" Click="ImportSettingsButton_Click">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon FontSize="16" Glyph="&#xE8B5;" />
-                        <TextBlock Text="导入设置" />
+                        <TextBlock x:Uid="ImportSettingsButton_Content" />
                     </StackPanel>
                 </Button>
             </StackPanel>

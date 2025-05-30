@@ -1,13 +1,7 @@
-using System;
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Input;
-using Microsoft.Extensions.DependencyInjection;
-using System.Threading.Tasks;
-using XiaoZhi.Core.Services;
-using XiaoZhi.Core.Models;
 using Microsoft.Extensions.Logging;
+using Windows.ApplicationModel.Resources;
 using Windows.Storage;
+using XiaoZhi.Core.Services;
 
 namespace XiaoZhi.WinUI.Views
 {
@@ -16,11 +10,14 @@ namespace XiaoZhi.WinUI.Views
         private readonly ILogger<SettingsPage>? _logger;
         private readonly IConfigurationService? _configurationService;
         private readonly ApplicationDataContainer _localSettings;
-
+        private readonly ResourceLoader _resourceLoader;
         public SettingsPage()
         {
             this.InitializeComponent();
-            
+
+            // Initialize ResourceLoader
+            _resourceLoader = new();
+
             try
             {
                 _logger = App.GetService<ILogger<SettingsPage>>();
@@ -43,7 +40,7 @@ namespace XiaoZhi.WinUI.Views
                 var wakeWordEnabled = _localSettings?.Values["WakeWordEnabled"] as bool? ?? false;
                 WakeWordToggle.IsOn = wakeWordEnabled;
 
-                var wakeWords = _localSettings?.Values["WakeWords"] as string ?? "小智,小智同学";
+                var wakeWords = _localSettings?.Values["WakeWords"] as string ?? _resourceLoader.GetString("WakeWords_Default");
                 WakeWordsTextBox.Text = wakeWords;
 
                 // Load device settings
@@ -95,7 +92,7 @@ namespace XiaoZhi.WinUI.Views
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed to load settings");
-                await ShowErrorDialog($"加载设置时出错: {ex.Message}");
+                await ShowErrorDialog(string.Format(_resourceLoader.GetString("Error_LoadSettings"), ex.Message));
             }
         }
 
@@ -106,17 +103,17 @@ namespace XiaoZhi.WinUI.Views
                 // Load audio input devices
                 var inputDevices = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(
                     Windows.Media.Devices.MediaDevice.GetAudioCaptureSelector());
-                
+
                 // Load audio output devices  
                 var outputDevices = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(
                     Windows.Media.Devices.MediaDevice.GetAudioRenderSelector());
-                
+
                 // Update device text boxes with current default devices
                 if (inputDevices.Count > 0)
                 {
                     AudioInputDeviceTextBox.Text = inputDevices[0].Name;
                 }
-                
+
                 if (outputDevices.Count > 0)
                 {
                     AudioOutputDeviceTextBox.Text = outputDevices[0].Name;
@@ -125,7 +122,7 @@ namespace XiaoZhi.WinUI.Views
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed to load audio devices");
-                await ShowErrorDialog($"加载音频设备时出错: {ex.Message}");
+                await ShowErrorDialog(string.Format(_resourceLoader.GetString("Error_LoadAudioDevices"), ex.Message));
             }
         }
 
@@ -206,7 +203,7 @@ namespace XiaoZhi.WinUI.Views
         private async void RefreshAudioDevicesButton_Click(object sender, RoutedEventArgs e)
         {
             await LoadAudioDevicesAsync();
-            await ShowInfoDialog("音频设备列表已刷新");
+            await ShowInfoDialog(_resourceLoader.GetString("Info_AudioDevicesRefreshed"));
         }
 
         private void AutoStartToggle_Toggled(object sender, RoutedEventArgs e)
@@ -269,11 +266,11 @@ namespace XiaoZhi.WinUI.Views
             try
             {
                 // Settings are automatically saved when changed
-                await ShowInfoDialog("设置已保存");
+                await ShowInfoDialog(_resourceLoader.GetString("Info_SettingsSaved"));
             }
             catch (Exception ex)
             {
-                await ShowErrorDialog($"保存设置时出错: {ex.Message}");
+                await ShowErrorDialog(string.Format(_resourceLoader.GetString("Error_SaveSettings"), ex.Message));
             }
         }
 
@@ -282,11 +279,11 @@ namespace XiaoZhi.WinUI.Views
             try
             {
                 // Export settings functionality - to be implemented
-                await ShowInfoDialog("导出设置功能将在后续版本中实现");
+                await ShowInfoDialog(_resourceLoader.GetString("Info_ExportNotImplemented"));
             }
             catch (Exception ex)
             {
-                await ShowErrorDialog($"导出设置时出错: {ex.Message}");
+                await ShowErrorDialog(string.Format(_resourceLoader.GetString("Error_ExportSettings"), ex.Message));
             }
         }
 
@@ -295,11 +292,11 @@ namespace XiaoZhi.WinUI.Views
             try
             {
                 // Import settings functionality - to be implemented
-                await ShowInfoDialog("导入设置功能将在后续版本中实现");
+                await ShowInfoDialog(_resourceLoader.GetString("Info_ImportNotImplemented"));
             }
             catch (Exception ex)
             {
-                await ShowErrorDialog($"导入设置时出错: {ex.Message}");
+                await ShowErrorDialog(string.Format(_resourceLoader.GetString("Error_ImportSettings"), ex.Message));
             }
         }
 
@@ -309,15 +306,14 @@ namespace XiaoZhi.WinUI.Views
             {
                 // Clear all settings
                 _localSettings.Values.Clear();
-                
                 // Reload default settings
                 await LoadSettingsAsync();
-                
-                await ShowInfoDialog("设置已重置为默认值");
+
+                await ShowInfoDialog(_resourceLoader.GetString("Info_SettingsReset"));
             }
             catch (Exception ex)
             {
-                await ShowErrorDialog($"重置设置时出错: {ex.Message}");
+                await ShowErrorDialog(string.Format(_resourceLoader.GetString("Error_ResetSettings"), ex.Message));
             }
         }
 
@@ -329,9 +325,9 @@ namespace XiaoZhi.WinUI.Views
         {
             var dialog = new ContentDialog()
             {
-                Title = "信息",
+                Title = _resourceLoader.GetString("Dialog_InfoTitle"),
                 Content = message,
-                CloseButtonText = "确定",
+                CloseButtonText = _resourceLoader.GetString("Dialog_OkButton"),
                 XamlRoot = this.XamlRoot
             };
             await dialog.ShowAsync();
@@ -341,9 +337,9 @@ namespace XiaoZhi.WinUI.Views
         {
             var dialog = new ContentDialog()
             {
-                Title = "错误",
+                Title = _resourceLoader.GetString("Dialog_ErrorTitle"),
                 Content = message,
-                CloseButtonText = "确定",
+                CloseButtonText = _resourceLoader.GetString("Dialog_OkButton"),
                 XamlRoot = this.XamlRoot
             };
             await dialog.ShowAsync();

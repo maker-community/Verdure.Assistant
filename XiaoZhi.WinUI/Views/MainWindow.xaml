@@ -34,13 +34,13 @@
                 <NavigationView.MenuItems>
                     <NavigationViewItem
                         x:Name="MainPageNavItem"
-                        Content="对话"
+                        x:Uid="MainPageNavItem"
                         Icon="Message"
                         IsSelected="True"
                         Tag="HomePage" />
                     <NavigationViewItem
                         x:Name="SettingsNavItem"
-                        Content="设置"
+                        x:Uid="SettingsNavItem"
                         Icon="Setting"
                         Tag="SettingsPage" />
                 </NavigationView.MenuItems>

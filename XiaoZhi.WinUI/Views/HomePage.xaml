@@ -34,13 +34,13 @@
                         x:Name="StatusIcon"
                         FontSize="20"
                         Foreground="{ThemeResource SystemAccentColor}"
-                        Glyph="&#xE916;" />
+                        Glyph="&#xE916;" />                    
                     <TextBlock
                         x:Name="StatusText"
+                        x:Uid="StatusText"
                         VerticalAlignment="Center"
                         FontSize="14"
-                        FontWeight="SemiBold"
-                        Text="状态: 未连接" />
+                        FontWeight="SemiBold" />
                 </StackPanel>
 
                 <StackPanel
@@ -52,12 +52,12 @@
                         Width="16"
                         Height="16"
                         Background="{ThemeResource SystemFillColorCriticalBrush}"
-                        CornerRadius="8" />
+                        CornerRadius="8" />                    
                     <TextBlock
                         x:Name="ConnectionStatusText"
+                        x:Uid="ConnectionStatusText"
                         VerticalAlignment="Center"
-                        FontSize="12"
-                        Text="离线" />
+                        FontSize="12" />
                 </StackPanel>
             </Grid>
         </Border>
@@ -122,26 +122,26 @@
                         Padding="16"
                         Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
                         CornerRadius="8">
-                        <ScrollViewer MaxHeight="80" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer MaxHeight="80" VerticalScrollBarVisibility="Auto">                            
                             <TextBlock
                                 x:Name="TtsText"
+                                x:Uid="TtsText"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 FontSize="13"
-                                Text="待命"
                                 TextWrapping="Wrap" />
                         </ScrollViewer>
                     </Border>
 
                     <!--  Audio Controls Stack  -->
                     <Grid Grid.Row="2" Margin="0,15,0,0">
-                        <!--  Volume Control  -->
+                        <!--  Volume Control  -->                        
                         <StackPanel x:Name="VolumeControlPanel" Spacing="8">
                             <TextBlock
+                                x:Uid="VolumeControl_Header"
                                 FontSize="12"
                                 FontWeight="SemiBold"
-                                Opacity="0.8"
-                                Text="音量控制" />
+                                Opacity="0.8" />
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -182,16 +182,16 @@
                             </Grid>
                         </StackPanel>
 
-                        <!--  Microphone Visualizer (Hidden by default)  -->
+                        <!--  Microphone Visualizer (Hidden by default)  -->                        
                         <StackPanel
                             x:Name="MicVisualizerPanel"
                             Spacing="8"
                             Visibility="Collapsed">
                             <TextBlock
+                                x:Uid="MicrophoneMonitor_Header"
                                 FontSize="12"
                                 FontWeight="SemiBold"
-                                Opacity="0.8"
-                                Text="麦克风监测" />
+                                Opacity="0.8" />
                             <Border
                                 Height="50"
                                 Padding="10"
@@ -222,10 +222,10 @@
                             PointerCaptureLost="ManualButton_PointerCaptureLost"
                             PointerPressed="ManualButton_PointerPressed"
                             PointerReleased="ManualButton_PointerReleased"
-                            Style="{ThemeResource AccentButtonStyle}">
+                            Style="{ThemeResource AccentButtonStyle}">                            
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon FontSize="16" Glyph="&#xE720;" />
-                                <TextBlock x:Name="ManualButtonText" Text="按住后说话" />
+                                <TextBlock x:Name="ManualButtonText" x:Uid="ManualButtonText" />
                             </StackPanel>
                         </Button>
 
@@ -238,10 +238,10 @@
                             HorizontalAlignment="Stretch"
                             Click="AutoButton_Click"
                             Style="{ThemeResource AccentButtonStyle}"
-                            Visibility="Collapsed">
+                            Visibility="Collapsed">                            
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon FontSize="16" Glyph="&#xE768;" />
-                                <TextBlock x:Name="AutoButtonText" Text="开始对话" />
+                                <TextBlock x:Name="AutoButtonText" x:Uid="AutoButtonText" />
                             </StackPanel>
                         </Button>
 
@@ -252,10 +252,10 @@
                             Height="36"
                             Margin="0,0,0,8"
                             HorizontalAlignment="Stretch"
-                            Click="AbortButton_Click">
+                            Click="AbortButton_Click">                            
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon FontSize="14" Glyph="&#xE71A;" />
-                                <TextBlock Text="打断对话" />
+                                <TextBlock x:Uid="AbortButton_Content" />
                             </StackPanel>
                         </Button>
 
@@ -266,10 +266,10 @@
                             Height="36"
                             HorizontalAlignment="Stretch"
                             Click="ModeToggleButton_Click"
-                            Style="{ThemeResource DefaultButtonStyle}">
+                            Style="{ThemeResource DefaultButtonStyle}">                            
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon FontSize="14" Glyph="&#xE8AB;" />
-                                <TextBlock x:Name="ModeToggleText" Text="手动对话" />
+                                <TextBlock x:Name="ModeToggleText" x:Uid="ModeToggleText" />
                             </StackPanel>
                         </Button>
                     </Grid>
@@ -302,13 +302,13 @@
                             Height="36"
                             Margin="0,0,5,0"
                             Click="ConnectButton_Click"
-                            Style="{ThemeResource AccentButtonStyle}">
+                            Style="{ThemeResource AccentButtonStyle}">                            
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon
                                     x:Name="ConnectIcon"
                                     FontSize="16"
                                     Glyph="&#xE703;" />
-                                <TextBlock x:Name="ConnectText" Text="连接" />
+                                <TextBlock x:Name="ConnectText" x:Uid="ConnectText" />
                             </StackPanel>
                         </Button>
 
@@ -318,10 +318,10 @@
                             Height="36"
                             Margin="5,0,0,0"
                             Click="DisconnectButton_Click"
-                            IsEnabled="False">
+                            IsEnabled="False">                            
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon FontSize="16" Glyph="&#xE711;" />
-                                <TextBlock Text="断开" />
+                                <TextBlock x:Uid="DisconnectButton_Content" />
                             </StackPanel>
                         </Button>
                     </Grid>
@@ -331,15 +331,14 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
+                        </Grid.ColumnDefinitions>                        
                         <TextBox
                             x:Name="MessageTextBox"
+                            x:Uid="MessageTextBox"
                             Grid.Column="0"
                             Height="36"
                             Margin="0,0,10,0"
-                            KeyDown="MessageTextBox_KeyDown"
-                            PlaceholderText="输入文字..." />
+                            KeyDown="MessageTextBox_KeyDown" />
 
                         <Button
                             x:Name="SendButton"
@@ -348,7 +347,7 @@
                             MinWidth="60"
                             Click="SendButton_Click"
                             Style="{ThemeResource AccentButtonStyle}">
-                            <TextBlock Text="发送" />
+                            <TextBlock x:Uid="SendButton_Content" />
                         </Button>
                     </Grid>
 
@@ -363,13 +362,13 @@
                             VerticalScrollBarVisibility="Auto"
                             ZoomMode="Disabled">
                             <StackPanel x:Name="MessagesPanel" Spacing="8">
-                                <!--  Messages will be added here programmatically  -->
+                                <!--  Messages will be added here programmatically  -->                                
                                 <TextBlock
+                                    x:Uid="MessagesPanel_WaitingText"
                                     Margin="0,20"
                                     HorizontalAlignment="Center"
                                     FontSize="13"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="等待对话开始..." />
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
                         </ScrollViewer>
                     </Border>

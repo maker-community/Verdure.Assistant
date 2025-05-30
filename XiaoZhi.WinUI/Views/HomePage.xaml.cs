@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Input;
+using Windows.ApplicationModel.Resources;
 using XiaoZhi.Core.Constants;
 using XiaoZhi.Core.Interfaces;
 using XiaoZhi.Core.Models;
@@ -16,13 +17,15 @@ public sealed partial class HomePage : Page
     private readonly IVoiceChatService? _voiceChatService;
     private readonly EmotionManager? _emotionManager;
     private InterruptManager? _interruptManager;
+    private readonly ResourceLoader _resourceLoader;
     private bool _isConnected = false;
     private bool _isListening = false;
-    private bool _isAutoMode = false;
-
+    private bool _isAutoMode = false;    
     public HomePage()
     {
         this.InitializeComponent();
+        _resourceLoader = new();
+        
         try
         {
             _logger = App.GetService<ILogger<HomePage>>();
@@ -38,14 +41,12 @@ public sealed partial class HomePage : Page
 
         InitializeUI();
         BindEvents();
-    }
-
-    private void InitializeUI()
+    }    private void InitializeUI()
     {
         // 初始化状态文本
-        StatusText.Text = "状态: 未连接";
-        ConnectionStatusText.Text = "离线";
-        TtsText.Text = "待命";
+        StatusText.Text = _resourceLoader.GetString("Status_Disconnected");
+        ConnectionStatusText.Text = _resourceLoader.GetString("ConnectionStatus_Offline");
+        TtsText.Text = _resourceLoader.GetString("TtsText_Standby");
         DefaultEmotionText.Text = "😊";
 
         // 设置初始音量
@@ -216,23 +217,23 @@ public sealed partial class HomePage : Page
             switch (state)
             {
                 case DeviceState.Listening:
-                    StatusText.Text = "状态: 监听中";
+                    StatusText.Text = _resourceLoader.GetString("Status_Listening");
                     // Update emotion/visual indicators but don't touch connection state
                     SetEmotion("listening");
                     break;
                 case DeviceState.Speaking:
-                    StatusText.Text = "状态: 播放中";
+                    StatusText.Text = _resourceLoader.GetString("Status_Playing");
                     // Update emotion/visual indicators but don't touch connection state
                     SetEmotion("speaking");
                     break;
                 case DeviceState.Connecting:
-                    StatusText.Text = "状态: 连接中";
+                    StatusText.Text = _resourceLoader.GetString("Status_Connecting");
                     // Update emotion/visual indicators but don't touch connection state
                     SetEmotion("thinking");
                     break;
                 case DeviceState.Idle:
                 default:
-                    StatusText.Text = "状态: 待机";
+                    StatusText.Text = _resourceLoader.GetString("Status_Standby");
                     // Update emotion/visual indicators but don't touch connection state
                     SetEmotion("neutral");
                     break;
@@ -251,11 +252,11 @@ public sealed partial class HomePage : Page
             {
                 if (_voiceChatService?.KeepListening == true && _isListening)
                 {
-                    AutoButtonText.Text = "停止对话";
+                    AutoButtonText.Text = _resourceLoader.GetString("AutoButtonText_Stop");
                 }
                 else if (_voiceChatService?.KeepListening == false || !_isListening)
                 {
-                    AutoButtonText.Text = "开始对话";
+                    AutoButtonText.Text = _resourceLoader.GetString("AutoButtonText_Start");
                 }
             }
         });
@@ -379,25 +380,24 @@ public sealed partial class HomePage : Page
         _isAutoMode = false;
         if (ManualButton != null) ManualButton.Visibility = Visibility.Visible;
         if (AutoButton != null) AutoButton.Visibility = Visibility.Collapsed;
-        if (ModeToggleText != null) ModeToggleText.Text = "手动对话";
+        if (ModeToggleText != null) ModeToggleText.Text = _resourceLoader.GetString("ModeToggleText_Manual");
     }
     private void SwitchToAutoMode()
     {
         _isAutoMode = true;
         if (ManualButton != null) ManualButton.Visibility = Visibility.Collapsed;
         if (AutoButton != null) AutoButton.Visibility = Visibility.Visible;
-        if (ModeToggleText != null) ModeToggleText.Text = "自动对话";
+        if (ModeToggleText != null) ModeToggleText.Text = _resourceLoader.GetString("ModeToggleText_Auto");
 
         // Update button text based on current listening state and auto mode
         if (AutoButtonText != null)
         {
-            if (_voiceChatService?.KeepListening == true && _isListening)
-            {
-                AutoButtonText.Text = "停止对话";
+            if (_voiceChatService?.KeepListening == true && _isListening)            {
+                AutoButtonText.Text = _resourceLoader.GetString("AutoButtonText_Stop");
             }
             else
             {
-                AutoButtonText.Text = "开始对话";
+                AutoButtonText.Text = _resourceLoader.GetString("AutoButtonText_Start");
             }
         }
     }
@@ -491,8 +491,8 @@ public sealed partial class HomePage : Page
         try
         {
             ConnectButton.IsEnabled = false;
-            StatusText.Text = "状态: 连接中";
-            ConnectionStatusText.Text = "连接中";
+            StatusText.Text = _resourceLoader.GetString("Status_Connecting");
+            ConnectionStatusText.Text = _resourceLoader.GetString("ConnectionStatus_Connecting");
             ConnectionIndicator.Background = Application.Current.Resources["SystemFillColorCautionBrush"] as Microsoft.UI.Xaml.Media.Brush;
 
             // 创建配置
@@ -521,7 +521,7 @@ public sealed partial class HomePage : Page
             if (isConnected)
             {
                 AddMessage("连接成功");
-                StatusText.Text = "状态: 已连接";
+                StatusText.Text = _resourceLoader.GetString("Status_Connected");
             }
             else
             {
@@ -581,7 +581,7 @@ public sealed partial class HomePage : Page
             if (!_isListening)
             {
                 await _voiceChatService.StartVoiceChatAsync();
-                ManualButtonText.Text = "松开结束";
+                ManualButtonText.Text = _resourceLoader.GetString("ManualButtonText_Release");
                 AddMessage("开始录音，松开结束");
             }
         }
@@ -601,7 +601,7 @@ public sealed partial class HomePage : Page
             if (_isListening)
             {
                 await _voiceChatService.StopVoiceChatAsync();
-                ManualButtonText.Text = "按住说话";
+                ManualButtonText.Text = _resourceLoader.GetString("ManualButtonText_Hold");
                 AddMessage("录音结束，正在处理...");
             }
         }

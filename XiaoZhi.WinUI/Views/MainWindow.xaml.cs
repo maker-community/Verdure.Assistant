@@ -1,4 +1,4 @@
-using Microsoft.UI.Xaml;
+ï»¿using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using System;
@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace XiaoZhi.WinUI.Views;
 
 /// <summary>
-/// Ö÷´°¿Ú - Frameµ¼º½Ä£Ê½µÄÖ÷´°¿Ú
+/// ä¸»çª—å£ - Frameå¯¼èˆªæ¨¡å¼çš„ä¸»çª—å£
 /// </summary>
 public sealed partial class MainWindow : Window
 {
@@ -18,7 +18,7 @@ public sealed partial class MainWindow : Window
         this.InitializeComponent();
         _logger = App.GetService<ILogger<MainWindow>>();
 
-        // µ¼º½µ½Ä¬ÈÏÒ³Ãæ (HomePage)
+        // å¯¼èˆªåˆ°é»˜è®¤é¡µé¢ (HomePage)
         ContentFrame.Navigate(typeof(HomePage));
     }
 
