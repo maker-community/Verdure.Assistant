@@ -1,31 +1,36 @@
 ﻿using System;
 using System.Linq;
 using System.Reflection;
+using Concentus;
+using Concentus.Enums;
 using Concentus.Structs;
 
 class ApiCheck 
 {
     static void Main()
     {
-        var decoder = new OpusDecoder(48000, 1);
+        // Use OpusCodecFactory to create decoder (recommended approach)
+        var decoder = (OpusDecoder)OpusCodecFactory.CreateDecoder(48000, 1);
         
         // Test the Span-based method signatures
         byte[] encoded = new byte[100];
         short[] output = new short[1000];
         
         ReadOnlySpan<byte> encodedSpan = new ReadOnlySpan<byte>(encoded);
-        Span<short> outputSpan = new Span<short>(output);        Console.WriteLine("Testing Concentus OpusDecoder API...");
+        Span<short> outputSpan = new Span<short>(output);
         
-        // Use the legacy method that we know works to understand the API
+        Console.WriteLine("Testing Concentus OpusDecoder API...");
+        
+        // Use the modern Span-based method
         try 
         {
-            int result = decoder.Decode(encoded, 0, encoded.Length, output, 0, output.Length, false);
-            Console.WriteLine($"Legacy 7-parameter Decode works, result: {result}");
-            Console.WriteLine("Signature: Decode(byte[], int, int, short[], int, int, bool)");
+            int result = decoder.Decode(encodedSpan, outputSpan, 1440);
+            Console.WriteLine($"Modern 3-parameter Span-based Decode works, result: {result}");
+            Console.WriteLine("Signature: Decode(ReadOnlySpan<byte>, Span<short>, int)");
         }
         catch (Exception e)
         {
-            Console.WriteLine($"Legacy method failed: {e.Message}");
+            Console.WriteLine($"Span-based method failed: {e.Message}");
         }
         
         // Now let's use reflection to see what Span methods are available

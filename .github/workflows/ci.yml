@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    
+    strategy:
+      matrix:
+        dotnet-version: ['6.0.x', '8.0.x']
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ matrix.dotnet-version }}
+        
+    - name: Restore dependencies
+      run: dotnet restore XiaoZhi.sln
+      
+    - name: Build solution
+      run: dotnet build XiaoZhi.sln --no-restore --configuration Release
+      
+    - name: Run tests
+      run: dotnet test XiaoZhi.sln --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
+      
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: '**/coverage.cobertura.xml'
+        fail_ci_if_error: false
+
+  code-analysis:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+        
+    - name: Restore dependencies
+      run: dotnet restore XiaoZhi.sln
+      
+    - name: Run code analysis
+      run: dotnet build XiaoZhi.sln --configuration Release --verbosity normal /p:TreatWarningsAsErrors=true
+
+  security-scan:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run security scan
+      uses: github/codeql-action/init@v3
+      with:
+        languages: csharp
+        
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+        
+    - name: Build for analysis
+      run: dotnet build XiaoZhi.sln --configuration Release
+      
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3

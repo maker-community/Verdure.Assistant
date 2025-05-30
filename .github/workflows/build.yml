@@ -1,0 +1,61 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        dotnet-version: ['9.0.x']
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ matrix.dotnet-version }}
+    
+    - name: Restore dependencies
+      run: dotnet restore
+    
+    - name: Build
+      run: dotnet build --no-restore --configuration Release
+    
+    - name: Test
+      run: dotnet test --no-build --verbosity normal --configuration Release
+
+  publish:
+    needs: build
+    runs-on: windows-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+    
+    - name: Publish Console App
+      run: |
+        dotnet publish src/XiaoZhi.Console/XiaoZhi.Console.csproj -c Release -o publish/console --self-contained true -r win-x64
+        dotnet publish src/XiaoZhi.Console/XiaoZhi.Console.csproj -c Release -o publish/console-linux --self-contained true -r linux-x64
+        dotnet publish src/XiaoZhi.Console/XiaoZhi.Console.csproj -c Release -o publish/console-macos --self-contained true -r osx-x64
+    
+    - name: Publish WinUI App
+      run: |
+        dotnet publish src/XiaoZhi.WinUI/XiaoZhi.WinUI.csproj -c Release -o publish/winui --self-contained true -r win-x64
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: xiaozhi-apps
+        path: publish/

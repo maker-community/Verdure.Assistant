@@ -50,29 +50,13 @@ try
     short[] decodedData = new short[1440];
     ReadOnlySpan<byte> encodedSpan = new ReadOnlySpan<byte>(encodedData);
     Span<short> decodedSpan = new Span<short>(decodedData);
-    
-    // Try different decode method signatures
-    int decodedSamples = decoder.Decode(encodedSpan, encodedData.Length, decodedSpan, 1440, false);
+      // Try different decode method signatures - use the correct 3-parameter Span method
+    int decodedSamples = decoder.Decode(encodedSpan, decodedSpan, 1440);
     Console.WriteLine($"Decoded {decodedSamples} samples successfully!");
 }
 catch (Exception ex)
 {
     Console.WriteLine($"Decode failed: {ex.Message}");
-    
-    // Try alternative signature if the first one fails
-    try
-    {
-        byte[] encodedData = new byte[encodedLength];
-        Array.Copy(outputBuffer, encodedData, encodedLength);
-        
-        short[] decodedData = new short[1440];
-        int decodedSamples = decoder.Decode(encodedData, 0, encodedData.Length, decodedData, 0, 1440, false);
-        Console.WriteLine($"Decoded {decodedSamples} samples with alternative method!");
-    }
-    catch (Exception ex2)
-    {
-        Console.WriteLine($"Alternative decode also failed: {ex2.Message}");
-    }
 }
 
 encoder.Dispose();
