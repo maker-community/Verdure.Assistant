@@ -21,13 +21,13 @@
         <StackPanel MaxWidth="600" Spacing="16">
             <!--  Page Title  -->
             <TextBlock
-                x:Uid="SettingsPage_Title"
+                x:Uid="SettingsPageTitle"
                 Margin="0,0,0,10"
                 FontSize="24"
                 FontWeight="Bold" />
             <!--  Wake Word Settings  -->
             <Expander
-                x:Uid="WakeWordSettings_Header"
+                x:Uid="WakeWordSettings"
                 IsExpanded="True"
                 Style="{StaticResource SettingsExpanderStyle}">
                 <StackPanel
@@ -39,7 +39,6 @@
                         x:Uid="WakeWordToggle"
                         IsOn="False"
                         Toggled="WakeWordToggle_Toggled" />
-
                     <TextBox
                         x:Name="WakeWordsTextBox"
                         x:Uid="WakeWordsTextBox"
@@ -48,7 +47,7 @@
             </Expander>
             <!--  Device Settings  -->
             <Expander
-                x:Uid="DeviceSettings_Header"
+                x:Uid="DeviceSettings"
                 IsExpanded="True"
                 Style="{StaticResource SettingsExpanderStyle}">
                 <StackPanel
@@ -66,9 +65,8 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-
                         <TextBlock
-                            x:Uid="OtaAddress_Label"
+                            x:Uid="OtaAddressLabel"
                             Grid.Row="0"
                             Grid.ColumnSpan="2"
                             Margin="0,0,0,8" />
@@ -100,7 +98,7 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <TextBlock
-                            x:Uid="WebSocketAddress_Label"
+                            x:Uid="WebSocketAddressLabel"
                             Grid.Row="0"
                             Grid.ColumnSpan="2"
                             Margin="0,12,0,8" />
@@ -127,7 +125,7 @@
             </Expander>
             <!--  Audio Settings  -->
             <Expander
-                x:Uid="AudioSettings_Header"
+                x:Uid="AudioSettings"
                 IsExpanded="False"
                 Style="{StaticResource SettingsExpanderStyle}">
                 <StackPanel
@@ -141,17 +139,14 @@
                         Minimum="0"
                         ValueChanged="DefaultVolumeSlider_ValueChanged"
                         Value="80" />
-
                     <ToggleSwitch
                         x:Name="AutoAdjustVolumeToggle"
                         x:Uid="AutoAdjustVolumeToggle"
                         IsOn="True" />
-
                     <TextBox
                         x:Name="AudioInputDeviceTextBox"
                         x:Uid="AudioInputDeviceTextBox"
                         IsReadOnly="True" />
-
                     <TextBox
                         x:Name="AudioOutputDeviceTextBox"
                         x:Uid="AudioOutputDeviceTextBox"
@@ -159,14 +154,14 @@
                     <Button x:Name="RefreshAudioDevicesButton" Click="RefreshAudioDevicesButton_Click">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon FontSize="16" Glyph="&#xE72C;" />
-                            <TextBlock x:Uid="RefreshAudioDevicesButton_Content" />
+                            <TextBlock x:Uid="RefreshAudioDevicesButton" />
                         </StackPanel>
                     </Button>
                 </StackPanel>
             </Expander>
             <!--  Application Settings  -->
             <Expander
-                x:Uid="ApplicationSettings_Header"
+                x:Uid="ApplicationSettings"
                 IsExpanded="False"
                 Style="{StaticResource SettingsExpanderStyle}">
                 <StackPanel
@@ -177,30 +172,27 @@
                         x:Name="AutoStartToggle"
                         x:Uid="AutoStartToggle"
                         IsOn="False" />
-
                     <ToggleSwitch
                         x:Name="MinimizeToTrayToggle"
                         x:Uid="MinimizeToTrayToggle"
                         IsOn="True" />
-
                     <ToggleSwitch
                         x:Name="EnableLoggingToggle"
                         x:Uid="EnableLoggingToggle"
                         IsOn="True" />
-
                     <ComboBox
                         x:Name="ThemeComboBox"
                         x:Uid="ThemeComboBox"
                         SelectedIndex="0">
-                        <ComboBoxItem x:Uid="ThemeComboBox_FollowSystem" />
-                        <ComboBoxItem x:Uid="ThemeComboBox_Light" />
-                        <ComboBoxItem x:Uid="ThemeComboBox_Dark" />
+                        <ComboBoxItem x:Uid="ThemeComboBoxFollowSystem" />
+                        <ComboBoxItem x:Uid="ThemeComboBoxLight" />
+                        <ComboBoxItem x:Uid="ThemeComboBoxDark" />
                     </ComboBox>
                 </StackPanel>
             </Expander>
             <!--  Advanced Settings  -->
             <Expander
-                x:Uid="AdvancedSettings_Header"
+                x:Uid="AdvancedSettings"
                 IsExpanded="False"
                 Style="{StaticResource SettingsExpanderStyle}">
                 <StackPanel
@@ -213,21 +205,18 @@
                         Maximum="60"
                         Minimum="5"
                         Value="30" />
-
                     <NumberBox
                         x:Name="AudioSampleRateNumberBox"
                         x:Uid="AudioSampleRateNumberBox"
                         Maximum="48000"
                         Minimum="8000"
                         Value="16000" />
-
                     <NumberBox
                         x:Name="AudioChannelsNumberBox"
                         x:Uid="AudioChannelsNumberBox"
                         Maximum="2"
                         Minimum="1"
                         Value="1" />
-
                     <ComboBox
                         x:Name="AudioCodecComboBox"
                         x:Uid="AudioCodecComboBox"
@@ -242,28 +231,24 @@
                         Style="{ThemeResource DefaultButtonStyle}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon FontSize="16" Glyph="&#xE777;" />
-                            <TextBlock x:Uid="ResetToDefaultsButton_Content" />
+                            <TextBlock x:Uid="ResetToDefaultsButton" />
                         </StackPanel>
                     </Button>
                 </StackPanel>
             </Expander>
             <!--  About Section  -->
             <Expander
-                x:Uid="AboutSection_Header"
+                x:Uid="AboutSection"
                 IsExpanded="False"
                 Style="{StaticResource SettingsExpanderStyle}">
                 <StackPanel
                     Padding="0,12,0,0"
                     HorizontalAlignment="Stretch"
                     Spacing="12">
-                    <TextBlock
-                        x:Uid="AboutSection_AppName"
-                        FontSize="16"
-                        FontWeight="SemiBold" />
-                    <TextBlock x:Uid="AboutSection_Version" />
-                    <TextBlock x:Uid="AboutSection_Framework" />
-                    <HyperlinkButton x:Uid="AboutSection_SourceCode" NavigateUri="https://github.com/your-repo" />
-                    <HyperlinkButton x:Uid="AboutSection_ReportIssue" NavigateUri="https://github.com/your-repo/issues" />
+                    <TextBlock x:Uid="AboutSectionVersion" />
+                    <TextBlock x:Uid="AboutSectionFramework" />
+                    <HyperlinkButton x:Uid="AboutSectionSourceCode" NavigateUri="https://github.com/your-repo" />
+                    <HyperlinkButton x:Uid="AboutSectionReportIssue" NavigateUri="https://github.com/your-repo/issues" />
                 </StackPanel>
             </Expander>
 
@@ -278,21 +263,20 @@
                     Style="{ThemeResource AccentButtonStyle}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon FontSize="16" Glyph="&#xE74E;" />
-                        <TextBlock x:Uid="SaveSettingsButton_Content" />
+                        <TextBlock x:Uid="SaveSettingsButton" />
                     </StackPanel>
                 </Button>
-
                 <Button x:Name="ExportSettingsButton" Click="ExportSettingsButton_Click">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon FontSize="16" Glyph="&#xE74C;" />
-                        <TextBlock x:Uid="ExportSettingsButton_Content" />
+                        <TextBlock x:Uid="ExportSettingsButton" />
                     </StackPanel>
                 </Button>
 
                 <Button x:Name="ImportSettingsButton" Click="ImportSettingsButton_Click">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon FontSize="16" Glyph="&#xE8B5;" />
-                        <TextBlock x:Uid="ImportSettingsButton_Content" />
+                        <TextBlock x:Uid="ImportSettingsButton" />
                     </StackPanel>
                 </Button>
             </StackPanel>

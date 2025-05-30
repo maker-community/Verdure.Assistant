@@ -117,6 +117,126 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="SettingsPageTitle.Text" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="WakeWordSettings.Header" xml:space="preserve">
+    <value>Wake Word Settings</value>
+  </data>
+  <data name="WakeWordToggle.Header" xml:space="preserve">
+    <value>Enable Wake Word</value>
+  </data>
+  <data name="WakeWordsTextBox.Header" xml:space="preserve">
+    <value>Wake Words (separate multiple words with commas)</value>
+  </data>
+  <data name="WakeWordsTextBox.PlaceholderText" xml:space="preserve">
+    <value>e.g., Hey Xiaozhi, Hello AI</value>
+  </data>
+  <data name="DeviceSettings.Header" xml:space="preserve">
+    <value>Device Settings</value>
+  </data>
+  <data name="DeviceIdTextBox.Header" xml:space="preserve">
+    <value>Device ID</value>
+  </data>
+  <data name="DeviceIdTextBox.PlaceholderText" xml:space="preserve">
+    <value>Enter device ID</value>
+  </data>
+  <data name="OtaAddressLabel.Text" xml:space="preserve">
+    <value>OTA Server Address</value>
+  </data>
+  <data name="OtaAddressTextBox.Header" xml:space="preserve">
+    <value>OTA Server Address</value>
+  </data>
+  <data name="OtaAddressTextBox.PlaceholderText" xml:space="preserve">
+    <value>Enter OTA server address</value>
+  </data>
+  <data name="WebSocketAddressLabel.Text" xml:space="preserve">
+    <value>WebSocket Server Address</value>
+  </data>
+  <data name="WsAddressTextBox.Header" xml:space="preserve">
+    <value>WebSocket Server Address</value>
+  </data>
+  <data name="WsAddressTextBox.PlaceholderText" xml:space="preserve">
+    <value>Enter WebSocket server address</value>
+  </data>
+  <data name="WsTokenTextBox.Header" xml:space="preserve">
+    <value>Access Token</value>
+  </data>
+  <data name="WsTokenTextBox.PlaceholderText" xml:space="preserve">
+    <value>Enter access token</value>
+  </data>
+  <data name="AudioSettings.Header" xml:space="preserve">
+    <value>Audio Settings</value>
+  </data>
+  <data name="DefaultVolumeSlider.Header" xml:space="preserve">
+    <value>Default Volume</value>
+  </data>
+  <data name="AutoAdjustVolumeToggle.Header" xml:space="preserve">
+    <value>Auto Adjust Volume</value>
+  </data>
+  <data name="AudioInputDeviceTextBox.Header" xml:space="preserve">
+    <value>Audio Input Device</value>
+  </data>
+  <data name="AudioInputDeviceTextBox.PlaceholderText" xml:space="preserve">
+    <value>Default audio input device</value>
+  </data>
+  <data name="AudioOutputDeviceTextBox.Header" xml:space="preserve">
+    <value>Audio Output Device</value>
+  </data>
+  <data name="AudioOutputDeviceTextBox.PlaceholderText" xml:space="preserve">
+    <value>Default audio output device</value>
+  </data>
+  <data name="AutoStartToggle.Header" xml:space="preserve">
+    <value>Start with Windows</value>
+  </data>
+  <data name="MinimizeToTrayToggle.Header" xml:space="preserve">
+    <value>Minimize to System Tray</value>
+  </data>
+  <data name="EnableLoggingToggle.Header" xml:space="preserve">
+    <value>Enable Detailed Logging</value>
+  </data>
+  <data name="ThemeComboBox.Header" xml:space="preserve">
+    <value>App Theme</value>
+  </data>
+  <data name="ThemeComboBoxFollowSystem.Content" xml:space="preserve">
+    <value>Follow System</value>
+  </data>
+  <data name="ThemeComboBoxLight.Content" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="ThemeComboBoxDark.Content" xml:space="preserve">
+    <value>Dark</value>
+  </data>
+  <data name="AdvancedSettings.Header" xml:space="preserve">
+    <value>Advanced Settings</value>
+  </data>
+  <data name="ConnectionTimeoutNumberBox.Header" xml:space="preserve">
+    <value>Connection Timeout (seconds)</value>
+  </data>
+  <data name="AudioSampleRateNumberBox.Header" xml:space="preserve">
+    <value>Audio Sample Rate (Hz)</value>
+  </data>
+  <data name="AudioChannelsNumberBox.Header" xml:space="preserve">
+    <value>Audio Channels</value>
+  </data>
+  <data name="AudioCodecComboBox.Header" xml:space="preserve">
+    <value>Audio Codec</value>
+  </data>
+  <data name="AboutSection.Header" xml:space="preserve">
+    <value>About</value>
+  </data>
+  <data name="AboutSectionVersion.Text" xml:space="preserve">
+    <value>Version: 1.0.0</value>
+  </data>
+  <data name="AboutSectionFramework.Text" xml:space="preserve">
+    <value>Built with Windows App SDK</value>
+  </data>
+  <data name="AboutSectionSourceCode.Content" xml:space="preserve">
+    <value>View Source Code</value>
+  </data>
+  <data name="AboutSectionReportIssue.Content" xml:space="preserve">
+    <value>Report Issue</value>
+  </data>
   <data name="TtsText_Standby" xml:space="preserve">
     <value>Standby</value>
   </data>
@@ -125,138 +245,6 @@
   </data>
   <data name="ModeToggleText_Auto" xml:space="preserve">
     <value>Auto Chat</value>
-  </data>
-  <data name="SettingsPage_Title" xml:space="preserve">
-    <value>Settings</value>
-  </data>
-  <data name="WakeWordSettings_Header" xml:space="preserve">
-    <value>Wake Word Settings</value>
-  </data>
-  <data name="WakeWordToggle_Header" xml:space="preserve">
-    <value>Enable Wake Word</value>
-  </data>
-  <data name="WakeWordsTextBox_Header" xml:space="preserve">
-    <value>Wake Words (separate multiple words with commas)</value>
-  </data>
-  <data name="WakeWordsTextBox_PlaceholderText" xml:space="preserve">
-    <value>e.g., Hey Xiaozhi, Hello AI</value>
-  </data>
-  <data name="DeviceSettings_Header" xml:space="preserve">
-    <value>Device Settings</value>
-  </data>
-  <data name="DeviceIdTextBox_Header" xml:space="preserve">
-    <value>Device ID</value>
-  </data>
-  <data name="DeviceIdTextBox_PlaceholderText" xml:space="preserve">
-    <value>Enter device ID</value>
-  </data>
-  <data name="OtaAddress_Label" xml:space="preserve">
-    <value>OTA Address:</value>
-  </data>
-  <data name="OtaAddressTextBox_PlaceholderText" xml:space="preserve">
-    <value>Enter OTA server address</value>
-  </data>
-  <data name="WebSocketAddress_Label" xml:space="preserve">
-    <value>WebSocket Address:</value>
-  </data>
-  <data name="WsAddressTextBox_PlaceholderText" xml:space="preserve">
-    <value>Enter WebSocket server address</value>
-  </data>
-  <data name="WsTokenTextBox_Header" xml:space="preserve">
-    <value>Access Token</value>
-  </data>
-  <data name="WsTokenTextBox_PlaceholderText" xml:space="preserve">
-    <value>Enter access token</value>
-  </data>
-  <data name="AudioSettings_Header" xml:space="preserve">
-    <value>Audio Settings</value>
-  </data>
-  <data name="DefaultVolumeSlider_Header" xml:space="preserve">
-    <value>Default Volume</value>
-  </data>
-  <data name="AutoAdjustVolumeToggle_Header" xml:space="preserve">
-    <value>Auto Adjust Volume</value>
-  </data>
-  <data name="AudioInputDeviceTextBox_Header" xml:space="preserve">
-    <value>Audio Input Device</value>
-  </data>
-  <data name="AudioInputDeviceTextBox_PlaceholderText" xml:space="preserve">
-    <value>Default audio input device</value>
-  </data>
-  <data name="AudioOutputDeviceTextBox_Header" xml:space="preserve">
-    <value>Audio Output Device</value>
-  </data>
-  <data name="AudioOutputDeviceTextBox_PlaceholderText" xml:space="preserve">
-    <value>Default audio output device</value>
-  </data>
-  <data name="RefreshAudioDevicesButton_Content" xml:space="preserve">
-    <value>Refresh Audio Devices</value>
-  </data>
-  <data name="ApplicationSettings_Header" xml:space="preserve">
-    <value>Application Settings</value>
-  </data>
-  <data name="AutoStartToggle_Header" xml:space="preserve">
-    <value>Start with Windows</value>
-  </data>
-  <data name="MinimizeToTrayToggle_Header" xml:space="preserve">
-    <value>Minimize to System Tray</value>
-  </data>
-  <data name="EnableLoggingToggle_Header" xml:space="preserve">
-    <value>Enable Detailed Logging</value>
-  </data>
-  <data name="ThemeComboBox_Header" xml:space="preserve">
-    <value>App Theme</value>
-  </data>
-  <data name="ThemeComboBox_FollowSystem" xml:space="preserve">
-    <value>Follow System</value>
-  </data>
-  <data name="ThemeComboBox_Light" xml:space="preserve">
-    <value>Light</value>
-  </data>
-  <data name="ThemeComboBox_Dark" xml:space="preserve">
-    <value>Dark</value>
-  </data>
-  <data name="AdvancedSettings_Header" xml:space="preserve">
-    <value>Advanced Settings</value>
-  </data>
-  <data name="ConnectionTimeoutNumberBox_Header" xml:space="preserve">
-    <value>Connection Timeout (seconds)</value>
-  </data>
-  <data name="AudioSampleRateNumberBox_Header" xml:space="preserve">
-    <value>Audio Sample Rate (Hz)</value>
-  </data>
-  <data name="AudioChannelsNumberBox_Header" xml:space="preserve">
-    <value>Audio Channels</value>
-  </data>
-  <data name="AudioCodecComboBox_Header" xml:space="preserve">
-    <value>Audio Codec</value>
-  </data>
-  <data name="ResetToDefaultsButton_Content" xml:space="preserve">
-    <value>Reset to Defaults</value>
-  </data>
-  <data name="AboutSection_Header" xml:space="preserve">
-    <value>About</value>
-  </data>
-  <data name="AboutSection_Version" xml:space="preserve">
-    <value>Version: 1.0.0</value>
-  </data>
-  <data name="AboutSection_Framework" xml:space="preserve">
-    <value>Built with Windows App SDK</value>
-  </data>
-  <data name="AboutSection_SourceCode" xml:space="preserve">
-    <value>View Source Code</value>
-  </data>
-  <data name="AboutSection_ReportIssue" xml:space="preserve">
-    <value>Report Issue</value>
-  </data>
-  <data name="SaveSettingsButton_Content" xml:space="preserve">
-    <value>Save Settings</value>
-  </data>
-  <data name="ExportSettingsButton_Content" xml:space="preserve">
-    <value>Export Settings</value>
-  </data>
-  <data name="ImportSettingsButton_Content" xml:space="preserve">
-    <value>Import Settings</value>
   </data>
   <data name="Status_Disconnected" xml:space="preserve">
     <value>Status: Disconnected</value>
@@ -279,6 +267,9 @@
   <data name="ConnectionStatus_Offline" xml:space="preserve">
     <value>Offline</value>
   </data>
+  <data name="ConnectionStatus_Online" xml:space="preserve">
+    <value>Online</value>
+  </data>
   <data name="ConnectionStatus_Connecting" xml:space="preserve">
     <value>Connecting</value>
   </data>
@@ -293,6 +284,57 @@
   </data>
   <data name="DefaultWakeWords" xml:space="preserve">
     <value>XiaoZhi,Hello XiaoZhi</value>
+  </data>
+  <data name="MainWindow.Title" xml:space="preserve">
+    <value>XiaoZhi AI Client</value>
+  </data>
+  <data name="MainPageNavItem.Content" xml:space="preserve">
+    <value>Chat</value>
+  </data>
+  <data name="SettingsNavItem.Content" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="StatusText.Text" xml:space="preserve">
+    <value>Status: Disconnected</value>
+  </data>
+  <data name="ConnectionStatusText.Text" xml:space="preserve">
+    <value>Offline</value>
+  </data>
+  <data name="TtsText.Text" xml:space="preserve">
+    <value>Standby</value>
+  </data>
+  <data name="VolumeControl_Header.Text" xml:space="preserve">
+    <value>Volume Control</value>
+  </data>
+  <data name="MicrophoneMonitor_Header.Text" xml:space="preserve">
+    <value>Microphone Monitor</value>
+  </data>
+  <data name="ManualButtonText.Text" xml:space="preserve">
+    <value>Press and Hold to Talk</value>
+  </data>
+  <data name="AutoButtonText.Text" xml:space="preserve">
+    <value>Start Conversation</value>
+  </data>
+  <data name="AbortButton_Content.Text" xml:space="preserve">
+    <value>Interrupt</value>
+  </data>
+  <data name="ModeToggleText.Text" xml:space="preserve">
+    <value>Manual Mode</value>
+  </data>
+  <data name="ConnectText.Text" xml:space="preserve">
+    <value>Connect</value>
+  </data>
+  <data name="DisconnectButton_Content.Text" xml:space="preserve">
+    <value>Disconnect</value>
+  </data>
+  <data name="MessageTextBox.PlaceholderText" xml:space="preserve">
+    <value>Type a message...</value>
+  </data>
+  <data name="SendButton_Content.Text" xml:space="preserve">
+    <value>Send</value>
+  </data>
+  <data name="MessagesPanel_WaitingText.Text" xml:space="preserve">
+    <value>Waiting for conversation to start...</value>
   </data>
   <data name="Error_LoadSettings" xml:space="preserve">
     <value>Error loading settings: {0}</value>
@@ -330,58 +372,22 @@
   <data name="Dialog_InfoTitle" xml:space="preserve">
     <value>Information</value>
   </data>
-  <data name="MainWindow.Title" xml:space="preserve">
-    <value>XiaoZhi AI Client</value>
+  <data name="RefreshAudioDevicesButton.Text" xml:space="preserve">
+    <value>Refresh Audio Devices</value>
   </data>
-  <data name="MainPageNavItem.Content" xml:space="preserve">
-    <value>Chat</value>
+  <data name="ResetToDefaultsButton.Text" xml:space="preserve">
+    <value>Reset to Defaults</value>
   </data>
-  <data name="SettingsNavItem.Content" xml:space="preserve">
-    <value>Settings</value>
+  <data name="SaveSettingsButton.Text" xml:space="preserve">
+    <value>Save Settings</value>
   </data>
-  <data name="StatusText.Text" xml:space="preserve">
-    <value>Status: Disconnected</value>
+  <data name="ExportSettingsButton.Text" xml:space="preserve">
+    <value>Export Settings</value>
   </data>
-  <data name="ConnectionStatusText.Text" xml:space="preserve">
-    <value>Offline</value>
+  <data name="ImportSettingsButton.Text" xml:space="preserve">
+    <value>Import Settings</value>
   </data>
-  <data name="TtsText.Text" xml:space="preserve">
-    <value>Standby</value>
-  </data>
-  <data name="ConnectionStatus_Online" xml:space="preserve">
-    <value>Online</value>
-  </data>
-  <data name="VolumeControl_Header.Text" xml:space="preserve">
-    <value>Volume Control</value>
-  </data>
-  <data name="MicrophoneMonitor_Header.Text" xml:space="preserve">
-    <value>Microphone Monitor</value>
-  </data>
-  <data name="ManualButtonText.Text" xml:space="preserve">
-    <value>Press and Hold to Talk</value>
-  </data>
-  <data name="AutoButtonText.Text" xml:space="preserve">
-    <value>Start Conversation</value>
-  </data>
-  <data name="AbortButton_Content.Text" xml:space="preserve">
-    <value>Interrupt</value>
-  </data>
-  <data name="ModeToggleText.Text" xml:space="preserve">
-    <value>Manual Mode</value>
-  </data>
-  <data name="ConnectText.Text" xml:space="preserve">
-    <value>Connect</value>
-  </data>
-  <data name="DisconnectButton_Content.Text" xml:space="preserve">
-    <value>Disconnect</value>
-  </data>
-  <data name="MessageTextBox.PlaceholderText" xml:space="preserve">
-    <value>Type a message...</value>
-  </data>
-  <data name="SendButton_Content.Text" xml:space="preserve">
-    <value>Send</value>
-  </data>
-  <data name="MessagesPanel_WaitingText.Text" xml:space="preserve">
-    <value>Waiting for conversation to start...</value>
+  <data name="ApplicationSettings.Header" xml:space="preserve">
+    <value>Application Settings</value>
   </data>
 </root>
