@@ -18,7 +18,8 @@ public sealed partial class HomePage : Page
     private readonly ILogger<HomePage>? _logger;
     private readonly IVoiceChatService? _voiceChatService;
     private readonly EmotionManager? _emotionManager;
-    private InterruptManager? _interruptManager;    private readonly ResourceLoader _resourceLoader;
+    private InterruptManager? _interruptManager;    
+    private readonly ResourceLoader _resourceLoader;
     private bool _isConnected = false;
     private bool _isListening = false;
     private bool _isAutoMode = false;

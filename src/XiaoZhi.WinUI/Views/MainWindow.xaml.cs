@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using System;
 using Microsoft.Extensions.Logging;
+using Microsoft.Windows.ApplicationModel.Resources;
 
 namespace XiaoZhi.WinUI.Views;
 
@@ -13,11 +14,13 @@ public sealed partial class MainWindow : Window
 {
     private readonly ILogger<MainWindow>? _logger;
 
+    private readonly ResourceLoader _resourceLoader =new();
+
     public MainWindow()
     {
         this.InitializeComponent();
         _logger = App.GetService<ILogger<MainWindow>>();
-
+        Title = _resourceLoader.GetString("AppDisplayName");
         // 导航到默认页面 (HomePage)
         ContentFrame.Navigate(typeof(HomePage));
     }
