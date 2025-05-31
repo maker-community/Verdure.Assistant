@@ -141,21 +141,59 @@ public class NAudioRecorder : IAudioRecorder, IDisposable
         {
             _recordedData.Clear();
         }
-    }
-
+    }    
     public void Dispose()
     {
         try
         {
-            StopRecordingAsync().Wait();
-            
-            if (_waveIn != null)
+            // 停止录制并等待完成
+            try
             {
-                _waveIn.DataAvailable -= OnDataAvailable;
-                _waveIn.RecordingStopped -= OnRecordingStopped;
-                _waveIn.Dispose();
-                _waveIn = null;
+                StopRecordingAsync().Wait(1000); // 最多等待1秒
             }
+            catch (TimeoutException)
+            {
+                _logger?.LogWarning("停止音频录制超时");
+            }
+            
+            lock (_lock)
+            {
+                if (_waveIn != null)
+                {
+                    try
+                    {
+                        // 取消事件订阅
+                        _waveIn.DataAvailable -= OnDataAvailable;
+                        _waveIn.RecordingStopped -= OnRecordingStopped;
+                        
+                        // 强制停止录制
+                        if (_isRecording)
+                        {
+                            _waveIn.StopRecording();
+                        }
+                        
+                        _waveIn.Dispose();
+                        _waveIn = null;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "释放WaveIn时出错");
+                    }
+                }
+                
+                // 清理录制数据
+                try
+                {
+                    _recordedData.Clear();
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "清理录制数据时出错");
+                }
+            }
+            
+            _isRecording = false;
+            _logger?.LogDebug("NAudioRecorder资源已释放");
         }
         catch (Exception ex)
         {

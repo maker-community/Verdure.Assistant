@@ -637,14 +637,118 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogError(ex, "处理WebSocket音频数据失败");
             ErrorOccurred?.Invoke(this, $"处理WebSocket音频数据失败: {ex.Message}");
         }
-    }
-
+    }    
     public void Dispose()
     {
-        StopVoiceChatAsync().Wait();
-        _communicationClient?.Dispose();
-        (_audioRecorder as IDisposable)?.Dispose();
-        (_audioPlayer as IDisposable)?.Dispose();
-        (_audioCodec as IDisposable)?.Dispose();
+        try
+        {
+            _logger?.LogInformation("开始释放VoiceChatService资源");
+            
+            // 1. 停止语音聊天并等待完成
+            try
+            {
+                var stopTask = StopVoiceChatAsync();
+                if (!stopTask.Wait(3000)) // 最多等待3秒
+                {
+                    _logger?.LogWarning("停止语音聊天超时");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "停止语音聊天时出错");
+            }
+            
+            // 2. 释放通信客户端
+            if (_communicationClient != null)
+            {
+                try
+                {
+                    _communicationClient.MessageReceived -= OnMessageReceived;
+                    _communicationClient.ConnectionStateChanged -= OnConnectionStateChanged;
+                    
+                    // 如果是WebSocket客户端，取消订阅更多事件
+                    if (_communicationClient is WebSocketClient webSocketClient)
+                    {
+                        //webSocketClient.ProtocolMessageReceived -= OnProtocolMessageReceived;
+                        webSocketClient.AudioDataReceived -= OnWebSocketAudioDataReceived;
+                        webSocketClient.TtsStateChanged -= OnTtsStateChanged;
+                    }
+                    
+                    _communicationClient.Dispose();
+                    _communicationClient = null;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "释放通信客户端时出错");
+                }
+            }
+            
+            // 3. 释放音频录制器
+            if (_audioRecorder != null)
+            {
+                try
+                {
+                    _audioRecorder.DataAvailable -= OnAudioDataReceived;
+                    //_audioRecorder.RecordingStopped -= OnAudioRecordingStopped;
+                    
+                    if (_audioRecorder is IDisposable disposableRecorder)
+                    {
+                        disposableRecorder.Dispose();
+                    }
+                    _audioRecorder = null;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "释放音频录制器时出错");
+                }
+            }
+            
+            // 4. 释放音频播放器
+            if (_audioPlayer != null)
+            {
+                try
+                {
+                    _audioPlayer.PlaybackStopped -= OnAudioPlaybackStopped;
+                    
+                    if (_audioPlayer is IDisposable disposablePlayer)
+                    {
+                        disposablePlayer.Dispose();
+                    }
+                    _audioPlayer = null;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "释放音频播放器时出错");
+                }
+            }
+            
+            // 5. 释放音频编解码器
+            if (_audioCodec != null)
+            {
+                try
+                {
+                    if (_audioCodec is IDisposable disposableCodec)
+                    {
+                        disposableCodec.Dispose();
+                    }
+                    _audioCodec = null;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "释放音频编解码器时出错");
+                }
+            }
+            
+            // 6. 重置状态
+            _isVoiceChatActive = false;
+            CurrentState = DeviceState.Idle;
+            _lastAbortReason = AbortReason.None;
+            
+            _logger?.LogInformation("VoiceChatService资源释放完成");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "释放VoiceChatService资源时发生严重错误");
+        }
     }
 }
