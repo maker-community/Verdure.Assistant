@@ -578,12 +578,13 @@ public sealed partial class HomePage : Page
             _voiceChatService.MessageReceived -= OnMessageReceived;
             _voiceChatService.VoiceChatStateChanged -= OnVoiceChatStateChanged;
             _voiceChatService.ErrorOccurred -= OnErrorOccurred;
-            _voiceChatService.DeviceStateChanged -= OnDeviceStateChanged;
-
-            _voiceChatService.Dispose();
+            _voiceChatService.DeviceStateChanged -= OnDeviceStateChanged;            _voiceChatService.Dispose();
             // 重置所有状态
             _isConnected = false;
             _isListening = false;
+
+            // 更新UI状态以反映断开连接
+            UpdateConnectionState(false);
 
             AddMessage("已断开连接");
         }
@@ -591,6 +592,9 @@ public sealed partial class HomePage : Page
         {
             _logger?.LogError(ex, "Failed to disconnect from voice chat service");
             AddMessage($"断开连接失败: {ex.Message}", true);
+            
+            // 即使发生错误也要更新UI状态
+            UpdateConnectionState(false);
         }
     }private async void ManualButton_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
