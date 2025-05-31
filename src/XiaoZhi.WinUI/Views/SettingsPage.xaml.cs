@@ -34,7 +34,8 @@ namespace XiaoZhi.WinUI.Views
 
             _localSettings = ApplicationData.Current.LocalSettings;
             _ = LoadSettingsAsync();
-        }        private async Task LoadSettingsAsync()
+        }        
+        private async Task LoadSettingsAsync()
         {
             try
             {

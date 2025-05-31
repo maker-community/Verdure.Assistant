@@ -1,8 +1,9 @@
+using Microsoft.Extensions.Logging;
 using System;
 using System.IO;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Windows.Storage;
 using Windows.Storage.Pickers;
 using XiaoZhi.Core.Interfaces;
@@ -40,7 +41,8 @@ namespace XiaoZhi.WinUI.Services
                 WriteIndented = true,
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                 AllowTrailingCommas = true,
-                ReadCommentHandling = JsonCommentHandling.Skip
+                ReadCommentHandling = JsonCommentHandling.Skip,
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
             };
 
             // 初始化当前设置
