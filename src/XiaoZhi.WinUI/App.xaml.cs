@@ -60,9 +60,9 @@ public partial class App : Application
         // Core services
         services.AddSingleton<IVerificationService, VerificationService>();
         services.AddSingleton<IConfigurationService, ConfigurationService>();        // Audio services
-        services.AddSingleton<IAudioRecorder, NAudioRecorder>();
-        services.AddSingleton<IAudioPlayer, NAudioPlayer>();
-        services.AddSingleton<IAudioCodec, OpusAudioCodec>();
+        services.AddSingleton<IAudioRecorder, PortAudioRecorder>();
+        services.AddSingleton<IAudioPlayer, PortAudioPlayer>();
+        services.AddSingleton<IAudioCodec, OpusSharpAudioCodec>();
         
         // Communication services
         services.AddSingleton<ICommunicationClient, MqttNetClient>(provider =>
