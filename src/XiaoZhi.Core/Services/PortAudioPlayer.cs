@@ -8,7 +8,8 @@ namespace XiaoZhi.Core.Services;
 /// PortAudioSharp2实现的音频播放器
 /// </summary>
 public class PortAudioPlayer : IAudioPlayer
-{    private PortAudioSharp.Stream? _outputStream;
+{
+    private PortAudioSharp.Stream? _outputStream;
     private bool _isPlaying;
     private readonly Queue<byte[]> _audioQueue = new();
     private readonly object _lock = new();
@@ -22,12 +23,14 @@ public class PortAudioPlayer : IAudioPlayer
 
     public event EventHandler? PlaybackStopped;
 
-    public bool IsPlaying => _isPlaying;    public PortAudioPlayer(ILogger<PortAudioPlayer>? logger = null)
+    public bool IsPlaying => _isPlaying;
+    public PortAudioPlayer(ILogger<PortAudioPlayer>? logger = null)
     {
         _logger = logger;
         // 创建定时器来检测播放完成（类似Python中的延迟状态变更）
         _playbackTimer = new Timer(CheckPlaybackCompletion, null, Timeout.Infinite, Timeout.Infinite);
-    }private void CheckPlaybackCompletion(object? state)
+    }
+    private void CheckPlaybackCompletion(object? state)
     {
         lock (_lock)
         {
@@ -37,15 +40,15 @@ public class PortAudioPlayer : IAudioPlayer
                 // More conservative timing - wait longer to ensure all audio is played
                 var timeSinceLastData = (DateTime.Now - _lastDataTime).TotalMilliseconds;
                 var shouldStop = timeSinceLastData > 1500; // Increased from 1000ms to 1500ms
-                
+
                 if (shouldStop)
                 {
                     _logger?.LogDebug("Playback completion detected - no data for {TimeSinceLastData}ms", timeSinceLastData);
-                    
+
                     // Stop timer first to prevent multiple triggers
                     _playbackTimer.Change(Timeout.Infinite, Timeout.Infinite);
-                    
-                    Task.Run(async () => 
+
+                    Task.Run(async () =>
                     {
                         try
                         {
@@ -60,7 +63,8 @@ public class PortAudioPlayer : IAudioPlayer
                 }
             }
         }
-    }public async Task InitializeAsync(int sampleRate, int channels)
+    }
+    public async Task InitializeAsync(int sampleRate, int channels)
     {
         _sampleRate = sampleRate;
         _channels = channels;
@@ -68,7 +72,7 @@ public class PortAudioPlayer : IAudioPlayer
         try
         {
             // 初始化PortAudio
-            PortAudio.Initialize();            
+            PortAudio.Initialize();
             // 获取默认输出设备
             var defaultOutputDevice = PortAudio.DefaultOutputDevice;
             if (defaultOutputDevice == -1)
@@ -126,7 +130,7 @@ public class PortAudioPlayer : IAudioPlayer
             {
                 _outputStream.Start();
                 _isPlaying = true;
-                
+
                 // 启动定时器检测播放完成
                 _playbackTimer.Change(500, 500); // 每500ms检查一次
             }
@@ -147,7 +151,7 @@ public class PortAudioPlayer : IAudioPlayer
         {
             // 停止定时器
             _playbackTimer.Change(Timeout.Infinite, Timeout.Infinite);
-            
+
             _outputStream?.Stop();
             _outputStream?.Close();
             _outputStream?.Dispose();
@@ -168,7 +172,8 @@ public class PortAudioPlayer : IAudioPlayer
         {
             System.Console.WriteLine($"停止音频播放时出错: {ex.Message}");
         }
-    }    private StreamCallbackResult OnAudioDataRequested(
+    }
+    private StreamCallbackResult OnAudioDataRequested(
         IntPtr input,
         IntPtr output,
         uint frameCount,
@@ -195,7 +200,7 @@ public class PortAudioPlayer : IAudioPlayer
                 {
                     // 计算要复制的数据大小 (16位音频 = 2字节/样本)
                     int bytesToCopy = Math.Min(audioData.Length, (int)(frameCount * _channels * 2));
-                    
+
                     // 直接复制数据到输出缓冲区
                     System.Runtime.InteropServices.Marshal.Copy(audioData, 0, output, bytesToCopy);
 
@@ -205,8 +210,8 @@ public class PortAudioPlayer : IAudioPlayer
                         var remainingBytes = (int)(frameCount * _channels * 2) - bytesToCopy;
                         var silenceBuffer = new byte[remainingBytes];
                         System.Runtime.InteropServices.Marshal.Copy(
-                            silenceBuffer, 0, 
-                            IntPtr.Add(output, bytesToCopy), 
+                            silenceBuffer, 0,
+                            IntPtr.Add(output, bytesToCopy),
                             remainingBytes);
                     }
 
@@ -217,9 +222,9 @@ public class PortAudioPlayer : IAudioPlayer
                     // 没有更多数据，播放静音
                     var silenceBuffer = new byte[frameCount * _channels * 2];
                     System.Runtime.InteropServices.Marshal.Copy(silenceBuffer, 0, output, silenceBuffer.Length);
-                    
+
                     _emptyFrameCount++;
-                    
+
                     // 如果连续播放静音超过阈值，保持继续但不立即停止
                     // 让定时器来处理播放完成的逻辑
                     return StreamCallbackResult.Continue;
