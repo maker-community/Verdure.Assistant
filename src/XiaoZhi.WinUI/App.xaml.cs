@@ -7,6 +7,7 @@ using XiaoZhi.WinUI.ViewModels;
 using XiaoZhi.WinUI.Services;
 using XiaoZhi.Core.Services;
 using XiaoZhi.Core.Interfaces;
+using XiaoZhi.Core.Models;
 
 namespace XiaoZhi.WinUI;
 
@@ -47,7 +48,8 @@ public partial class App : Application
 
         MainWindow = new MainWindow();
         MainWindow.Activate();
-    }    private void ConfigureServices(IServiceCollection services)
+    }    
+    private void ConfigureServices(IServiceCollection services)
     {
         // Logging
         services.AddLogging(builder =>
@@ -57,29 +59,32 @@ public partial class App : Application
             builder.SetMinimumLevel(LogLevel.Information);
         });
 
+        // Settings services
+        services.AddSingleton<ISettingsService<AppSettings>, WindowsSettingsService<AppSettings>>();
+
         // Core services
         services.AddSingleton<IVerificationService, VerificationService>();
         services.AddSingleton<IConfigurationService, ConfigurationService>();        // Audio services
         services.AddSingleton<IAudioRecorder, PortAudioRecorder>();
         services.AddSingleton<IAudioPlayer, PortAudioPlayer>();
         services.AddSingleton<IAudioCodec, OpusSharpAudioCodec>();
-        
+
         // Communication services
         services.AddSingleton<ICommunicationClient, MqttNetClient>(provider =>
         {
             var logger = provider.GetService<ILogger<MqttNetClient>>();
             return new MqttNetClient("localhost", 1883, "winui-client", "xiaozhi/chat", logger);
         });
-        
+
         // Voice chat service
         services.AddSingleton<IVoiceChatService, VoiceChatService>();
-        
+
         // Interrupt manager and related services
         services.AddSingleton<InterruptManager>();
-        
+
         // Emotion Manager
         services.AddSingleton<EmotionManager>();
-        
+
         // ViewModels
 
         // Views
