@@ -164,7 +164,8 @@
                         </StackPanel>
                     </Button>
                 </StackPanel>
-            </Expander>            <!--  Application Settings  -->
+            </Expander>            
+            <!--  Application Settings  -->
             <Expander
                 x:Uid="ApplicationSettings"
                 IsExpanded="False"
@@ -191,16 +192,18 @@
                     <ComboBox
                         x:Name="ThemeComboBox"
                         x:Uid="ThemeComboBox"
+                        SelectionChanged="ThemeComboBox_SelectionChanged"
                         SelectedIndex="0"
                         MinWidth="120"
                         HorizontalAlignment="Left"
                         Style="{StaticResource SettingsControlStyle}">
-                        <ComboBoxItem x:Uid="ThemeComboBoxFollowSystem" />
-                        <ComboBoxItem x:Uid="ThemeComboBoxLight" />
-                        <ComboBoxItem x:Uid="ThemeComboBoxDark" />
+                        <ComboBoxItem x:Name="Default" x:Uid="ThemeComboBoxFollowSystem" />
+                        <ComboBoxItem x:Name="Light" x:Uid="ThemeComboBoxLight" />
+                        <ComboBoxItem x:Name="Dark" x:Uid="ThemeComboBoxDark" />
                     </ComboBox>
                 </StackPanel>
-            </Expander>            <!--  Advanced Settings  -->
+            </Expander>            
+            <!--  Advanced Settings  -->
             <Expander
                 x:Uid="AdvancedSettings"
                 IsExpanded="False"
@@ -258,7 +261,8 @@
                         </StackPanel>
                     </Button>
                 </StackPanel>
-            </Expander>            <!--  About Section  -->
+            </Expander>            
+            <!--  About Section  -->
             <Expander
                 x:Uid="AboutSection"
                 IsExpanded="False"
@@ -284,7 +288,8 @@
                         HorizontalAlignment="Left"
                         Style="{StaticResource SettingsControlStyle}" />
                 </StackPanel>
-            </Expander>            <!--  Action Buttons  -->
+            </Expander>            
+            <!--  Action Buttons  -->
             <StackPanel
                 Margin="0,24,0,0"
                 Orientation="Horizontal"

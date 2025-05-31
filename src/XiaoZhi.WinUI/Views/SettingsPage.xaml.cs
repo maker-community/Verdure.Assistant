@@ -48,8 +48,7 @@ namespace XiaoZhi.WinUI.Views
                 {
                     // Fallback to default settings
                     _currentSettings = new AppSettings();
-                }
-
+                }                
                 // Update UI controls with loaded settings
                 WakeWordToggle.IsOn = _currentSettings.WakeWordEnabled;
                 WakeWordsTextBox.Text = _currentSettings.WakeWords;
@@ -66,6 +65,9 @@ namespace XiaoZhi.WinUI.Views
                 ConnectionTimeoutNumberBox.Value = _currentSettings.ConnectionTimeout;
                 AudioSampleRateNumberBox.Value = _currentSettings.AudioSampleRate;
                 AudioChannelsNumberBox.Value = _currentSettings.AudioChannels;
+
+                // Load and set theme selection
+                LoadThemeSelection();
 
                 await LoadAudioDevicesAsync();
             }
@@ -208,13 +210,18 @@ namespace XiaoZhi.WinUI.Views
             {
                 _localSettings.Values["EnableLogging"] = toggle.IsOn;
             }
-        }
-
+        }        
         private void ThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (sender is ComboBox comboBox && comboBox.SelectedItem is ComboBoxItem item)
             {
-                _localSettings.Values["Theme"] = item.Content?.ToString() ?? "Default";
+                var themeName = item.Name?.ToString() ?? "Default";
+                if (_currentSettings != null)
+                {
+                    _currentSettings.Theme = themeName;
+                }
+                // Apply the theme immediately
+                App.ChangeTheme(themeName);
             }
         }
 
@@ -281,10 +288,16 @@ namespace XiaoZhi.WinUI.Views
             _currentSettings.AudioOutputDevice = AudioOutputDeviceTextBox.Text;
             _currentSettings.AutoStart = AutoStartToggle.IsOn;
             _currentSettings.MinimizeToTray = MinimizeToTrayToggle.IsOn;
-            _currentSettings.EnableLogging = EnableLoggingToggle.IsOn;
+            _currentSettings.EnableLogging = EnableLoggingToggle.IsOn;            
             _currentSettings.ConnectionTimeout = ConnectionTimeoutNumberBox.Value;
             _currentSettings.AudioSampleRate = AudioSampleRateNumberBox.Value;
             _currentSettings.AudioChannels = AudioChannelsNumberBox.Value;
+
+            // Update theme setting
+            if (ThemeComboBox.SelectedItem is ComboBoxItem selectedThemeItem)
+            {
+                _currentSettings.Theme = selectedThemeItem.Name?.ToString() ?? "Default";
+            }
         }
 
         private void UpdateUIFromSettings()
@@ -466,8 +479,38 @@ namespace XiaoZhi.WinUI.Views
                 Content = message,
                 CloseButtonText = _resourceLoader.GetString("Dialog_OkButton"),
                 XamlRoot = this.XamlRoot
-            };
-            await dialog.ShowAsync();
+            };            await dialog.ShowAsync();
+        }
+
+        #endregion
+
+        #region Theme Helper Methods
+
+        /// <summary>
+        /// Load the saved theme selection and set the ComboBox accordingly
+        /// </summary>
+        private void LoadThemeSelection()
+        {
+            try
+            {
+                var savedTheme = _currentSettings?.Theme ?? "Default";
+                
+                // Map saved theme to ComboBox index
+                int selectedIndex = savedTheme switch
+                {
+                    "Default" => 0,
+                    "Light" => 1,
+                    "Dark" => 2,
+                    _ => 0
+                };
+                
+                ThemeComboBox.SelectedIndex = selectedIndex;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to load theme selection");
+                ThemeComboBox.SelectedIndex = 0; // Default to "Follow System"
+            }
         }
 
         #endregion
