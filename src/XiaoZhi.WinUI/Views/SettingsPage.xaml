@@ -5,13 +5,14 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    mc:Ignorable="d">    <Page.Resources>
+    mc:Ignorable="d">    
+    <Page.Resources>
         <Style x:Key="SettingsExpanderStyle" TargetType="Expander">
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="BorderThickness" Value="0,0,0,1" />
             <Setter Property="BorderBrush" Value="{ThemeResource DividerStrokeColorDefaultBrush}" />
-            <Setter Property="Padding" Value="0,8,0,16" />
+            <Setter Property="Padding" Value="0,4,0,8" />
             <Setter Property="Margin" Value="0,0,0,8" />
         </Style>
         
@@ -23,14 +24,16 @@
         <Style x:Key="SettingsControlStyle" TargetType="FrameworkElement">
             <Setter Property="Margin" Value="0,0,0,12" />
         </Style>
-    </Page.Resources>    <ScrollViewer Padding="24" VerticalScrollBarVisibility="Auto">
+    </Page.Resources>    
+    <ScrollViewer Padding="24" VerticalScrollBarVisibility="Auto">
         <StackPanel MaxWidth="680" Spacing="20">
             <!--  Page Title  -->
             <TextBlock
                 x:Uid="SettingsPageTitle"
                 Margin="0,0,0,16"
                 FontSize="28"
-                FontWeight="Bold" />            <!--  Wake Word Settings  -->
+                FontWeight="Bold" />            
+            <!--  Wake Word Settings  -->
             <Expander
                 x:Uid="WakeWordSettings"
                 IsExpanded="True"
@@ -51,7 +54,8 @@
                         Text=""
                         Style="{StaticResource SettingsControlStyle}" />
                 </StackPanel>
-            </Expander><!--  Device Settings  -->
+            </Expander>
+            <!--  Device Settings  -->
             <Expander
                 x:Uid="DeviceSettings"
                 IsExpanded="True"
@@ -66,16 +70,14 @@
                         Style="{StaticResource SettingsControlStyle}" />
 
                     <StackPanel Spacing="8">
-                        <TextBlock
-                            x:Uid="OtaAddressLabel"
-                            Style="{StaticResource SettingsLabelStyle}" />
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <ComboBox
+                            </Grid.ColumnDefinitions>   
+                         <ComboBox
                                 x:Name="OtaProtocolComboBox"
+                                x:Uid="OtaProtocolComboBox"
                                 Grid.Column="0"
                                 MinWidth="120"
                                 Margin="0,0,12,0"
@@ -91,16 +93,14 @@
                     </StackPanel>
 
                     <StackPanel Spacing="8">
-                        <TextBlock
-                            x:Uid="WebSocketAddressLabel"
-                            Style="{StaticResource SettingsLabelStyle}" />
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
+                            </Grid.ColumnDefinitions>  
                             <ComboBox
                                 x:Name="WsProtocolComboBox"
+                                x:Uid="WsProtocolComboBox"
                                 Grid.Column="0"
                                 MinWidth="120"
                                 Margin="0,0,12,0"
@@ -120,7 +120,8 @@
                         x:Uid="WsTokenTextBox"
                         Style="{StaticResource SettingsControlStyle}" />
                 </StackPanel>
-            </Expander>            <!--  Audio Settings  -->
+            </Expander>            
+            <!--  Audio Settings  -->
             <Expander
                 x:Uid="AudioSettings"
                 IsExpanded="False"

@@ -146,9 +146,11 @@
   </data>
   <data name="OtaAddressTextBox.Header" xml:space="preserve">
     <value>OTA Server Address</value>
-  </data>
-  <data name="OtaAddressTextBox.PlaceholderText" xml:space="preserve">
+  </data>  <data name="OtaAddressTextBox.PlaceholderText" xml:space="preserve">
     <value>Enter OTA server address</value>
+  </data>
+  <data name="OtaProtocolComboBox.Header" xml:space="preserve">
+    <value>OTA Protocol</value>
   </data>
   <data name="WebSocketAddressLabel.Text" xml:space="preserve">
     <value>WebSocket Server Address</value>
@@ -158,6 +160,9 @@
   </data>
   <data name="WsAddressTextBox.PlaceholderText" xml:space="preserve">
     <value>Enter WebSocket server address</value>
+  </data>
+  <data name="WsProtocolComboBox.Header" xml:space="preserve">
+    <value>WebSocket Protocol</value>
   </data>
   <data name="WsTokenTextBox.Header" xml:space="preserve">
     <value>Access Token</value>
