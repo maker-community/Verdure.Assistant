@@ -25,19 +25,15 @@ public partial class App : Application
     public static Window? MainWindow { get; private set; }    /// <summary>
     /// Initializes the singleton application object.  This is the first line of authored code
     /// executed, and as such is the logical equivalent of main() or WinMain().
-    /// </summary>
+    /// </summary>    
     public App()
     {
         InitializeComponent();
-        // Apply saved theme on startup
-        ApplySavedTheme();
-    }
-
-    /// <summary>
+    }/// <summary>
     /// Invoked when the application is launched.
     /// </summary>
     /// <param name="args">Details about the launch request and process.</param>
-    protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
+    protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
         // Configure services
         _host = Host.CreateDefaultBuilder()
@@ -45,11 +41,19 @@ public partial class App : Application
             .Build();
 
         // Start the host
-        _ = _host.StartAsync();
+        await _host.StartAsync();
 
         MainWindow = new MainWindow();
         MainWindow.Activate();
-    }    
+
+        // Initialize theme service after window is created
+        var themeService = GetService<ThemeService>();
+        if (themeService != null)
+        {
+            await themeService.InitializeAsync();
+            themeService.StartSystemThemeListener();
+        }
+    }
     private void ConfigureServices(IServiceCollection services)
     {
         // Logging
@@ -58,10 +62,11 @@ public partial class App : Application
             builder.AddConsole();
             builder.AddDebug();
             builder.SetMinimumLevel(LogLevel.Information);
-        });
-
-        // Settings services
+        });        // Settings services
         services.AddSingleton<ISettingsService<AppSettings>, WindowsSettingsService<AppSettings>>();
+        
+        // Theme service
+        services.AddSingleton<ThemeService>();
 
         // Core services
         services.AddSingleton<IVerificationService, VerificationService>();
