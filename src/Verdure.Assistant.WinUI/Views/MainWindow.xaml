@@ -55,7 +55,7 @@
                 IsPaneToggleButtonVisible="False"
                 IsSettingsVisible="False"
                 PaneDisplayMode="Top"
-                SelectedItem="{x:Bind _viewModel.SelectedNavigationItem, Mode=OneWay}"
+                SelectedItem="{x:Bind ViewModel.SelectedNavigationItem, Mode=OneWay}"
                 SelectionChanged="MainNavigationView_SelectionChanged">
                 <NavigationView.MenuItems>
                     <NavigationViewItem

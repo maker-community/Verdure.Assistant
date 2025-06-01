@@ -13,10 +13,12 @@ namespace Verdure.Assistant.WinUI.Views;
 /// 主窗口 - Frame导航模式的主窗口
 /// </summary>
 public sealed partial class MainWindow : WindowEx
-{
-    private readonly ILogger<MainWindow>? _logger;
+{    private readonly ILogger<MainWindow>? _logger;
     private readonly ResourceLoader _resourceLoader = new();
     private readonly MainWindowViewModel _viewModel;
+
+    // Expose ViewModel for x:Bind
+    public MainWindowViewModel ViewModel => _viewModel;
 
     public MainWindow()
     {

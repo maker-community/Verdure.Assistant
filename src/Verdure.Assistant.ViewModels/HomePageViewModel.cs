@@ -60,13 +60,8 @@ public partial class HomePageViewModel : ViewModelBase
     private double _volumeValue = 80;
 
     [ObservableProperty]
-    private string _volumeText = "80%";
-
-    [ObservableProperty]
+    private string _volumeText = "80%";    [ObservableProperty]
     private string _currentMessage = string.Empty;
-
-    [ObservableProperty]
-    private string _messageText = string.Empty;
 
     [ObservableProperty]
     private bool _showMicrophoneVisualizer = false;

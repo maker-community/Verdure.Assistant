@@ -185,32 +185,6 @@ public sealed partial class HomePage : Page
         _viewModel.InterruptTriggered -= OnInterruptTriggered;
         _viewModel.ScrollToBottomRequested -= OnScrollToBottomRequested;
         _viewModel.ManualButtonStateChanged -= OnManualButtonStateChanged;
-    }
-
+    }    
     #endregion
-
-    private void AutoButton_Click(object sender, RoutedEventArgs e)
-    {
-
-    }
-
-    private void AbortButton_Click(object sender, RoutedEventArgs e)
-    {
-
-    }
-
-    private void ModeToggleButton_Click(object sender, RoutedEventArgs e)
-    {
-
-    }
-
-    private void MuteButton_Click(object sender, RoutedEventArgs e)
-    {
-
-    }
-
-    private void VolumeSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-    {
-
-    }
 }

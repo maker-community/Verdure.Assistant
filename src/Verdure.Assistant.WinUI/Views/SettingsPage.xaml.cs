@@ -13,32 +13,45 @@ public sealed partial class SettingsPage : Page
 {
     private readonly ILogger<SettingsPage>? _logger;
 
-    public SettingsPageViewModel ViewModel { get; }
+    public SettingsPageViewModel ViewModel { get; } = null!;
 
     public SettingsPage()
     {
-        this.InitializeComponent();
-        
-        try
+        this.InitializeComponent();        try
         {
             _logger = App.GetService<ILogger<SettingsPage>>();
-            ViewModel = App.GetService<SettingsPageViewModel>();
+            ViewModel = App.GetService<SettingsPageViewModel>() ?? CreateDefaultViewModel();
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Failed to get services: {ex.Message}");
             // Create a default ViewModel if service resolution fails
-            ViewModel = new SettingsPageViewModel(null);
+            ViewModel = CreateDefaultViewModel();
         }
 
         // Subscribe to ViewModel events
-        ViewModel.ExportSettingsRequested += OnExportSettingsRequested;
-        ViewModel.ImportSettingsRequested += OnImportSettingsRequested;
-        ViewModel.RefreshAudioDevicesRequested += OnRefreshAudioDevicesRequested;
-        ViewModel.ThemeChangeRequested += OnThemeChangeRequested;
-        ViewModel.SettingsError += OnSettingsError;
-
-        _ = InitializeAsync();
+        if (ViewModel != null)
+        {
+            ViewModel.ExportSettingsRequested += OnExportSettingsRequested;
+            ViewModel.ImportSettingsRequested += OnImportSettingsRequested;
+            ViewModel.RefreshAudioDevicesRequested += OnRefreshAudioDevicesRequested;
+            ViewModel.ThemeChangeRequested += OnThemeChangeRequested;
+            ViewModel.SettingsError += OnSettingsError;
+        }        _ = InitializeAsync();
+    }    private SettingsPageViewModel CreateDefaultViewModel()
+    {
+        // Try to get logger service for ViewModel, or create a minimal logger
+        var viewModelLogger = App.GetService<ILogger<SettingsPageViewModel>>();
+        
+        // If we can't get the logger service, we need to create one or pass null carefully
+        if (viewModelLogger == null)
+        {
+            // Create a simple console logger as fallback
+            using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
+            viewModelLogger = loggerFactory.CreateLogger<SettingsPageViewModel>();
+        }
+        
+        return new SettingsPageViewModel(viewModelLogger);
     }
 
     private async Task InitializeAsync()

@@ -29,10 +29,10 @@ public partial class SettingsPageViewModel : ViewModelBase
     private int _audioSampleRate = 16000;
 
     [ObservableProperty]
-    private int _audioChannels = 1;
+    private int _audioChannels = 1;    [ObservableProperty]
+    private string _audioFormat = "opus";
 
     [ObservableProperty]
-    private string _audioFormat = "opus";    [ObservableProperty]
     private bool _wakeWordEnabled = false;
 
     [ObservableProperty]
@@ -195,10 +195,8 @@ public partial class SettingsPageViewModel : ViewModelBase
             _logger?.LogError(ex, "Failed to save settings");
             SettingsError?.Invoke(this, $"保存设置失败: {ex.Message}");
         }
-    }
-
-    [RelayCommand]
-    private async Task ResetSettingsAsync()
+    }    [RelayCommand]
+    private void ResetSettings()
     {
         try
         {
@@ -239,11 +237,12 @@ public partial class SettingsPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Failed to test audio");
-            SettingsError?.Invoke(this, $"音频测试失败: {ex.Message}");
+            _logger?.LogError(ex, "Failed to test audio");            SettingsError?.Invoke(this, $"音频测试失败: {ex.Message}");
         }
-    }    [RelayCommand]
-    private async Task ExportSettingsAsync()
+    }
+
+    [RelayCommand]
+    private void ExportSettings()
     {
         try
         {
@@ -255,10 +254,8 @@ public partial class SettingsPageViewModel : ViewModelBase
             _logger?.LogError(ex, "Failed to export settings");
             SettingsError?.Invoke(this, $"导出设置失败: {ex.Message}");
         }
-    }
-
-    [RelayCommand]
-    private async Task ImportSettingsAsync()
+    }    [RelayCommand]
+    private void ImportSettings()
     {
         try
         {
@@ -270,10 +267,8 @@ public partial class SettingsPageViewModel : ViewModelBase
             _logger?.LogError(ex, "Failed to import settings");
             SettingsError?.Invoke(this, $"导入设置失败: {ex.Message}");
         }
-    }
-
-    [RelayCommand]
-    private async Task RefreshAudioDevicesAsync()
+    }    [RelayCommand]
+    private void RefreshAudioDevices()
     {
         try
         {
