@@ -40,13 +40,12 @@ public interface IKeywordSpottingService : IDisposable
     /// </summary>
     /// <param name="audioRecorder">可选的音频录制器，如果提供则使用外部音频流</param>
     /// <returns>启动是否成功</returns>
-    Task<bool> StartAsync(IAudioRecorder? audioRecorder = null);
-
+    Task<bool> StartAsync(IAudioRecorder? audioRecorder = null);    
     /// <summary>
     /// 停止关键词检测
     /// 对应py-xiaozhi的stop()方法
     /// </summary>
-    void Stop();
+    Task StopAsync();
 
     /// <summary>
     /// 暂停检测（对应py-xiaozhi的pause()方法）

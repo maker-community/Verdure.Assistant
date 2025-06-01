@@ -197,20 +197,18 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogError(ex, "启动关键词唤醒检测时发生错误");
             return false;
         }
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// 停止关键词唤醒检测
     /// </summary>
-    public void StopKeywordDetection()
+    public async Task StopKeywordDetectionAsync()
     {
         if (_keywordSpottingService != null)
         {
-            _keywordSpottingService.Stop();
+            await _keywordSpottingService.StopAsync();
             _keywordDetectionEnabled = false;
             _logger?.LogInformation("关键词唤醒检测已停止");
         }
-    }    /// <summary>
+    }/// <summary>
     /// 关键词检测事件处理（对应py-xiaozhi的_on_wake_word_detected回调）
     /// </summary>
     private void OnKeywordDetected(object? sender, KeywordDetectedEventArgs e)

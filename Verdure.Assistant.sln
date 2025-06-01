@@ -31,6 +31,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Verdure.Assistant.ViewModel
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AudioStreamIntegrationTest", "tests\AudioStreamIntegrationTest\AudioStreamIntegrationTest.csproj", "{99A9FA13-9B82-4F39-BD4E-3E8264B2D404}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KeywordSpottingIntegrationTest", "tests\KeywordSpottingIntegrationTest\KeywordSpottingIntegrationTest.csproj", "{EF892F99-8A81-F30C-641F-D986E744B936}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -243,6 +245,22 @@ Global
 		{99A9FA13-9B82-4F39-BD4E-3E8264B2D404}.Release|x64.Build.0 = Release|Any CPU
 		{99A9FA13-9B82-4F39-BD4E-3E8264B2D404}.Release|x86.ActiveCfg = Release|Any CPU
 		{99A9FA13-9B82-4F39-BD4E-3E8264B2D404}.Release|x86.Build.0 = Release|Any CPU
+		{EF892F99-8A81-F30C-641F-D986E744B936}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EF892F99-8A81-F30C-641F-D986E744B936}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EF892F99-8A81-F30C-641F-D986E744B936}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{EF892F99-8A81-F30C-641F-D986E744B936}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{EF892F99-8A81-F30C-641F-D986E744B936}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{EF892F99-8A81-F30C-641F-D986E744B936}.Debug|x64.Build.0 = Debug|Any CPU
+		{EF892F99-8A81-F30C-641F-D986E744B936}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{EF892F99-8A81-F30C-641F-D986E744B936}.Debug|x86.Build.0 = Debug|Any CPU
+		{EF892F99-8A81-F30C-641F-D986E744B936}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EF892F99-8A81-F30C-641F-D986E744B936}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EF892F99-8A81-F30C-641F-D986E744B936}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{EF892F99-8A81-F30C-641F-D986E744B936}.Release|ARM64.Build.0 = Release|Any CPU
+		{EF892F99-8A81-F30C-641F-D986E744B936}.Release|x64.ActiveCfg = Release|Any CPU
+		{EF892F99-8A81-F30C-641F-D986E744B936}.Release|x64.Build.0 = Release|Any CPU
+		{EF892F99-8A81-F30C-641F-D986E744B936}.Release|x86.ActiveCfg = Release|Any CPU
+		{EF892F99-8A81-F30C-641F-D986E744B936}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -257,6 +275,7 @@ Global
 		{132A10D4-54B2-45E4-9B44-51777964D466} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{2F399631-2243-485B-84FD-9CAA1A6205A1} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{99A9FA13-9B82-4F39-BD4E-3E8264B2D404} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{EF892F99-8A81-F30C-641F-D986E744B936} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {239C1F87-537E-4A57-8658-89012288A12E}

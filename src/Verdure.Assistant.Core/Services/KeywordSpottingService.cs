@@ -25,9 +25,7 @@ public class KeywordSpottingService : IKeywordSpottingService
     private readonly string[] _keywordModels = {
         "keyword_xiaodian.table",  // 对应py-xiaozhi的"你好小天"等
         "keyword_cortana.table"    // 对应"Cortana"关键词
-    };
-
-    // 状态管理
+    };    // 状态管理
     private bool _isRunning = false;
     private bool _isPaused = false;
     private bool _isEnabled = true;
@@ -35,6 +33,8 @@ public class KeywordSpottingService : IKeywordSpottingService
     private IAudioRecorder? _audioRecorder;
     private bool _useExternalAudioSource = false;
     private PushAudioInputStream? _pushStream;
+    private Task? _audioPushTask;
+    private EventHandler<byte[]>? _audioDataHandler;
 
     // 线程安全
     private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
@@ -134,9 +134,7 @@ public class KeywordSpottingService : IKeywordSpottingService
             _keywordRecognizer = new KeywordRecognizer(audioConfig);
 
             // 订阅事件
-            SubscribeToRecognizerEvents();
-
-            // 开始识别
+            SubscribeToRecognizerEvents();            // 开始识别
             _keywordRecognizer?.RecognizeOnceAsync(_keywordModel);
 
             _isRunning = true;
@@ -310,18 +308,17 @@ public class KeywordSpottingService : IKeywordSpottingService
 
     /// <summary>
     /// 从共享音频流推送数据到语音服务（参考 py-xiaozhi 的 AudioCodec 集成模式）
-    /// </summary>
-    private async Task PushSharedAudioDataAsync(AudioStreamManager audioStreamManager)
+    /// </summary>    
+    private async Task PushSharedAudioDataAsync(AudioStreamManager audioStreamManager, CancellationToken cancellationToken)
     {
         if (_pushStream == null)
             return;
 
         try
         {
-            bool isSubscribed = false;
-            EventHandler<byte[]> audioDataHandler = (sender, audioData) =>
+            _audioDataHandler = (sender, audioData) =>
             {
-                if (_isRunning && !_isPaused && _pushStream != null)
+                if (!cancellationToken.IsCancellationRequested && _pushStream != null)
                 {
                     try
                     {
@@ -336,31 +333,33 @@ public class KeywordSpottingService : IKeywordSpottingService
             };
 
             // 订阅共享音频流数据
-            audioStreamManager.SubscribeToAudioData(audioDataHandler);
-            isSubscribed = true;
+            audioStreamManager.SubscribeToAudioData(_audioDataHandler);
             _logger?.LogInformation("已订阅共享音频流数据，开始推送到关键词识别器");
 
-            // 保持订阅直到停止
-            while (_isRunning && !_cancellationTokenSource!.Token.IsCancellationRequested)
+            // 保持推送直到取消
+            try
             {
-                await Task.Delay(100, _cancellationTokenSource.Token);
+                await Task.Delay(Timeout.Infinite, cancellationToken);
             }
-
-            // 取消订阅
-            if (isSubscribed)
+            catch (OperationCanceledException)
             {
-                audioStreamManager.UnsubscribeFromAudioData(audioDataHandler);
-                _logger?.LogInformation("已取消订阅共享音频流数据");
+                // 正常的取消操作
             }
-        }
-        catch (OperationCanceledException)
-        {
-            _logger?.LogInformation("共享音频数据推送任务已取消");
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "从共享音频流推送数据时发生错误");
-            OnErrorOccurred($"共享音频数据推送错误: {ex.Message}");
+            _logger?.LogError(ex, "推送音频数据时发生错误");
+            OnErrorOccurred($"音频数据推送错误: {ex.Message}");
+        }
+        finally
+        {
+            // 清理订阅
+            if (_audioDataHandler != null)
+            {
+                audioStreamManager.UnsubscribeFromAudioData(_audioDataHandler);
+                _logger?.LogInformation("已取消订阅共享音频流数据");
+                _audioDataHandler = null;
+            }
         }
     }
 
@@ -463,26 +462,60 @@ public class KeywordSpottingService : IKeywordSpottingService
         {
             OnErrorOccurred($"识别错误: {e.ErrorDetails}");
         }
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// 停止关键词检测（对应py-xiaozhi的stop方法）
     /// </summary>
-    public void Stop()
+    public async Task StopAsync()
     {
         try
         {
-            _semaphore.Wait();
+            await _semaphore.WaitAsync();
 
             if (!_isRunning) return;
 
-            _cancellationTokenSource?.Cancel();
-
-            if (_keywordRecognizer != null)
+            _cancellationTokenSource?.Cancel();            if (_keywordRecognizer != null)
             {
-                _keywordRecognizer.StopRecognitionAsync();
-                _keywordRecognizer.Dispose();
-                _keywordRecognizer = null;
+                try
+                {
+                    // 先停止识别并等待完成
+                    await _keywordRecognizer.StopRecognitionAsync();
+                    
+                    // 给SDK一些时间来完全停止异步操作
+                    await Task.Delay(100);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "停止关键词识别时发生警告");
+                }
+                
+                try
+                {
+                    _keywordRecognizer.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "释放关键词识别器时发生警告");
+                }
+                finally
+                {
+                    _keywordRecognizer = null;
+                }            }
+
+            // 等待音频推送任务完成
+            if (_audioPushTask != null)
+            {
+                try
+                {
+                    await _audioPushTask;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "等待音频推送任务完成时发生警告");
+                }
+                finally
+                {
+                    _audioPushTask = null;
+                }
             }
 
             _pushStream?.Close();
@@ -597,11 +630,17 @@ public class KeywordSpottingService : IKeywordSpottingService
     private void OnErrorOccurred(string error)
     {
         ErrorOccurred?.Invoke(this, error);
-    }
-
-    public void Dispose()
+    }    public void Dispose()
     {
-        Stop();
+        // Use the async method but wait for completion during disposal
+        try
+        {
+            StopAsync().GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "停止关键词检测时发生错误 (在Dispose中)");
+        }
 
         _voiceChatService.DeviceStateChanged -= OnDeviceStateChanged;
 
@@ -612,9 +651,7 @@ public class KeywordSpottingService : IKeywordSpottingService
         _semaphore.Dispose();
 
         _logger?.LogInformation("关键词检测服务已释放");
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// 配置共享音频输入（类似 py-xiaozhi 的 AudioCodec 共享流模式）
     /// </summary>
     private async Task<AudioConfig?> ConfigureSharedAudioInput()
@@ -628,8 +665,8 @@ public class KeywordSpottingService : IKeywordSpottingService
             var format = AudioStreamFormat.GetWaveFormatPCM(16000, 16, 1); // 16kHz, 16-bit, mono
             _pushStream = AudioInputStream.CreatePushStream(format);
 
-            // 启动音频数据推送任务，从共享流获取数据
-            _ = Task.Run(() => PushSharedAudioDataAsync(_audioStreamManager));
+            // 启动音频数据推送任务，从共享流获取数据，使用取消令牌保持任务存活
+            _audioPushTask = Task.Run(() => PushSharedAudioDataAsync(_audioStreamManager, _cancellationTokenSource!.Token));
 
             return AudioConfig.FromStreamInput(_pushStream);
         }

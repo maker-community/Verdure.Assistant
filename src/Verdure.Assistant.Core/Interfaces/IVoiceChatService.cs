@@ -108,12 +108,10 @@ public interface IVoiceChatService : IDisposable
     /// 启动关键词唤醒检测
     /// 对应py-xiaozhi的_start_wake_word_detector方法
     /// </summary>
-    Task<bool> StartKeywordDetectionAsync();
-
-    /// <summary>
+    Task<bool> StartKeywordDetectionAsync();    /// <summary>
     /// 停止关键词唤醒检测
     /// </summary>
-    void StopKeywordDetection();
+    Task StopKeywordDetectionAsync();
 
     /// <summary>
     /// 关键词唤醒是否启用

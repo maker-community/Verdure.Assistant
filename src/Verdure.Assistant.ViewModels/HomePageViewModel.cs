@@ -353,10 +353,8 @@ public partial class HomePageViewModel : ViewModelBase
             if (IsListening)
             {
                 await _voiceChatService.StopVoiceChatAsync();
-            }
-
-            // 停止关键词检测
-            StopKeywordDetection();
+            }            // 停止关键词检测
+            await StopKeywordDetectionAsync();
 
             // 清理事件订阅
             CleanupEventSubscriptions();
@@ -522,10 +520,9 @@ public partial class HomePageViewModel : ViewModelBase
         if (_voiceChatService == null || !IsConnected) return;
 
         try
-        {
-            if (_voiceChatService.IsKeywordDetectionEnabled)
+        {            if (_voiceChatService.IsKeywordDetectionEnabled)
             {
-                StopKeywordDetection();
+                await StopKeywordDetectionAsync();
                 AddMessage("🔇 关键词唤醒已关闭");
             }
             else
@@ -579,18 +576,16 @@ public partial class HomePageViewModel : ViewModelBase
             _logger?.LogError(ex, "启动关键词检测时发生错误");
             AddMessage($"关键词唤醒启动错误: {ex.Message}", true);
         }
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// 停止关键词检测
     /// </summary>
-    private void StopKeywordDetection()
+    private async Task StopKeywordDetectionAsync()
     {
         if (_voiceChatService == null) return;
 
         try
         {
-            _voiceChatService.StopKeywordDetection();
+            await _voiceChatService.StopKeywordDetectionAsync();
             _logger?.LogInformation("关键词检测已停止");
         }
         catch (Exception ex)
