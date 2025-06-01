@@ -96,6 +96,11 @@ public interface IVoiceChatService : IDisposable
     void SetInterruptManager(InterruptManager interruptManager);
 
     /// <summary>
+    /// 设置UI调度器以确保线程安全的事件处理
+    /// </summary>
+    void SetUIDispatcher(IUIDispatcher uiDispatcher);
+
+    /// <summary>
     /// 设置关键词唤醒服务
     /// 对应py-xiaozhi的wake_word_detector集成
     /// </summary>

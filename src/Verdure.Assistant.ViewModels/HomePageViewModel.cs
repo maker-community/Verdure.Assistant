@@ -61,7 +61,9 @@ public partial class HomePageViewModel : ViewModelBase
     private double _volumeValue = 80;
 
     [ObservableProperty]
-    private string _volumeText = "80%";    [ObservableProperty]
+    private string _volumeText = "80%";    
+    
+    [ObservableProperty]
     private string _currentMessage = string.Empty;
 
     [ObservableProperty]
@@ -115,6 +117,15 @@ public partial class HomePageViewModel : ViewModelBase
         
         // 绑定服务事件
         await BindEventsAsync();
+    }
+
+    /// <summary>
+    /// 设置UI调度器以确保线程安全的UI更新
+    /// </summary>
+    /// <param name="uiDispatcher">UI调度器实例</param>
+    public void SetUIDispatcher(IUIDispatcher uiDispatcher)
+    {
+        _voiceChatService?.SetUIDispatcher(uiDispatcher);
     }
 
     private async Task BindEventsAsync()
@@ -275,7 +286,9 @@ public partial class HomePageViewModel : ViewModelBase
                 AudioFormat = "opus"
             };
             
-            await _voiceChatService.InitializeAsync(config);            // Set up wake word detector coordination
+            await _voiceChatService.InitializeAsync(config);            
+            
+            // Set up wake word detector coordination
             if (_interruptManager != null)
             {
                 _voiceChatService.SetInterruptManager(_interruptManager);
@@ -429,7 +442,9 @@ public partial class HomePageViewModel : ViewModelBase
             _logger?.LogError(ex, "Failed to toggle auto chat mode");
             AddMessage($"切换自动对话失败: {ex.Message}", true);
         }
-    }    
+    } 
+    
+
     [RelayCommand]
     private async Task AbortAsync()
     {
@@ -476,7 +491,9 @@ public partial class HomePageViewModel : ViewModelBase
         IsAutoMode = !IsAutoMode;
         UpdateModeUI(IsAutoMode);
         AddMessage($"已切换到{(IsAutoMode ? "自动" : "手动")}对话模式");
-    }    [RelayCommand]
+    }    
+    
+    [RelayCommand]
     private void ToggleMute()
     {
         var isMuted = VolumeValue == 0;
@@ -564,7 +581,9 @@ public partial class HomePageViewModel : ViewModelBase
         {
             _logger?.LogError(ex, "停止关键词检测时发生错误");
         }
-    }private void UpdateModeUI(bool isAutoMode)
+    }
+    
+    private void UpdateModeUI(bool isAutoMode)
     {
         IsAutoMode = isAutoMode;
         ModeToggleText = isAutoMode ? "自动" : "手动";

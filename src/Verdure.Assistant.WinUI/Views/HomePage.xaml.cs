@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Services;
 using Verdure.Assistant.ViewModels;
 
@@ -20,12 +21,18 @@ public sealed partial class HomePage : Page
 
     public HomePage()
     {
-        InitializeComponent();
-
+        InitializeComponent();        
         try
         {
             _logger = App.GetService<ILogger<HomePage>>();
             _viewModel = App.GetService<HomePageViewModel>() ?? throw new InvalidOperationException("HomePageViewModel not found");
+            
+            // 设置UI调度器以确保线程安全的UI更新
+            var uiDispatcher = App.GetService<IUIDispatcher>();
+            if (uiDispatcher != null)
+            {
+                _viewModel.SetUIDispatcher(uiDispatcher);
+            }
         }
         catch (Exception ex)
         {
@@ -35,7 +42,8 @@ public sealed partial class HomePage : Page
         }
 
         // 设置DataContext
-        this.DataContext = _viewModel;        // 绑定ViewModel事件
+        this.DataContext = _viewModel;        
+        // 绑定ViewModel事件
         BindViewModelEvents();
 
         // 初始化ViewModel

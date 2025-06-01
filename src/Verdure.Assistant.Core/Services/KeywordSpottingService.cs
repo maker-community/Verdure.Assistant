@@ -39,6 +39,9 @@ public class KeywordSpottingService : IKeywordSpottingService
     private AudioInputStream? _audioInputStream;
     private PushAudioInputStream? _pushStream;
 
+    // UI thread dispatcher for cross-platform thread marshaling
+    private IUIDispatcher _uiDispatcher;
+
     // 线程安全
     private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
     private CancellationTokenSource? _cancellationTokenSource;
@@ -51,7 +54,7 @@ public class KeywordSpottingService : IKeywordSpottingService
     public bool IsPaused => _isPaused;
     public bool IsEnabled => _isEnabled;
 
-    public KeywordSpottingService(IVoiceChatService voiceChatService, ILogger<KeywordSpottingService>? logger = null)
+    public KeywordSpottingService(IVoiceChatService voiceChatService, ILogger<KeywordSpottingService>? logger = null, IUIDispatcher? uiDispatcher = null)
     {
         _voiceChatService = voiceChatService;
         _logger = logger;
@@ -60,6 +63,7 @@ public class KeywordSpottingService : IKeywordSpottingService
         _voiceChatService.DeviceStateChanged += OnDeviceStateChanged;
 
         InitializeSpeechConfig();
+        _uiDispatcher = uiDispatcher ?? new DefaultUIDispatcher();
     }
 
     /// <summary>
@@ -354,7 +358,9 @@ public class KeywordSpottingService : IKeywordSpottingService
                 KeywordDetected?.Invoke(this, eventArgs);
 
                 // 实现py-xiaozhi的状态协调逻辑
-                HandleKeywordDetection(keyword);
+                // 使用UI调度器确保线程安全的事件处理
+                _ = _uiDispatcher.InvokeAsync(() => HandleKeywordDetection(keyword));
+                
             }
         }
         catch (Exception ex)

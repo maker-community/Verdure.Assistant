@@ -20,14 +20,17 @@ public partial class App : Application
     /// <summary>
     /// Gets the main window instance
     /// </summary>
-    public static Window? MainWindow { get; private set; }    /// <summary>
-                                                              /// Initializes the singleton application object.  This is the first line of authored code
-                                                              /// executed, and as such is the logical equivalent of main() or WinMain().
-                                                              /// </summary>    
+    public static Window? MainWindow { get; private set; }
+    /// <summary>
+    /// Initializes the singleton application object.  This is the first line of authored code
+    /// executed, and as such is the logical equivalent of main() or WinMain().
+    /// </summary> 
     public App()
     {
         InitializeComponent();
-    }/// <summary>
+    }
+    
+    /// <summary>
      /// Invoked when the application is launched.
      /// </summary>
      /// <param name="args">Details about the launch request and process.</param>
@@ -68,7 +71,8 @@ public partial class App : Application
 
         // Core services
         services.AddSingleton<IVerificationService, VerificationService>();
-        services.AddSingleton<IConfigurationService, ConfigurationService>();        // Audio services
+        services.AddSingleton<IConfigurationService, ConfigurationService>();        
+        // Audio services
         services.AddSingleton<IAudioRecorder, PortAudioRecorder>();
         services.AddSingleton<IAudioPlayer, PortAudioPlayer>();
         services.AddSingleton<IAudioCodec, OpusSharpAudioCodec>();
@@ -78,7 +82,19 @@ public partial class App : Application
         {
             var logger = provider.GetService<ILogger<MqttNetClient>>();
             return new MqttNetClient("localhost", 1883, "winui-client", "verdure/chat", logger);
-        });        // Voice chat service
+        });        // UI Dispatcher for thread-safe UI operations
+        services.AddSingleton<IUIDispatcher>(provider =>
+        {
+            // Get the DispatcherQueue from the current thread (main UI thread)
+            var dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+            if (dispatcherQueue == null)
+            {
+                throw new InvalidOperationException("No DispatcherQueue available for current thread. This service must be resolved on the UI thread.");
+            }
+            return new WinUIDispatcher(dispatcherQueue);
+        });
+
+        // Voice chat service
         services.AddSingleton<IVoiceChatService, VoiceChatService>();
 
         // Interrupt manager and related services
@@ -88,7 +104,9 @@ public partial class App : Application
         services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
 
         // Emotion Manager
-        services.AddSingleton<IEmotionManager, EmotionManager>();// ViewModels
+        services.AddSingleton<IEmotionManager, EmotionManager>();
+        
+        // ViewModels
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<HomePageViewModel>();
         services.AddTransient<SettingsPageViewModel>();
@@ -97,9 +115,11 @@ public partial class App : Application
         services.AddTransient<HomePage>();
         services.AddTransient<SettingsPage>();
         services.AddTransient<MainWindow>();
-    }    /// <summary>
-         /// Gets a service of the specified type from the dependency injection container
-         /// </summary>
+    }    
+    
+    /// <summary>
+    /// Gets a service of the specified type from the dependency injection container
+    /// </summary>
     public static T? GetService<T>() where T : class
     {
         return ((App)Current)?._host?.Services.GetService<T>();

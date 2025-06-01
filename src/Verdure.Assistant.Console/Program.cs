@@ -17,7 +17,9 @@ class Program
     static async Task Main(string[] args)
     {
         // 创建主机
-        var host = CreateHostBuilder(args).Build();        _logger = host.Services.GetRequiredService<ILogger<Program>>();
+        var host = CreateHostBuilder(args).Build();       
+        
+        _logger = host.Services.GetRequiredService<ILogger<Program>>();
         _voiceChatService = host.Services.GetRequiredService<IVoiceChatService>();
         var interruptManager = host.Services.GetRequiredService<InterruptManager>();
         var keywordSpottingService = host.Services.GetRequiredService<IKeywordSpottingService>();
