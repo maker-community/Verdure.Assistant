@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# XiaoZhi .NET 构建脚本
+# Verdure Assistant .NET 构建脚本
 # 用于在Linux/macOS环境下构建项目
 
 set -e
 
-echo "🚀 开始构建 XiaoZhi .NET 项目..."
+echo "🚀 开始构建 Verdure Assistant .NET 项目..."
 
 # 检查.NET版本
 echo "📋 检查 .NET 版本..."
@@ -30,14 +30,14 @@ dotnet test --configuration Release --no-build --verbosity normal
 
 # 发布控制台应用
 echo "📱 发布控制台应用..."
-dotnet publish src/XiaoZhi.Console/XiaoZhi.Console.csproj \
+dotnet publish src/Verdure.Assistant.Console/Verdure.Assistant.Console.csproj \
     --configuration Release \
     --output build/console/linux-x64 \
     --runtime linux-x64 \
     --self-contained true \
     -p:PublishSingleFile=true
 
-dotnet publish src/XiaoZhi.Console/XiaoZhi.Console.csproj \
+dotnet publish src/Verdure.Assistant.Console/Verdure.Assistant.Console.csproj \
     --configuration Release \
     --output build/console/osx-x64 \
     --runtime osx-x64 \
@@ -46,7 +46,7 @@ dotnet publish src/XiaoZhi.Console/XiaoZhi.Console.csproj \
 
 # 创建NuGet包
 echo "📦 创建 NuGet 包..."
-dotnet pack src/XiaoZhi.Core/XiaoZhi.Core.csproj \
+dotnet pack src/Verdure.Assistant.Core/Verdure.Assistant.Core.csproj \
     --configuration Release \
     --output build/packages \
     --no-build

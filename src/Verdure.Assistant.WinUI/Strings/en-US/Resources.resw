@@ -130,7 +130,7 @@
     <value>Wake Words (separate multiple words with commas)</value>
   </data>
   <data name="WakeWordsTextBox.PlaceholderText" xml:space="preserve">
-    <value>e.g., Hey Xiaozhi, Hello AI</value>
+    <value>e.g., Hey Verdure, Hello Assistant</value>
   </data>
   <data name="DeviceSettings.Header" xml:space="preserve">
     <value>Device Settings</value>
@@ -288,10 +288,10 @@
     <value>Release to End</value>
   </data>
   <data name="DefaultWakeWords" xml:space="preserve">
-    <value>XiaoZhi,Hello XiaoZhi</value>
+    <value>Verdure,Hello Verdure</value>
   </data>
   <data name="MainWindow.Title" xml:space="preserve">
-    <value>XiaoZhi AI Client</value>
+    <value>Verdure Assistant AI Client</value>
   </data>
   <data name="MainPageNavItem.Content" xml:space="preserve">
     <value>Chat</value>

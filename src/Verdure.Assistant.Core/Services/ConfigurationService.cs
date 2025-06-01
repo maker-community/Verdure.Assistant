@@ -81,7 +81,7 @@ namespace Verdure.Assistant.Core.Services
                     },
                     application = new
                     {
-                        name = "xiaozhi",
+                        name = "verdure-assistant",
                         version = "1.1.2",
                         idf_version = "v5.3.2-dirty"
                     },

@@ -7,7 +7,7 @@ class Program
 {
     static void Main()
     {
-        Console.WriteLine("=== XiaoZhi Audio Codec Comparison Test ===\n");
+        Console.WriteLine("=== Verdure Assistant Audio Codec Comparison Test ===\n");
         
         try
         {

@@ -6,7 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:winuiex="using:WinUIEx"
-    Title="小智AI客户端"
+    Title="绿荫助手AI客户端"
     mc:Ignorable="d">
 
     <winuiex:WindowEx.SystemBackdrop>
@@ -29,7 +29,7 @@
             --><!-- Logo and Title --><!--
             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
                 <Image Source="ms-appx:///Assets/logo.png" Width="20" Height="20" Margin="0,0,8,0" />
-                <TextBlock Text="小智AI客户端" 
+                <TextBlock Text="绿荫助手AI客户端" 
                           VerticalAlignment="Center" 
                           FontSize="14"
                           FontWeight="SemiBold"

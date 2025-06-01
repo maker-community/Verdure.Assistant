@@ -289,7 +289,7 @@ public sealed partial class HomePage : Page
             var displayText = message.Role switch
             {
                 "user" => $"用户: {message.Content}",
-                "assistant" => $"小智: {message.Content}",
+                "assistant" => $"绿荫助手: {message.Content}",
                 _ => message.Content
             };
 

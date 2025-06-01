@@ -1,6 +1,6 @@
 # 贡献指南
 
-感谢您对XiaoZhi项目的关注！我们欢迎所有形式的贡献。
+感谢您对绿荫助手（Verdure Assistant）项目的关注！我们欢迎所有形式的贡献。
 
 ## 开发环境要求
 
@@ -76,9 +76,9 @@ Closes #123
 ```
 xiaozhi-dotnet/
 ├── src/                    # 源代码
-│   ├── XiaoZhi.Core/      # 核心库
-│   ├── XiaoZhi.Console/   # 控制台应用
-│   └── XiaoZhi.WinUI/     # WinUI应用
+│   ├── Verdure.Assistant.Core/      # 核心库
+│   ├── Verdure.Assistant.Console/   # 控制台应用
+│   └── Verdure.Assistant.WinUI/     # WinUI应用
 ├── tests/                  # 测试项目
 ├── samples/               # 示例代码
 ├── docs/                  # 文档

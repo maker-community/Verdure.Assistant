@@ -4,9 +4,9 @@
 
 ### ✅ 项目结构重组
 - **源代码组织**: 将所有主要项目移至 `src/` 目录
-  - `src/XiaoZhi.Core/` - 核心库
-  - `src/XiaoZhi.Console/` - 控制台应用
-  - `src/XiaoZhi.WinUI/` - WinUI桌面应用
+  - `src/Verdure.Assistant.Core/` - 核心库
+  - `src/Verdure.Assistant.Console/` - 控制台应用
+  - `src/Verdure.Assistant.WinUI/` - WinUI桌面应用
 
 - **测试项目整理**: 所有测试项目已在 `tests/` 目录中
   - 7个测试项目，覆盖API、编解码、Opus等功能
@@ -41,15 +41,15 @@
 - **CONTRIBUTING.md** - 贡献指南和开发规范
 
 ### ✅ 解决方案配置
-- 更新了 `XiaoZhi.sln` 文件，正确引用重组后的项目路径
+- 更新了 `Verdure.Assistant.sln` 文件，正确引用重组后的项目路径
 - 修复了项目间的引用关系
 
 ## 🎯 项目状态
 
 ### ✅ 成功构建的项目
-- ✅ XiaoZhi.Core
-- ✅ XiaoZhi.Console  
-- ✅ XiaoZhi.WinUI
+- ✅ Verdure.Assistant.Core
+- ✅ Verdure.Assistant.Console  
+- ✅ Verdure.Assistant.WinUI
 - ✅ 大部分测试项目 (ApiCheck, CodecTest, ConcentusApiTest, OpusApiTest, OpusTest)
 
 ### ⚠️ 需要修复的测试项目
@@ -66,10 +66,10 @@
 ### 立即可用功能
 ```powershell
 # 运行控制台应用
-dotnet run --project src/XiaoZhi.Console
+dotnet run --project src/Verdure.Assistant.Console
 
 # 运行WinUI应用  
-dotnet run --project src/XiaoZhi.WinUI
+dotnet run --project src/Verdure.Assistant.WinUI
 
 # 使用构建脚本
 .\scripts\build.ps1 -Configuration Release -Test

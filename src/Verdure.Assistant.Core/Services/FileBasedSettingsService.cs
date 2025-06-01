@@ -53,7 +53,7 @@ namespace Verdure.Assistant.Core.Services
         private static string GetDefaultSettingsPath()
         {
             var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var appFolder = Path.Combine(appDataPath, "XiaoZhi");
+            var appFolder = Path.Combine(appDataPath, "Verdure.Assistant");
             
             // 确保目录存在
             Directory.CreateDirectory(appFolder);

@@ -25,7 +25,7 @@ class Program
         // 加载配置
         _config = LoadConfiguration();
 
-        System.Console.WriteLine("=== 小智语音聊天客户端 (控制台版) ===");
+        System.Console.WriteLine("=== 绿荫助手语音聊天客户端 (控制台版) ===");
         System.Console.WriteLine("初始化中...");
 
         try

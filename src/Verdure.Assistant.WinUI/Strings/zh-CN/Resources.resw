@@ -130,7 +130,7 @@
     <value>唤醒词 (多个唤醒词请用英文逗号 ',' 分隔)</value>
   </data>
   <data name="WakeWordsTextBox.PlaceholderText" xml:space="preserve">
-    <value>例如: 小智,小智同学</value>
+    <value>例如: 绿荫,绿荫助手</value>
   </data>
   <data name="DeviceSettings.Header" xml:space="preserve">
     <value>设备设置</value>
@@ -288,10 +288,10 @@
     <value>松开结束</value>
   </data>
   <data name="DefaultWakeWords" xml:space="preserve">
-    <value>小智,小智同学</value>
+    <value>绿荫,绿荫助手</value>
   </data>
   <data name="MainWindow.Title" xml:space="preserve">
-    <value>小智AI客户端</value>
+    <value>绿荫助手AI客户端</value>
   </data>
   <data name="MainPageNavItem.Content" xml:space="preserve">
     <value>对话</value>
