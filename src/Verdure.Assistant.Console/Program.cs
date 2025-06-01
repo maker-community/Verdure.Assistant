@@ -17,10 +17,10 @@ class Program
     static async Task Main(string[] args)
     {
         // 创建主机
-        var host = CreateHostBuilder(args).Build();
-          _logger = host.Services.GetRequiredService<ILogger<Program>>();
+        var host = CreateHostBuilder(args).Build();        _logger = host.Services.GetRequiredService<ILogger<Program>>();
         _voiceChatService = host.Services.GetRequiredService<IVoiceChatService>();
         var interruptManager = host.Services.GetRequiredService<InterruptManager>();
+        var keywordSpottingService = host.Services.GetRequiredService<IKeywordSpottingService>();
 
         // 加载配置
         _config = LoadConfiguration();
@@ -45,6 +45,10 @@ class Program
             _voiceChatService.SetInterruptManager(interruptManager);
             await interruptManager.InitializeAsync();
             
+            // Set up Microsoft Cognitive Services keyword spotting (matches py-xiaozhi wake word detector)
+            _voiceChatService.SetKeywordSpottingService(keywordSpottingService);
+            System.Console.WriteLine("关键词唤醒功能已启用（基于Microsoft认知服务）");
+            
             System.Console.WriteLine($"已连接到服务器: {(_config.UseWebSocket ? _config.ServerUrl : $"{_config.MqttBroker}:{_config.MqttPort}")}");
             System.Console.WriteLine();
 
@@ -68,14 +72,16 @@ class Program
                     builder.AddConsole();
                     // Set Debug as the minimum level, can be overridden by appsettings.json
                     builder.SetMinimumLevel(LogLevel.Debug);
-                });
-                  // Register services with dependency injection
+                });                // Register services with dependency injection
                 services.AddSingleton<IVerificationService, VerificationService>();
                 services.AddSingleton<IConfigurationService, ConfigurationService>();
                 services.AddSingleton<IVoiceChatService, VoiceChatService>();
                 
                 // Add InterruptManager for wake word detector coordination
                 services.AddSingleton<InterruptManager>();
+                
+                // Add Microsoft Cognitive Services keyword spotting service
+                services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
 
             });
 

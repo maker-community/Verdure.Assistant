@@ -16,6 +16,7 @@ public partial class HomePageViewModel : ViewModelBase
 {
     private readonly IVoiceChatService? _voiceChatService;
     private readonly IEmotionManager? _emotionManager;
+    private readonly IKeywordSpottingService? _keywordSpottingService;
     private InterruptManager? _interruptManager;
 
     #region 可观察属性
@@ -78,16 +79,17 @@ public partial class HomePageViewModel : ViewModelBase
 
     public ObservableCollection<ChatMessageViewModel> Messages { get; } = new();
 
-    #endregion
-
+    #endregion    
     public HomePageViewModel(ILogger<HomePageViewModel> logger, 
         IVoiceChatService? voiceChatService = null,
         IEmotionManager? emotionManager = null,
-        InterruptManager? interruptManager = null) : base(logger)
+        InterruptManager? interruptManager = null,
+        IKeywordSpottingService? keywordSpottingService = null) : base(logger)
     {
         _voiceChatService = voiceChatService;
         _emotionManager = emotionManager;
         _interruptManager = interruptManager;
+        _keywordSpottingService = keywordSpottingService;
 
         // 设置初始状态
         InitializeDefaultState();
@@ -124,9 +126,7 @@ public partial class HomePageViewModel : ViewModelBase
             _voiceChatService.VoiceChatStateChanged += OnVoiceChatStateChanged;
             _voiceChatService.MessageReceived += OnMessageReceived;
             _voiceChatService.ErrorOccurred += OnErrorOccurred;
-        }
-
-        // 初始化和绑定InterruptManager事件
+        }        // 初始化和绑定InterruptManager事件
         if (_interruptManager != null)
         {
             try
@@ -138,6 +138,21 @@ public partial class HomePageViewModel : ViewModelBase
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed to initialize InterruptManager");
+            }
+        }
+
+        // 设置关键词检测服务（对应py-xiaozhi的wake_word_detector集成）
+        if (_voiceChatService != null && _keywordSpottingService != null && _interruptManager != null)
+        {
+            try
+            {
+                _voiceChatService.SetInterruptManager(_interruptManager);
+                _voiceChatService.SetKeywordSpottingService(_keywordSpottingService);
+                _logger?.LogInformation("关键词唤醒服务已集成到语音聊天服务");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to integrate keyword spotting service");
             }
         }
     }

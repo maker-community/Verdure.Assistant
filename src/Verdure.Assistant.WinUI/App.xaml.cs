@@ -78,16 +78,17 @@ public partial class App : Application
         {
             var logger = provider.GetService<ILogger<MqttNetClient>>();
             return new MqttNetClient("localhost", 1883, "winui-client", "verdure/chat", logger);
-        });
-
-        // Voice chat service
+        });        // Voice chat service
         services.AddSingleton<IVoiceChatService, VoiceChatService>();
 
         // Interrupt manager and related services
         services.AddSingleton<InterruptManager>();
 
+        // Microsoft Cognitive Services keyword spotting service (matches py-xiaozhi wake word detector)
+        services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
+
         // Emotion Manager
-        services.AddSingleton<IEmotionManager, EmotionManager>();        // ViewModels
+        services.AddSingleton<IEmotionManager, EmotionManager>();// ViewModels
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<HomePageViewModel>();
         services.AddTransient<SettingsPageViewModel>();

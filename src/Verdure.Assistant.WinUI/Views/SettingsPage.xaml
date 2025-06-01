@@ -46,7 +46,7 @@
                         x:Name="WakeWordToggle"
                         x:Uid="WakeWordToggle"
                         IsOn="{x:Bind ViewModel.WakeWordEnabled, Mode=TwoWay}"
-                        Style="{StaticResource SettingsControlStyle}" />                    
+                        Style="{StaticResource SettingsControlStyle}" />
                     <TextBox
                         x:Name="WakeWordsTextBox"
                         x:Uid="WakeWordsTextBox"
@@ -157,7 +157,7 @@
                         x:Uid="AudioOutputDeviceTextBox"
                         IsReadOnly="True"
                         Style="{StaticResource SettingsControlStyle}"
-                        Text="{x:Bind ViewModel.AudioOutputDevice, Mode=OneWay}" />                    
+                        Text="{x:Bind ViewModel.AudioOutputDevice, Mode=OneWay}" />
                     <Button
                         x:Name="RefreshAudioDevicesButton"
                         HorizontalAlignment="Left"

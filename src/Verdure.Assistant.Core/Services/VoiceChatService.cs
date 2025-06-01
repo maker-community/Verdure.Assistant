@@ -24,10 +24,12 @@ public class VoiceChatService : IVoiceChatService
     private DeviceState _currentState = DeviceState.Idle;
     private ListeningMode _listeningMode = ListeningMode.Manual;
     private bool _keepListening = false;
-    private AbortReason _lastAbortReason = AbortReason.None;
-
-    // Wake word detector coordination (matches py-xiaozhi behavior)
+    private AbortReason _lastAbortReason = AbortReason.None;    // Wake word detector coordination (matches py-xiaozhi behavior)
     private InterruptManager? _interruptManager;
+
+    // Keyword spotting service (Microsoft Cognitive Services based)
+    private IKeywordSpottingService? _keywordSpottingService;
+    private bool _keywordDetectionEnabled = false;
 
     public event EventHandler<bool>? VoiceChatStateChanged;
     public event EventHandler<ChatMessage>? MessageReceived;
@@ -79,43 +81,39 @@ public class VoiceChatService : IVoiceChatService
                 DeviceStateChanged?.Invoke(this, value);
             }
         }
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Coordinate wake word detector state based on device state changes
     /// Matches py-xiaozhi behavior: pause during Listening, resume during Speaking/Idle
+    /// Now also coordinates Microsoft Cognitive Services keyword spotting
     /// </summary>
     private void CoordinateWakeWordDetector(DeviceState newState)
     {
-        if (_interruptManager == null)
-        {
-            // If no InterruptManager is set, skip coordination (fallback for apps that don't use it)
-            return;
-        }
-
         try
         {
             switch (newState)
             {
                 case DeviceState.Listening:
-                    // Pause wake word detector during user input (matches py-xiaozhi behavior)
+                    // Pause both VAD and keyword detection during user input (matches py-xiaozhi behavior)
                     // This prevents conflicts between user speech input and wake word detection
-                    _interruptManager.PauseVAD();
-                    _logger?.LogDebug("Wake word detector paused during Listening state");
+                    _interruptManager?.PauseVAD();
+                    _keywordSpottingService?.Pause();
+                    _logger?.LogDebug("Wake word detector and keyword spotting paused during Listening state");
                     break;
 
                 case DeviceState.Speaking:
                 case DeviceState.Idle:
-                    // Resume wake word detector during Speaking/Idle states (matches py-xiaozhi behavior)
+                    // Resume both VAD and keyword detection during Speaking/Idle states (matches py-xiaozhi behavior)
                     // This allows interrupt detection during AI speaking and auto-activation during idle
-                    _interruptManager.ResumeVAD();
-                    _logger?.LogDebug("Wake word detector resumed during {State} state", newState);
+                    _interruptManager?.ResumeVAD();
+                    _keywordSpottingService?.Resume();
+                    _logger?.LogDebug("Wake word detector and keyword spotting resumed during {State} state", newState);
                     break;
 
                 case DeviceState.Connecting:
-                    // Keep wake word detector paused during connection state
-                    _interruptManager.PauseVAD();
-                    _logger?.LogDebug("Wake word detector paused during Connecting state");
+                    // Keep both VAD and keyword detection paused during connection state
+                    _interruptManager?.PauseVAD();
+                    _keywordSpottingService?.Pause();
+                    _logger?.LogDebug("Wake word detector and keyword spotting paused during Connecting state");
                     break;
 
                 default:
@@ -125,11 +123,9 @@ public class VoiceChatService : IVoiceChatService
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Failed to coordinate wake word detector for state {State}", newState);
+            _logger?.LogError(ex, "Failed to coordinate wake word detector and keyword spotting for state {State}", newState);
         }
-    }
-
-    public ListeningMode CurrentListeningMode
+    }public ListeningMode CurrentListeningMode
     {
         get => _listeningMode;
         private set
@@ -141,14 +137,14 @@ public class VoiceChatService : IVoiceChatService
                 ListeningModeChanged?.Invoke(this, value);
             }
         }
-    }    
+    }
+
+    public bool IsKeywordDetectionEnabled => _keywordDetectionEnabled;
     public VoiceChatService(IConfigurationService configurationService, ILogger<VoiceChatService>? logger = null)
     {
         _configurationService = configurationService;
         _logger = logger;
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Set the interrupt manager for wake word detector coordination
     /// This enables py-xiaozhi-like wake word detector pause/resume behavior
     /// </summary>
@@ -156,6 +152,137 @@ public class VoiceChatService : IVoiceChatService
     {
         _interruptManager = interruptManager;
         _logger?.LogInformation("InterruptManager set for wake word detector coordination");
+    }
+
+    /// <summary>
+    /// 设置关键词唤醒服务（对应py-xiaozhi的wake_word_detector集成）
+    /// </summary>
+    public void SetKeywordSpottingService(IKeywordSpottingService keywordSpottingService)
+    {
+        _keywordSpottingService = keywordSpottingService;
+        
+        // 订阅关键词检测事件
+        _keywordSpottingService.KeywordDetected += OnKeywordDetected;
+        _keywordSpottingService.ErrorOccurred += OnKeywordDetectionError;
+        
+        _logger?.LogInformation("关键词唤醒服务已设置");
+    }
+
+    /// <summary>
+    /// 启动关键词唤醒检测（对应py-xiaozhi的_start_wake_word_detector方法）
+    /// </summary>
+    public async Task<bool> StartKeywordDetectionAsync()
+    {
+        if (_keywordSpottingService == null)
+        {
+            _logger?.LogWarning("关键词唤醒服务未设置");
+            return false;
+        }
+
+        try
+        {
+            // 使用音频录制器启动关键词检测（对应py-xiaozhi的AudioCodec集成模式）
+            var success = await _keywordSpottingService.StartAsync(_audioRecorder);
+            if (success)
+            {
+                _keywordDetectionEnabled = true;
+                _logger?.LogInformation("关键词唤醒检测已启动");
+            }
+            else
+            {
+                _logger?.LogError("启动关键词唤醒检测失败");
+            }
+            return success;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "启动关键词唤醒检测时发生错误");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 停止关键词唤醒检测
+    /// </summary>
+    public void StopKeywordDetection()
+    {
+        if (_keywordSpottingService != null)
+        {
+            _keywordSpottingService.Stop();
+            _keywordDetectionEnabled = false;
+            _logger?.LogInformation("关键词唤醒检测已停止");
+        }
+    }
+
+    /// <summary>
+    /// 关键词检测事件处理（对应py-xiaozhi的_on_wake_word_detected回调）
+    /// </summary>
+    private void OnKeywordDetected(object? sender, KeywordDetectedEventArgs e)
+    {
+        _logger?.LogInformation($"检测到关键词: {e.Keyword} (完整文本: {e.FullText})");
+        
+        // 在后台线程处理关键词检测事件（对应py-xiaozhi的_handle_wake_word_detected）
+        Task.Run(async () => await HandleKeywordDetectedAsync(e.Keyword));
+    }
+
+    /// <summary>
+    /// 处理关键词检测事件（对应py-xiaozhi的_handle_wake_word_detected方法）
+    /// </summary>
+    private async Task HandleKeywordDetectedAsync(string keyword)
+    {
+        try
+        {
+            switch (CurrentState)
+            {
+                case DeviceState.Idle:
+                    // 在空闲状态检测到关键词，启动对话（对应py-xiaozhi的唤醒逻辑）
+                    _logger?.LogInformation("在空闲状态检测到关键词，启动语音对话");
+                    await StartVoiceChatAsync();
+                    break;
+
+                case DeviceState.Speaking:
+                    // 在AI说话时检测到关键词，中断对话（对应py-xiaozhi的中断逻辑）
+                    _logger?.LogInformation("在AI说话时检测到关键词，中断当前对话");
+                    await StopVoiceChatAsync();
+                    break;
+
+                case DeviceState.Listening:
+                    // 在监听状态检测到关键词，可能是误触发，忽略
+                    _logger?.LogDebug("在监听状态检测到关键词，忽略（可能是误触发）");
+                    break;
+
+                case DeviceState.Connecting:
+                    // 在连接状态检测到关键词，暂不处理
+                    _logger?.LogDebug("在连接状态检测到关键词，暂不处理");
+                    break;
+
+                default:
+                    _logger?.LogDebug($"在状态 {CurrentState} 检测到关键词，暂不处理");
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "处理关键词检测事件时发生错误");
+        }
+    }
+
+    /// <summary>
+    /// 关键词检测错误处理
+    /// </summary>
+    private void OnKeywordDetectionError(object? sender, string error)
+    {
+        _logger?.LogError($"关键词检测错误: {error}");
+        
+        // 尝试在空闲状态重新启动检测器（对应py-xiaozhi的错误恢复逻辑）
+        if (CurrentState == DeviceState.Idle)
+        {
+            Task.Run(async () =>
+            {
+                await Task.Delay(1000); // 等待1秒后重试
+                await StartKeywordDetectionAsync();
+            });
+        }
     }
 
     public async Task InitializeAsync(VerdureConfig config)
@@ -210,10 +337,16 @@ public class VoiceChatService : IVoiceChatService
             {
                 wsClient.TtsStateChanged += OnTtsStateChanged;
                 wsClient.AudioDataReceived += OnWebSocketAudioDataReceived;
-            }
-
-            // 连接到服务器
+            }            // 连接到服务器
             await _communicationClient.ConnectAsync();
+            
+            // 启动关键词唤醒检测（对应py-xiaozhi的_start_wake_word_detector调用）
+            if (_keywordSpottingService != null)
+            {
+                _logger?.LogInformation("正在启动关键词唤醒检测...");
+                await StartKeywordDetectionAsync();
+            }
+            
             CurrentState = DeviceState.Idle;
 
             _logger?.LogInformation("语音聊天服务初始化完成");
@@ -757,8 +890,7 @@ public class VoiceChatService : IVoiceChatService
                     _logger?.LogWarning(ex, "释放音频播放器时出错");
                 }
             }
-            
-            // 5. 释放音频编解码器
+              // 5. 释放音频编解码器
             if (_audioCodec != null)
             {
                 try
@@ -775,7 +907,24 @@ public class VoiceChatService : IVoiceChatService
                 }
             }
             
-            // 6. 重置状态
+            // 6. 释放关键词检测服务
+            if (_keywordSpottingService != null)
+            {
+                try
+                {
+                    _keywordSpottingService.KeywordDetected -= OnKeywordDetected;
+                    _keywordSpottingService.ErrorOccurred -= OnKeywordDetectionError;
+                    _keywordSpottingService.Dispose();
+                    _keywordSpottingService = null;
+                    _keywordDetectionEnabled = false;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "释放关键词检测服务时出错");
+                }
+            }
+            
+            // 7. 重置状态
             _isVoiceChatActive = false;
             CurrentState = DeviceState.Idle;
             _lastAbortReason = AbortReason.None;

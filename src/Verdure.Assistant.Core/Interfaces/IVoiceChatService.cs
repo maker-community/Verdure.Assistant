@@ -89,11 +89,31 @@ public interface IVoiceChatService : IDisposable
     /// <summary>
     /// 当前监听模式
     /// </summary>
-    ListeningMode CurrentListeningMode { get; }
-
-    /// <summary>
+    ListeningMode CurrentListeningMode { get; }    /// <summary>
     /// Set interrupt manager for wake word detector coordination
     /// This enables py-xiaozhi-like wake word detector pause/resume behavior
     /// </summary>
     void SetInterruptManager(InterruptManager interruptManager);
+
+    /// <summary>
+    /// 设置关键词唤醒服务
+    /// 对应py-xiaozhi的wake_word_detector集成
+    /// </summary>
+    void SetKeywordSpottingService(IKeywordSpottingService keywordSpottingService);
+
+    /// <summary>
+    /// 启动关键词唤醒检测
+    /// 对应py-xiaozhi的_start_wake_word_detector方法
+    /// </summary>
+    Task<bool> StartKeywordDetectionAsync();
+
+    /// <summary>
+    /// 停止关键词唤醒检测
+    /// </summary>
+    void StopKeywordDetection();
+
+    /// <summary>
+    /// 关键词唤醒是否启用
+    /// </summary>
+    bool IsKeywordDetectionEnabled { get; }
 }
