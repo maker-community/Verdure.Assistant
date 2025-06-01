@@ -1,6 +1,6 @@
 # 项目文档
 
-欢迎查看 XiaoZhi .NET 项目文档。
+欢迎查看 绿荫助手（Verdure Assistant） 项目文档。
 
 ## 📚 文档目录
 

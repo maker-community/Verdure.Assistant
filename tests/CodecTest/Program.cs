@@ -1,6 +1,6 @@
 ﻿using System;
 using System.IO;
-using XiaoZhi.Core.Services;
+using Verdure.Assistant.Core.Services;
 
 // Test program to compare Concentus vs OpusSharp codec implementations
 class Program
@@ -35,7 +35,7 @@ class Program
         }
     }
     
-    static void TestCodec(string codecName, XiaoZhi.Core.Interfaces.IAudioCodec codec, byte[] testData, int sampleRate, int channels)
+    static void TestCodec(string codecName, Verdure.Assistant.Core.Interfaces.IAudioCodec codec, byte[] testData, int sampleRate, int channels)
     {
         Console.WriteLine($"\n--- Testing {codecName} ---");
         

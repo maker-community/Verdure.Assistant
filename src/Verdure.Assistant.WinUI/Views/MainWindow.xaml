@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<winuiex:WindowEx
+    x:Class="Verdure.Assistant.WinUI.Views.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:winuiex="using:WinUIEx"
+    Title="小智AI客户端"
+    mc:Ignorable="d">
+
+    <winuiex:WindowEx.SystemBackdrop>
+        <MicaBackdrop Kind="Base" />
+    </winuiex:WindowEx.SystemBackdrop>    
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Custom Title Bar -->
+        <!--<Grid x:Name="TitleBarGrid" Grid.Row="0" Height="32" Background="Transparent">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            
+            --><!-- Logo and Title --><!--
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                <Image Source="ms-appx:///Assets/logo.png" Width="20" Height="20" Margin="0,0,8,0" />
+                <TextBlock Text="小智AI客户端" 
+                          VerticalAlignment="Center" 
+                          FontSize="14"
+                          FontWeight="SemiBold"
+                          Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+            </StackPanel>
+            
+            --><!-- Drag Region --><!--
+            <Border Grid.Column="1" Background="Transparent" />
+        </Grid>-->
+
+        <!--  Navigation Header  -->
+        <Border
+            Grid.Row="0"
+            Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="0,0,0,1">
+            <NavigationView
+                x:Name="MainNavigationView"
+                IsBackButtonVisible="Collapsed"
+                IsPaneToggleButtonVisible="False"
+                IsSettingsVisible="False"
+                PaneDisplayMode="Top"
+                SelectionChanged="MainNavigationView_SelectionChanged">
+                <NavigationView.MenuItems>
+                    <NavigationViewItem
+                        x:Name="MainPageNavItem"
+                        x:Uid="MainPageNavItem"
+                        Icon="Message"
+                        IsSelected="True"
+                        Tag="HomePage" />
+                    <NavigationViewItem
+                        x:Name="SettingsNavItem"
+                        x:Uid="SettingsNavItem"
+                        Icon="Setting"
+                        Tag="SettingsPage" />
+                </NavigationView.MenuItems>
+            </NavigationView>
+        </Border>
+
+        <!--  Main Content Frame  -->
+        <Frame x:Name="ContentFrame" Grid.Row="1" />
+    </Grid>
+</winuiex:WindowEx>
