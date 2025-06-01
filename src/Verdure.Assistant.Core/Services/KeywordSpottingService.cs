@@ -31,12 +31,9 @@ public class KeywordSpottingService : IKeywordSpottingService
     private bool _isRunning = false;
     private bool _isPaused = false;
     private bool _isEnabled = true;
-    private DeviceState _lastDeviceState = DeviceState.Idle;
-
-    // 音频处理
+    private DeviceState _lastDeviceState = DeviceState.Idle;    // 音频处理
     private IAudioRecorder? _audioRecorder;
     private bool _useExternalAudioSource = false;
-    private AudioInputStream? _audioInputStream;
     private PushAudioInputStream? _pushStream;
 
     // 线程安全

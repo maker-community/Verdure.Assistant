@@ -8,28 +8,17 @@ namespace Verdure.Assistant.Core.Services;
 /// 参考 py-xiaozhi 的 AudioCodec 单例模式，避免重复初始化导致的资源冲突
 /// </summary>
 public sealed class PortAudioManager : IDisposable
-{
-    private static readonly Lazy<PortAudioManager> _instance = new(() => new PortAudioManager());
+{    private static readonly Lazy<PortAudioManager> _instance = new(() => new PortAudioManager());
     private readonly object _lock = new();
     private bool _isInitialized = false;
     private bool _isDisposed = false;
     private int _referenceCount = 0;
-    private readonly ILogger<PortAudioManager>? _logger;
 
     public static PortAudioManager Instance => _instance.Value;
 
     private PortAudioManager()
     {
-        // 使用静态 logger factory 或默认 null
-        _logger = null; // 可以后续通过 SetLogger 方法设置
-    }
-
-    /// <summary>
-    /// 设置日志记录器（可选）
-    /// </summary>
-    public void SetLogger(ILogger<PortAudioManager> logger)
-    {
-        // 这里不能直接赋值给 readonly 字段，但可以通过其他方式处理日志
+        // Private constructor for singleton
     }
 
     /// <summary>
