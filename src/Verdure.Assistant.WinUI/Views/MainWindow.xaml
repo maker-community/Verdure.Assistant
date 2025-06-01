@@ -42,9 +42,8 @@
         <!--  Drag Region  -->
         <!--
             <Border Grid.Column="1" Background="Transparent" />
-        </Grid>-->
-
-        <!--  Navigation Header IsBackButtonVisible="{x:Bind _viewModel.IsBackEnabled, Mode=OneWay}"  -->
+        </Grid>-->        
+        <!--  Navigation Header  -->
         <Border
             Grid.Row="0"
             Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
@@ -53,7 +52,7 @@
             <NavigationView
                 x:Name="MainNavigationView"
                 IsPaneToggleButtonVisible="False"
-                IsSettingsVisible="False"
+                IsSettingsVisible="True"
                 PaneDisplayMode="Top"
                 SelectedItem="{x:Bind ViewModel.SelectedNavigationItem, Mode=OneWay}"
                 SelectionChanged="MainNavigationView_SelectionChanged">
@@ -61,19 +60,16 @@
                     <NavigationViewItem
                         x:Name="MainPageNavItem"
                         x:Uid="MainPageNavItem"
+                        Content="主页"
                         Icon="Message"
-                        IsSelected="True"
                         Tag="HomePage" />
-                    <NavigationViewItem
-                        x:Name="SettingsNavItem"
-                        x:Uid="SettingsNavItem"
-                        Icon="Setting"
-                        Tag="SettingsPage" />
                 </NavigationView.MenuItems>
             </NavigationView>
-        </Border>
-
+        </Border>        
         <!--  Main Content Frame  -->
-        <Frame x:Name="ContentFrame" Grid.Row="1" />
+        <Frame
+            x:Name="ContentFrame"
+            Grid.Row="1"
+            Navigated="ContentFrame_Navigated" />
     </Grid>
 </winuiex:WindowEx>

@@ -2,6 +2,7 @@
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using System;
+using System.IO;
 using Microsoft.Extensions.Logging;
 using Microsoft.Windows.ApplicationModel.Resources;
 using WinUIEx;
@@ -37,9 +38,11 @@ public sealed partial class MainWindow : WindowEx
         // 配置窗口
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/logo.ico"));
         Title = _resourceLoader.GetString("AppDisplayName");
-        
-        // 导航到默认页面 (HomePage)
+          // 导航到默认页面 (HomePage)
         ContentFrame.Navigate(typeof(HomePage));
+        
+        // 设置默认选中的导航项
+        MainNavigationView.SelectedItem = MainPageNavItem;
 
         // 初始化ViewModel
         _ = _viewModel.InitializeAsync();
@@ -52,7 +55,7 @@ public sealed partial class MainWindow : WindowEx
         Type? pageType = e.PageTag switch
         {
             "HomePage" => typeof(HomePage),
-            "SettingsPage" => typeof(SettingsPage),
+            "Settings" => typeof(SettingsPage),
             _ => null
         };
 
@@ -84,15 +87,30 @@ public sealed partial class MainWindow : WindowEx
                 this.Close();
                 break;
         }
-    }
-
+    }    
+    
     private void MainNavigationView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        _viewModel.OnNavigationSelectionChanged(args.SelectedItem);
-    }
+        // 在UI层处理NavigationViewItem，然后将Tag传递给ViewModel
+        if (args.SelectedItem is NavigationViewItem navItem && navItem.Tag is string pageTag)
+        {
+            _viewModel.OnNavigationSelectionChanged(pageTag);
+        }
+    }    
 
     private void ContentFrame_Navigated(object sender, NavigationEventArgs e)
     {
         _viewModel.UpdateBackButtonState(ContentFrame.CanGoBack);
+        
+        // 根据导航的页面类型更新选中的导航项
+        if (e.SourcePageType == typeof(HomePage))
+        {
+            MainNavigationView.SelectedItem = MainPageNavItem;
+        }
+        else if (e.SourcePageType == typeof(SettingsPage))
+        {
+            // 对于设置页面，将选中项设置为null，这样设置按钮会保持高亮
+            MainNavigationView.SelectedItem = null;
+        }
     }
 }

@@ -48,12 +48,10 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     };
 
-    #endregion
-
+    #endregion    
     public MainWindowViewModel(ILogger<MainWindowViewModel> logger) : base(logger)
     {
-        // 设置默认选中项
-        SelectedNavigationItem = NavigationItems.FirstOrDefault(x => x.Tag == "HomePage");
+        // 初始化时不设置默认选中项，让NavigationView自己处理
     }
 
     public override Task InitializeAsync()
@@ -62,9 +60,7 @@ public partial class MainWindowViewModel : ViewModelBase
         return base.InitializeAsync();
     }
 
-    #region 命令
-
-    [RelayCommand]
+    #region 命令    [RelayCommand]
     private void NavigateToPage(string pageTag)
     {
         if (string.IsNullOrEmpty(pageTag) || CurrentPageType == pageTag)
@@ -73,9 +69,6 @@ public partial class MainWindowViewModel : ViewModelBase
         try
         {
             CurrentPageType = pageTag;
-            
-            // 更新选中的导航项
-            SelectedNavigationItem = NavigationItems.FirstOrDefault(x => x.Tag == pageTag);
             
             _logger?.LogInformation("Navigating to page: {PageTag}", pageTag);
             
@@ -159,15 +152,25 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    #endregion
-
+    #endregion    
     #region 导航处理
 
     public void OnNavigationSelectionChanged(object? selectedItem)
     {
-        if (selectedItem is NavigationItem navItem)
+        // ViewModel应该保持平台无关，所以我们通过Tag来识别导航项
+        // 在UI层处理具体的控件类型转换
+        if (selectedItem != null)
         {
-            NavigateToPage(navItem.Tag);
+            // 如果传入的是字符串Tag，直接使用
+            if (selectedItem is string pageTag)
+            {
+                NavigateToPage(pageTag);
+            }
+            // 如果是自定义NavigationItem，使用其Tag
+            else if (selectedItem is NavigationItem customNavItem)
+            {
+                NavigateToPage(customNavItem.Tag);
+            }
         }
     }
 
