@@ -412,16 +412,15 @@ public partial class HomePageViewModel : ViewModelBase
             _logger?.LogError(ex, "Failed to toggle auto chat mode");
             AddMessage($"切换自动对话失败: {ex.Message}", true);
         }
-    }
-
+    }    
     [RelayCommand]
     private async Task AbortAsync()
     {
         try
         {
-            if (_voiceChatService != null && IsListening)
+            if (_voiceChatService != null && (_voiceChatService.IsVoiceChatActive || _voiceChatService.CurrentState != DeviceState.Idle))
             {
-                await _voiceChatService.StopVoiceChatAsync();
+                await _voiceChatService.InterruptAsync(AbortReason.UserInterruption);
                 AddMessage("已中断当前操作");
                 TtsText = "待命";
                 SetEmotion("neutral");

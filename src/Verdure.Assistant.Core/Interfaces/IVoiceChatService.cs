@@ -44,12 +44,17 @@ public interface IVoiceChatService : IDisposable
     /// <summary>
     /// 开始语音对话
     /// </summary>
-    Task StartVoiceChatAsync();
-
+    Task StartVoiceChatAsync();    
     /// <summary>
     /// 停止语音对话
     /// </summary>
     Task StopVoiceChatAsync();
+
+    /// <summary>
+    /// 打断当前对话 - 发送打断消息到服务器
+    /// </summary>
+    /// <param name="reason">打断原因</param>
+    Task InterruptAsync(AbortReason reason = AbortReason.UserInterruption);
 
     /// <summary>
     /// 发送文本消息

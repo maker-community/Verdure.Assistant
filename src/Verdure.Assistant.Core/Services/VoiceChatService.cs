@@ -442,11 +442,47 @@ public class VoiceChatService : IVoiceChatService
     public async Task StartVoiceChatAsync()
     {
         await StartListeningAsync();
-    }
-
-    public async Task StopVoiceChatAsync()
+    }    public async Task StopVoiceChatAsync()
     {
         await StopListeningAsync(AbortReason.UserInterruption);
+    }
+
+    public async Task InterruptAsync(AbortReason reason = AbortReason.UserInterruption)
+    {
+        try
+        {
+            _logger?.LogInformation("Interrupting current conversation with reason: {Reason}", reason);
+
+            // 发送打断消息到WebSocket服务器
+            if (_communicationClient is WebSocketClient wsClient)
+            {
+                await wsClient.SendAbortAsync(reason);
+                _logger?.LogDebug("Sent abort message to server with reason: {Reason}", reason);
+            }
+
+            // 根据当前状态执行相应的本地停止操作
+            switch (CurrentState)
+            {
+                case DeviceState.Listening:
+                    await StopListeningAsync(reason);
+                    break;
+                case DeviceState.Speaking:
+                    await StopSpeakingAsync();
+                    break;
+                default:
+                    _logger?.LogDebug("Interrupt called but device is in {State} state", CurrentState);
+                    break;
+            }
+
+            _lastAbortReason = reason;
+            _logger?.LogInformation("Conversation interrupted successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to interrupt conversation");
+            ErrorOccurred?.Invoke(this, $"打断对话失败: {ex.Message}");
+            throw;
+        }
     }
 
     public async Task SendTextMessageAsync(string text)

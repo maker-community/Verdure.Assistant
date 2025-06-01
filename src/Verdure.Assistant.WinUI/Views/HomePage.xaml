@@ -109,7 +109,7 @@
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
                                     FontSize="100"
-                                    Text="😊" />
+                                    Text="{x:Bind ViewModel.DefaultEmotionText, Mode=OneWay}" />
 
                                 <!--  Animated Emotion  -->
                                 <Image
@@ -212,7 +212,7 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>                        
+                        </Grid.RowDefinitions>
                         <!--  Manual Mode Button  -->
                         <Button
                             x:Name="ManualButton"
@@ -247,7 +247,8 @@
                                 <FontIcon FontSize="16" Glyph="&#xE768;" />
                                 <TextBlock x:Name="AutoButtonText" Text="{x:Bind ViewModel.AutoButtonText, Mode=OneWay}" />
                             </StackPanel>
-                        </Button>                        <!--  Abort Button  -->
+                        </Button>
+                        <!--  Abort Button  -->
                         <Button
                             x:Name="AbortButton"
                             Grid.Row="1"
@@ -260,7 +261,8 @@
                                 <FontIcon FontSize="14" Glyph="&#xE71A;" />
                                 <TextBlock x:Uid="AbortButton_Content" />
                             </StackPanel>
-                        </Button><!--  Mode Toggle Button  -->
+                        </Button>
+                        <!--  Mode Toggle Button  -->
                         <Button
                             x:Name="ModeToggleButton"
                             Grid.Row="2"
