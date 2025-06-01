@@ -26,13 +26,6 @@ public sealed partial class HomePage : Page
         {
             _logger = App.GetService<ILogger<HomePage>>();
             _viewModel = App.GetService<HomePageViewModel>() ?? throw new InvalidOperationException("HomePageViewModel not found");
-            
-            // 设置UI调度器以确保线程安全的UI更新
-            var uiDispatcher = App.GetService<IUIDispatcher>();
-            if (uiDispatcher != null)
-            {
-                _viewModel.SetUIDispatcher(uiDispatcher);
-            }
         }
         catch (Exception ex)
         {

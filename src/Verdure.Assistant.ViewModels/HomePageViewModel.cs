@@ -17,6 +17,11 @@ public partial class HomePageViewModel : ViewModelBase
     private readonly IVoiceChatService? _voiceChatService;
     private readonly IEmotionManager? _emotionManager;
     private readonly IKeywordSpottingService? _keywordSpottingService;
+
+    // UI thread dispatcher for cross-platform thread marshaling
+    private IUIDispatcher _uiDispatcher;
+
+
     private InterruptManager? _interruptManager;
 
     #region 可观察属性
@@ -61,8 +66,8 @@ public partial class HomePageViewModel : ViewModelBase
     private double _volumeValue = 80;
 
     [ObservableProperty]
-    private string _volumeText = "80%";    
-    
+    private string _volumeText = "80%";
+
     [ObservableProperty]
     private string _currentMessage = string.Empty;
 
@@ -82,11 +87,12 @@ public partial class HomePageViewModel : ViewModelBase
     public ObservableCollection<ChatMessageViewModel> Messages { get; } = new();
 
     #endregion    
-    public HomePageViewModel(ILogger<HomePageViewModel> logger, 
+    public HomePageViewModel(ILogger<HomePageViewModel> logger,
         IVoiceChatService? voiceChatService = null,
         IEmotionManager? emotionManager = null,
         InterruptManager? interruptManager = null,
-        IKeywordSpottingService? keywordSpottingService = null) : base(logger)
+        IKeywordSpottingService? keywordSpottingService = null,
+        IUIDispatcher? uiDispatcher = null) : base(logger)
     {
         _voiceChatService = voiceChatService;
         _emotionManager = emotionManager;
@@ -95,6 +101,7 @@ public partial class HomePageViewModel : ViewModelBase
 
         // 设置初始状态
         InitializeDefaultState();
+        _uiDispatcher = uiDispatcher ?? new DefaultUIDispatcher();
     }
 
     private void InitializeDefaultState()
@@ -114,18 +121,9 @@ public partial class HomePageViewModel : ViewModelBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-        
+
         // 绑定服务事件
         await BindEventsAsync();
-    }
-
-    /// <summary>
-    /// 设置UI调度器以确保线程安全的UI更新
-    /// </summary>
-    /// <param name="uiDispatcher">UI调度器实例</param>
-    public void SetUIDispatcher(IUIDispatcher uiDispatcher)
-    {
-        _voiceChatService?.SetUIDispatcher(uiDispatcher);
     }
 
     private async Task BindEventsAsync()
@@ -172,78 +170,96 @@ public partial class HomePageViewModel : ViewModelBase
 
     private void OnDeviceStateChanged(object? sender, DeviceState state)
     {
-        switch (state)
+        // 使用UI调度器确保线程安全的事件处理
+        _ = _uiDispatcher.InvokeAsync(() =>
         {
-            case DeviceState.Listening:
-                StatusText = "正在聆听";
-                SetEmotion("listening");
-                break;
-            case DeviceState.Speaking:
-                StatusText = "正在播放";
-                SetEmotion("speaking");
-                break;
-            case DeviceState.Connecting:
-                StatusText = "连接中";
-                SetEmotion("thinking");
-                break;
-            case DeviceState.Idle:
-            default:
-                StatusText = "待命";
-                SetEmotion("neutral");
+            switch (state)
+            {
+                case DeviceState.Listening:
+                    StatusText = "正在聆听";
+                    SetEmotion("listening");
+                    break;
+                case DeviceState.Speaking:
+                    StatusText = "正在播放";
+                    SetEmotion("speaking");
+                    break;
+                case DeviceState.Connecting:
+                    StatusText = "连接中";
+                    SetEmotion("thinking");
+                    break;
+                case DeviceState.Idle:
+                default:
+                    StatusText = "待命";
+                    SetEmotion("neutral");
 
-                // Reset push-to-talk state when AI response completes
-                if (IsWaitingForResponse)
-                {
-                    IsWaitingForResponse = false;
-                    IsPushToTalkActive = false;
-                    RestoreManualButtonState();
-                    AddMessage("✅ AI 回复完成，可以继续对话");
-                }
-                break;
-        }
+                    // Reset push-to-talk state when AI response completes
+                    if (IsWaitingForResponse)
+                    {
+                        IsWaitingForResponse = false;
+                        IsPushToTalkActive = false;
+                        RestoreManualButtonState();
+                        AddMessage("✅ AI 回复完成，可以继续对话");
+                    }
+                    break;
+            }
+
+        });
     }
 
     private void OnVoiceChatStateChanged(object? sender, bool isActive)
     {
-        IsListening = isActive;
-        ShowMicrophoneVisualizer = isActive;
-
-        // Update auto button text when in auto mode
-        if (IsAutoMode)
+        // 使用UI调度器确保线程安全的事件处理
+        _ = _uiDispatcher.InvokeAsync(() =>
         {
-            if (_voiceChatService?.KeepListening == true && IsListening)
+            IsListening = isActive;
+            ShowMicrophoneVisualizer = isActive;
+
+            // Update auto button text when in auto mode
+            if (IsAutoMode)
             {
-                AutoButtonText = "停止对话";
+                if (_voiceChatService?.KeepListening == true && IsListening)
+                {
+                    AutoButtonText = "停止对话";
+                }
+                else if (_voiceChatService?.KeepListening == false || !IsListening)
+                {
+                    AutoButtonText = "开始对话";
+                }
             }
-            else if (_voiceChatService?.KeepListening == false || !IsListening)
-            {
-                AutoButtonText = "开始对话";
-            }
-        }
+
+        });            
     }
 
     private void OnMessageReceived(object? sender, ChatMessage message)
     {
-        var displayText = message.Role switch
+        // 使用UI调度器确保线程安全的事件处理
+        _ = _uiDispatcher.InvokeAsync(() =>
         {
-            "user" => $"用户: {message.Content}",
-            "assistant" => $"绿荫助手: {message.Content}",
-            _ => message.Content
-        };
+            var displayText = message.Role switch
+            {
+                "user" => $"用户: {message.Content}",
+                "assistant" => $"绿荫助手: {message.Content}",
+                _ => message.Content
+            };
 
-        AddMessage(displayText, false);
+            AddMessage(displayText, false);
 
-        // 如果是助手消息，更新TTS文本
-        if (message.Role == "assistant")
-        {
-            TtsText = message.Content;
-        }
+            // 如果是助手消息，更新TTS文本
+            if (message.Role == "assistant")
+            {
+                TtsText = message.Content;
+            }
+        });
     }
 
     private void OnErrorOccurred(object? sender, string error)
     {
-        AddMessage($"错误: {error}", true);
-        _logger?.LogError("Voice chat error: {Error}", error);
+        // 使用UI调度器确保线程安全的事件处理
+        _ = _uiDispatcher.InvokeAsync(() =>
+        {
+            AddMessage($"错误: {error}", true);
+            _logger?.LogError("Voice chat error: {Error}", error);
+        });
     }
 
     private void OnInterruptTriggered(object? sender, InterruptEventArgs e)
@@ -251,7 +267,7 @@ public partial class HomePageViewModel : ViewModelBase
         try
         {
             _logger?.LogInformation("Interrupt triggered: {Reason} - {Description}", e.Reason, e.Description);
-            
+
             // 在UI线程中处理中断需要通过事件通知View
             InterruptTriggered?.Invoke(this, e);
         }
@@ -285,9 +301,9 @@ public partial class HomePageViewModel : ViewModelBase
                 AudioChannels = 1,
                 AudioFormat = "opus"
             };
-            
-            await _voiceChatService.InitializeAsync(config);            
-            
+
+            await _voiceChatService.InitializeAsync(config);
+
             // Set up wake word detector coordination
             if (_interruptManager != null)
             {
@@ -303,7 +319,7 @@ public partial class HomePageViewModel : ViewModelBase
             {
                 AddMessage("连接成功");
                 StatusText = "已连接";
-                
+
                 // 启动关键词检测（对应py-xiaozhi的关键词唤醒功能）
                 await StartKeywordDetectionAsync();
             }
@@ -344,9 +360,9 @@ public partial class HomePageViewModel : ViewModelBase
 
             // 清理事件订阅
             CleanupEventSubscriptions();
-            
+
             _voiceChatService.Dispose();
-            
+
             // 重置所有状态
             UpdateConnectionState(false);
             IsListening = false;
@@ -442,8 +458,8 @@ public partial class HomePageViewModel : ViewModelBase
             _logger?.LogError(ex, "Failed to toggle auto chat mode");
             AddMessage($"切换自动对话失败: {ex.Message}", true);
         }
-    } 
-    
+    }
+
 
     [RelayCommand]
     private async Task AbortAsync()
@@ -491,8 +507,8 @@ public partial class HomePageViewModel : ViewModelBase
         IsAutoMode = !IsAutoMode;
         UpdateModeUI(IsAutoMode);
         AddMessage($"已切换到{(IsAutoMode ? "自动" : "手动")}对话模式");
-    }    
-    
+    }
+
     [RelayCommand]
     private void ToggleMute()
     {
@@ -582,7 +598,7 @@ public partial class HomePageViewModel : ViewModelBase
             _logger?.LogError(ex, "停止关键词检测时发生错误");
         }
     }
-    
+
     private void UpdateModeUI(bool isAutoMode)
     {
         IsAutoMode = isAutoMode;

@@ -31,8 +31,6 @@ public class VoiceChatService : IVoiceChatService
     private IKeywordSpottingService? _keywordSpottingService;
     private bool _keywordDetectionEnabled = false;
 
-    // UI thread dispatcher for cross-platform thread marshaling
-    private IUIDispatcher _uiDispatcher;
 
     public event EventHandler<bool>? VoiceChatStateChanged;
     public event EventHandler<ChatMessage>? MessageReceived;
@@ -142,11 +140,10 @@ public class VoiceChatService : IVoiceChatService
         }
     }    public bool IsKeywordDetectionEnabled => _keywordDetectionEnabled;
     
-    public VoiceChatService(IConfigurationService configurationService, ILogger<VoiceChatService>? logger = null, IUIDispatcher? uiDispatcher = null)
+    public VoiceChatService(IConfigurationService configurationService, ILogger<VoiceChatService>? logger = null)
     {
         _configurationService = configurationService;
         _logger = logger;
-        _uiDispatcher = uiDispatcher ?? new DefaultUIDispatcher();
     }    /// <summary>
     /// Set the interrupt manager for wake word detector coordination
     /// This enables py-xiaozhi-like wake word detector pause/resume behavior
@@ -155,15 +152,6 @@ public class VoiceChatService : IVoiceChatService
     {
         _interruptManager = interruptManager;
         _logger?.LogInformation("InterruptManager set for wake word detector coordination");
-    }
-
-    /// <summary>
-    /// 设置UI调度器以确保线程安全的事件处理
-    /// </summary>
-    public void SetUIDispatcher(IUIDispatcher uiDispatcher)
-    {
-        _uiDispatcher = uiDispatcher ?? new DefaultUIDispatcher();
-        _logger?.LogInformation("UI dispatcher set for thread-safe event handling");
     }
 
     /// <summary>
@@ -230,9 +218,9 @@ public class VoiceChatService : IVoiceChatService
     private void OnKeywordDetected(object? sender, KeywordDetectedEventArgs e)
     {
         _logger?.LogInformation($"检测到关键词: {e.Keyword} (完整文本: {e.FullText})");
-        
-        // 使用UI调度器确保线程安全的事件处理
-        _ = _uiDispatcher.InvokeAsync(async () => await HandleKeywordDetectedAsync(e.Keyword));
+
+        // 在后台线程处理关键词检测事件（对应py-xiaozhi的_handle_wake_word_detected）
+        Task.Run(async () => await HandleKeywordDetectedAsync(e.Keyword));
     }
 
     /// <summary>

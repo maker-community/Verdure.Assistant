@@ -85,20 +85,18 @@ public interface IVoiceChatService : IDisposable
     /// <summary>
     /// 当前设备状态
     /// </summary>
-    DeviceState CurrentState { get; }    
+    DeviceState CurrentState { get; } 
+    
     /// <summary>
     /// 当前监听模式
     /// </summary>
-    ListeningMode CurrentListeningMode { get; }    /// <summary>
+    ListeningMode CurrentListeningMode { get; }    
+    
+    /// <summary>
     /// Set interrupt manager for wake word detector coordination
     /// This enables py-xiaozhi-like wake word detector pause/resume behavior
     /// </summary>
     void SetInterruptManager(InterruptManager interruptManager);
-
-    /// <summary>
-    /// 设置UI调度器以确保线程安全的事件处理
-    /// </summary>
-    void SetUIDispatcher(IUIDispatcher uiDispatcher);
 
     /// <summary>
     /// 设置关键词唤醒服务
