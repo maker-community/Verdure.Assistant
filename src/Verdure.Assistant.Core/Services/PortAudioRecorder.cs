@@ -17,19 +17,25 @@ public class PortAudioRecorder : IAudioRecorder, IDisposable
     public event EventHandler<byte[]>? DataAvailable;
     public event EventHandler? RecordingStopped;
 
-    public bool IsRecording => _isRecording;    
-    public async Task StartRecordingAsync(int sampleRate, int channels)
+    public bool IsRecording => _isRecording;      public async Task StartRecordingAsync(int sampleRate, int channels)
     {
         if (_isRecording || _isDisposed) return;
 
         try
         {
-            // 初始化PortAudio
-            PortAudio.Initialize();            
+            // 使用 PortAudioManager 确保正确初始化
+            if (!PortAudioManager.Instance.AcquireReference())
+            {
+                throw new InvalidOperationException("无法初始化 PortAudio");
+            }
+            
             // 获取默认输入设备
             var defaultInputDevice = PortAudio.DefaultInputDevice;
             if (defaultInputDevice == -1)
+            {
+                PortAudioManager.Instance.ReleaseReference();
                 throw new InvalidOperationException("未找到音频输入设备");
+            }
             
             // 计算帧大小 (60ms帧，匹配Python配置)
             uint frameSize = (uint)(sampleRate * 60 / 1000);
@@ -63,6 +69,7 @@ public class PortAudioRecorder : IAudioRecorder, IDisposable
         catch (Exception ex)
         {
             _isRecording = false;
+            PortAudioManager.Instance.ReleaseReference();
             throw new Exception($"启动音频录制失败: {ex.Message}", ex);
         }
     }    public async Task StopRecordingAsync()
@@ -92,15 +99,8 @@ public class PortAudioRecorder : IAudioRecorder, IDisposable
                 }
             }
 
-            // 安全终止PortAudio
-            try
-            {
-                PortAudio.Terminate();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"终止PortAudio时出现警告: {ex.Message}");
-            }
+            // 释放 PortAudio 引用
+            PortAudioManager.Instance.ReleaseReference();
 
             RecordingStopped?.Invoke(this, EventArgs.Empty);
             Console.WriteLine("音频录制已停止");
@@ -111,7 +111,7 @@ public class PortAudioRecorder : IAudioRecorder, IDisposable
         {
             Console.WriteLine($"停止音频录制时出错: {ex.Message}");
         }
-    }    private StreamCallbackResult OnAudioDataReceived(
+    }private StreamCallbackResult OnAudioDataReceived(
         IntPtr input,
         IntPtr output,
         uint frameCount,

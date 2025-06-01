@@ -71,9 +71,13 @@ public partial class App : Application
 
         // Core services
         services.AddSingleton<IVerificationService, VerificationService>();
-        services.AddSingleton<IConfigurationService, ConfigurationService>();        
-        // Audio services
-        services.AddSingleton<IAudioRecorder, PortAudioRecorder>();
+        services.AddSingleton<IConfigurationService, ConfigurationService>();          // Audio services
+        services.AddSingleton<AudioStreamManager>(provider =>
+        {
+            var logger = provider.GetService<ILogger<AudioStreamManager>>();
+            return AudioStreamManager.GetInstance(logger);
+        });
+        services.AddSingleton<IAudioRecorder>(provider => provider.GetService<AudioStreamManager>()!);
         services.AddSingleton<IAudioPlayer, PortAudioPlayer>();
         services.AddSingleton<IAudioCodec, OpusSharpAudioCodec>();
 

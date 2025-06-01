@@ -12,9 +12,9 @@ namespace Verdure.Assistant.Core.Services;
 /// 支持使用.table模型文件进行离线关键词识别，无需订阅密钥
 /// </summary>
 public class KeywordSpottingService : IKeywordSpottingService
-{
-    private readonly ILogger<KeywordSpottingService>? _logger;
+{    private readonly ILogger<KeywordSpottingService>? _logger;
     private readonly IVoiceChatService _voiceChatService;
+    private readonly AudioStreamManager _audioStreamManager;
 
     // Microsoft认知服务相关
     private SpeechConfig? _speechConfig;
@@ -49,11 +49,10 @@ public class KeywordSpottingService : IKeywordSpottingService
 
     public bool IsRunning => _isRunning && !_isPaused;
     public bool IsPaused => _isPaused;
-    public bool IsEnabled => _isEnabled;
-
-    public KeywordSpottingService(IVoiceChatService voiceChatService, ILogger<KeywordSpottingService>? logger = null)
+    public bool IsEnabled => _isEnabled;    public KeywordSpottingService(IVoiceChatService voiceChatService, AudioStreamManager audioStreamManager, ILogger<KeywordSpottingService>? logger = null)
     {
         _voiceChatService = voiceChatService;
+        _audioStreamManager = audioStreamManager;
         _logger = logger;
 
         // 订阅设备状态变化，实现py-xiaozhi的状态协调逻辑
@@ -126,13 +125,8 @@ public class KeywordSpottingService : IKeywordSpottingService
             {
                 _logger?.LogError("加载关键词模型失败");
                 return false;
-            }
-
-            // 配置音频输入
-            // var audioConfig = ConfigureAudioInput();
-
-            // 使用默认麦克风输入
-            var audioConfig = AudioConfig.FromDefaultMicrophoneInput();
+            }            // 配置音频输入 - 使用共享音频流管理器
+            var audioConfig = await ConfigureSharedAudioInput();
             if (audioConfig == null)
             {
                 _logger?.LogError("配置音频输入失败");
@@ -279,9 +273,7 @@ public class KeywordSpottingService : IKeywordSpottingService
             _logger?.LogError(ex, "配置外部音频源失败");
             return null;
         }
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// 推送音频数据到语音服务
     /// </summary>
     private async Task PushAudioDataAsync()
@@ -316,6 +308,62 @@ public class KeywordSpottingService : IKeywordSpottingService
         {
             _logger?.LogError(ex, "推送音频数据时发生错误");
             OnErrorOccurred($"音频数据推送错误: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 从共享音频流推送数据到语音服务（参考 py-xiaozhi 的 AudioCodec 集成模式）
+    /// </summary>
+    private async Task PushSharedAudioDataAsync(AudioStreamManager audioStreamManager)
+    {
+        if (_pushStream == null)
+            return;
+
+        try
+        {
+            bool isSubscribed = false;
+            EventHandler<byte[]> audioDataHandler = (sender, audioData) =>
+            {
+                if (_isRunning && !_isPaused && _pushStream != null)
+                {
+                    try
+                    {
+                        // 将音频数据推送到语音识别服务
+                        _pushStream.Write(audioData);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "写入音频数据到推送流时出错");
+                    }
+                }
+            };
+
+            // 订阅共享音频流数据
+            audioStreamManager.SubscribeToAudioData(audioDataHandler);
+            isSubscribed = true;
+            _logger?.LogInformation("已订阅共享音频流数据，开始推送到关键词识别器");
+
+            // 保持订阅直到停止
+            while (_isRunning && !_cancellationTokenSource!.Token.IsCancellationRequested)
+            {
+                await Task.Delay(100, _cancellationTokenSource.Token);
+            }
+
+            // 取消订阅
+            if (isSubscribed)
+            {
+                audioStreamManager.UnsubscribeFromAudioData(audioDataHandler);
+                _logger?.LogInformation("已取消订阅共享音频流数据");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger?.LogInformation("共享音频数据推送任务已取消");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "从共享音频流推送数据时发生错误");
+            OnErrorOccurred($"共享音频数据推送错误: {ex.Message}");
         }
     }
 
@@ -567,5 +615,31 @@ public class KeywordSpottingService : IKeywordSpottingService
         _semaphore.Dispose();
 
         _logger?.LogInformation("关键词检测服务已释放");
+    }
+
+    /// <summary>
+    /// 配置共享音频输入（类似 py-xiaozhi 的 AudioCodec 共享流模式）
+    /// </summary>
+    private async Task<AudioConfig?> ConfigureSharedAudioInput()
+    {
+        try
+        {
+            // 启动共享音频流管理器
+            await _audioStreamManager.StartRecordingAsync();
+
+            // 创建推送音频流用于关键词检测
+            var format = AudioStreamFormat.GetWaveFormatPCM(16000, 16, 1); // 16kHz, 16-bit, mono
+            _pushStream = AudioInputStream.CreatePushStream(format);
+
+            // 启动音频数据推送任务，从共享流获取数据
+            _ = Task.Run(() => PushSharedAudioDataAsync(_audioStreamManager));
+
+            return AudioConfig.FromStreamInput(_pushStream);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "配置共享音频输入失败，回退到默认输入");
+            return AudioConfig.FromDefaultMicrophoneInput();
+        }
     }
 }

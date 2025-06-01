@@ -65,20 +65,25 @@ public class PortAudioPlayer : IAudioPlayer
                 }
             }
         }
-    }
-    public async Task InitializeAsync(int sampleRate, int channels)
+    }    public async Task InitializeAsync(int sampleRate, int channels)
     {
         _sampleRate = sampleRate;
         _channels = channels;
 
         try
         {
-            // 初始化PortAudio
-            PortAudio.Initialize();
+            // 使用 PortAudioManager 确保正确初始化
+            if (!PortAudioManager.Instance.AcquireReference())
+            {
+                throw new InvalidOperationException("无法初始化 PortAudio");
+            }
+            
             // 获取默认输出设备
-            var defaultOutputDevice = PortAudio.DefaultOutputDevice;
-            if (defaultOutputDevice == -1)
+            var defaultOutputDevice = PortAudio.DefaultOutputDevice;            if (defaultOutputDevice == -1)
+            {
+                PortAudioManager.Instance.ReleaseReference();
                 throw new InvalidOperationException("未找到音频输出设备");
+            }
 
             // 配置音频流参数 - 匹配Python配置
             var outputParameters = new StreamParameters
@@ -104,9 +109,9 @@ public class PortAudioPlayer : IAudioPlayer
 
             System.Console.WriteLine($"音频播放器初始化成功: {sampleRate}Hz, {channels}声道, 帧大小: {frameSize}");
             await Task.CompletedTask;
-        }
-        catch (Exception ex)
+        }        catch (Exception ex)
         {
+            PortAudioManager.Instance.ReleaseReference();
             throw new Exception($"初始化音频播放器失败: {ex.Message}", ex);
         }
     }    public async Task PlayAsync(byte[] audioData, int sampleRate, int channels)
@@ -165,9 +170,7 @@ public class PortAudioPlayer : IAudioPlayer
             // 停止定时器
             _playbackTimer.Change(Timeout.Infinite, Timeout.Infinite);
 
-            _isPlaying = false;
-
-            // 安全停止音频流
+            _isPlaying = false;            // 安全停止音频流
             if (_outputStream != null)
             {
                 try
@@ -192,15 +195,8 @@ public class PortAudioPlayer : IAudioPlayer
                 _audioQueue.Clear();
             }
 
-            // 终止PortAudio（如果需要）
-            try
-            {
-                PortAudio.Terminate();
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "终止PortAudio时出现警告");
-            }
+            // 释放 PortAudio 引用
+            PortAudioManager.Instance.ReleaseReference();
 
             _logger?.LogInformation("音频播放已停止");
             await Task.CompletedTask;

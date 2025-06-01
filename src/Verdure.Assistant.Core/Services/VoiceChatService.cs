@@ -9,9 +9,10 @@ namespace Verdure.Assistant.Core.Services;
 /// 语音聊天服务实现
 /// </summary>
 public class VoiceChatService : IVoiceChatService
-{    
+{      
     private readonly ILogger<VoiceChatService>? _logger;
     private readonly IConfigurationService _configurationService;
+    private readonly AudioStreamManager _audioStreamManager;
     private ICommunicationClient? _communicationClient;
     private IAudioRecorder? _audioRecorder;
     private IAudioPlayer? _audioPlayer;
@@ -140,11 +141,12 @@ public class VoiceChatService : IVoiceChatService
         }
     }    public bool IsKeywordDetectionEnabled => _keywordDetectionEnabled;
     
-    public VoiceChatService(IConfigurationService configurationService, ILogger<VoiceChatService>? logger = null)
+    public VoiceChatService(IConfigurationService configurationService, AudioStreamManager audioStreamManager, ILogger<VoiceChatService>? logger = null)
     {
         _configurationService = configurationService;
+        _audioStreamManager = audioStreamManager;
         _logger = logger;
-    }    /// <summary>
+    }/// <summary>
     /// Set the interrupt manager for wake word detector coordination
     /// This enables py-xiaozhi-like wake word detector pause/resume behavior
     /// </summary>
@@ -166,9 +168,7 @@ public class VoiceChatService : IVoiceChatService
         _keywordSpottingService.ErrorOccurred += OnKeywordDetectionError;
         
         _logger?.LogInformation("关键词唤醒服务已设置");
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// 启动关键词唤醒检测（对应py-xiaozhi的_start_wake_word_detector方法）
     /// </summary>
     public async Task<bool> StartKeywordDetectionAsync()
@@ -177,12 +177,10 @@ public class VoiceChatService : IVoiceChatService
         {
             _logger?.LogWarning("关键词唤醒服务未设置");
             return false;
-        }
-
-        try
+        }        try
         {
-            // 使用音频录制器启动关键词检测（对应py-xiaozhi的AudioCodec集成模式）
-            var success = await _keywordSpottingService.StartAsync(_audioRecorder);
+            // 使用共享音频流管理器启动关键词检测（对应py-xiaozhi的AudioCodec集成模式）
+            var success = await _keywordSpottingService.StartAsync();
             if (success)
             {
                 _keywordDetectionEnabled = true;
@@ -296,11 +294,11 @@ public class VoiceChatService : IVoiceChatService
             }            
               // 初始化音频编解码器 - 暂时使用Concentus进行测试
             _audioCodec = new OpusSharpAudioCodec();
-            
-            // 初始化音频录制和播放
+              // 初始化音频录制和播放
             if (config.EnableVoice)
             {
-                _audioRecorder = new PortAudioRecorder();
+                // 使用共享音频流管理器，而不是创建独立的录制器
+                _audioRecorder = _audioStreamManager;
                 _audioPlayer = new PortAudioPlayer();
 
                 _audioRecorder.DataAvailable += OnAudioDataReceived;
