@@ -146,9 +146,11 @@
   </data>
   <data name="OtaAddressTextBox.Header" xml:space="preserve">
     <value>OTA服务器地址</value>
-  </data>
-  <data name="OtaAddressTextBox.PlaceholderText" xml:space="preserve">
+  </data>  <data name="OtaAddressTextBox.PlaceholderText" xml:space="preserve">
     <value>输入OTA服务器地址</value>
+  </data>
+  <data name="OtaProtocolComboBox.Header" xml:space="preserve">
+    <value>OTA协议</value>
   </data>
   <data name="WebSocketAddressLabel.Text" xml:space="preserve">
     <value>WebSocket地址:</value>
@@ -158,6 +160,9 @@
   </data>
   <data name="WsAddressTextBox.PlaceholderText" xml:space="preserve">
     <value>输入WebSocket服务器地址</value>
+  </data>
+  <data name="WsProtocolComboBox.Header" xml:space="preserve">
+    <value>WebSocket协议</value>
   </data>
   <data name="WsTokenTextBox.Header" xml:space="preserve">
     <value>Access Token</value>
@@ -353,9 +358,11 @@
   </data>
   <data name="Info_ExportNotImplemented" xml:space="preserve">
     <value>导出设置功能将在后续版本中实现</value>
-  </data>
-  <data name="Error_ExportSettings" xml:space="preserve">
+  </data>  <data name="Error_ExportSettings" xml:space="preserve">
     <value>导出设置时出错: {0}</value>
+  </data>
+  <data name="Info_SettingsExported" xml:space="preserve">
+    <value>设置已成功导出</value>
   </data>
   <data name="Info_ImportNotImplemented" xml:space="preserve">
     <value>导入设置功能将在后续版本中实现</value>
@@ -363,14 +370,22 @@
   <data name="Error_ImportSettings" xml:space="preserve">
     <value>导入设置时出错: {0}</value>
   </data>
+  <data name="Info_SettingsImported" xml:space="preserve">
+    <value>设置已成功导入</value>
+  </data>
   <data name="Info_SettingsReset" xml:space="preserve">
     <value>设置已重置为默认值</value>
   </data>
   <data name="Error_ResetSettings" xml:space="preserve">
     <value>重置设置时出错: {0}</value>
-  </data>
-  <data name="Dialog_InfoTitle" xml:space="preserve">
+  </data>  <data name="Dialog_InfoTitle" xml:space="preserve">
     <value>信息</value>
+  </data>
+  <data name="Dialog_ErrorTitle" xml:space="preserve">
+    <value>错误</value>
+  </data>
+  <data name="Dialog_OkButton" xml:space="preserve">
+    <value>确定</value>
   </data>
   <data name="RefreshAudioDevicesButton.Text" xml:space="preserve">
     <value>刷新音频设备</value>

@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Windows.ApplicationModel.Resources;
 using XiaoZhi.Core.Constants;
@@ -16,11 +18,15 @@ public sealed partial class HomePage : Page
     private readonly ILogger<HomePage>? _logger;
     private readonly IVoiceChatService? _voiceChatService;
     private readonly EmotionManager? _emotionManager;
-    private InterruptManager? _interruptManager;
+    private InterruptManager? _interruptManager;    
     private readonly ResourceLoader _resourceLoader;
     private bool _isConnected = false;
     private bool _isListening = false;
-    private bool _isAutoMode = false;    
+    private bool _isAutoMode = false;
+      // Push-to-talk state tracking
+    private bool _isPushToTalkActive = false;
+    private bool _isWaitingForResponse = false;
+    private DispatcherTimer? _pushToTalkTimeoutTimer;
     public HomePage()
     {
         this.InitializeComponent();
@@ -212,9 +218,8 @@ public sealed partial class HomePage : Page
         {
             // Don't update connection state based on device state!
             // DeviceState.Idle means "connected but idle", not "disconnected"
-            // Connection state should only be managed by actual connection/disconnection events
-
-            switch (state)
+            // Connection state should only be managed by actual connection/disconnection events            switch (state)
+            switch(state)
             {
                 case DeviceState.Listening:
                     StatusText.Text = _resourceLoader.GetString("Status_Listening");
@@ -230,12 +235,23 @@ public sealed partial class HomePage : Page
                     StatusText.Text = _resourceLoader.GetString("Status_Connecting");
                     // Update emotion/visual indicators but don't touch connection state
                     SetEmotion("thinking");
-                    break;
-                case DeviceState.Idle:
+                    break;                case DeviceState.Idle:
                 default:
                     StatusText.Text = _resourceLoader.GetString("Status_Standby");
                     // Update emotion/visual indicators but don't touch connection state
                     SetEmotion("neutral");
+                    
+                    // Reset push-to-talk state when AI response completes
+                    if (_isWaitingForResponse)
+                    {
+                        _isWaitingForResponse = false;
+                        _isPushToTalkActive = false;
+                        
+                        // Use helper method for consistent button state restoration
+                        RestoreManualButtonState();
+                        
+                        AddMessage("✅ AI 回复完成，可以继续对话");
+                    }
                     break;
             }
         });
@@ -536,15 +552,21 @@ public sealed partial class HomePage : Page
             UpdateConnectionState(false);
             ConnectButton.IsEnabled = true;
         }
-    }
-
-    private async void DisconnectButton_Click(object sender, RoutedEventArgs e)
+    }    private async void DisconnectButton_Click(object sender, RoutedEventArgs e)
     {
         if (!_isConnected || _voiceChatService == null) return;
 
         try
         {
             DisconnectButton.IsEnabled = false;
+
+            // Reset push-to-talk state before disconnecting
+            if (_isPushToTalkActive || _isWaitingForResponse)
+            {
+                _isPushToTalkActive = false;
+                _isWaitingForResponse = false;
+                RestoreManualButtonState();
+            }
 
             // 停止当前语音对话
             if (_isListening)
@@ -556,12 +578,13 @@ public sealed partial class HomePage : Page
             _voiceChatService.MessageReceived -= OnMessageReceived;
             _voiceChatService.VoiceChatStateChanged -= OnVoiceChatStateChanged;
             _voiceChatService.ErrorOccurred -= OnErrorOccurred;
-            _voiceChatService.DeviceStateChanged -= OnDeviceStateChanged;
-
-            _voiceChatService.Dispose();
+            _voiceChatService.DeviceStateChanged -= OnDeviceStateChanged;            _voiceChatService.Dispose();
             // 重置所有状态
             _isConnected = false;
             _isListening = false;
+
+            // 更新UI状态以反映断开连接
+            UpdateConnectionState(false);
 
             AddMessage("已断开连接");
         }
@@ -569,44 +592,70 @@ public sealed partial class HomePage : Page
         {
             _logger?.LogError(ex, "Failed to disconnect from voice chat service");
             AddMessage($"断开连接失败: {ex.Message}", true);
+            
+            // 即使发生错误也要更新UI状态
+            UpdateConnectionState(false);
         }
-    }
-
-    private async void ManualButton_PointerPressed(object sender, PointerRoutedEventArgs e)
+    }private async void ManualButton_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        if (_voiceChatService == null || !_isConnected) return;
+        if (_voiceChatService == null || !_isConnected || _isPushToTalkActive || _isWaitingForResponse) 
+            return;
 
         try
         {
+            // Capture the pointer to ensure we get release events
+            var button = (Button)sender;
+            button.CapturePointer(e.Pointer);
+            
+            _isPushToTalkActive = true;
+            
             if (!_isListening)
             {
                 await _voiceChatService.StartVoiceChatAsync();
-                ManualButtonText.Text = _resourceLoader.GetString("ManualButtonText_Release");
-                AddMessage("开始录音，松开结束");
+                
+                // Use helper method for consistent visual feedback
+                SetManualButtonRecordingState();
+                
+                AddMessage("🎤 正在录音... 松开按钮结束录音");
+                _logger?.LogInformation("Push-to-talk activated, recording started");
             }
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Failed to start manual voice chat");
+            // Reset state on error
+            _isPushToTalkActive = false;
+            RestoreManualButtonState();
+            
+            _logger?.LogError(ex, "Failed to start push-to-talk recording");
             AddMessage($"开始录音失败: {ex.Message}", true);
         }
-    }
-
-    private async void ManualButton_PointerReleased(object sender, PointerRoutedEventArgs e)
+    }    private async void ManualButton_PointerReleased(object sender, PointerRoutedEventArgs e)
     {
-        if (_voiceChatService == null || !_isConnected) return;
+        if (_voiceChatService == null || !_isConnected || !_isPushToTalkActive) 
+            return;
 
         try
         {
             if (_isListening)
             {
                 await _voiceChatService.StopVoiceChatAsync();
-                ManualButtonText.Text = _resourceLoader.GetString("ManualButtonText_Hold");
-                AddMessage("录音结束，正在处理...");
+                
+                // Update UI to show waiting state using helper method
+                _isPushToTalkActive = false;
+                _isWaitingForResponse = true;
+                
+                SetManualButtonProcessingState();
+                AddMessage("录音结束，正在处理和等待回复...");
+                
+                // The response will be handled by OnDeviceStateChanged
+                // When device state goes back to Idle, we'll re-enable the button
             }
         }
         catch (Exception ex)
         {
+            _isPushToTalkActive = false;
+            _isWaitingForResponse = false;
+            RestoreManualButtonState();
             _logger?.LogError(ex, "Failed to stop manual voice chat");
             AddMessage($"停止录音失败: {ex.Message}", true);
         }
@@ -720,6 +769,75 @@ public sealed partial class HomePage : Page
         {
             VolumeSlider.Value = 0;
             MuteIcon.Glyph = "\uE74F"; // Mute icon
+        }
+    }
+
+    #endregion
+
+    #region 按住对话辅助方法
+
+    private void RestoreManualButtonState()
+    {
+        try
+        {
+            if (ManualButton != null)
+            {
+                ManualButton.IsEnabled = true;
+                ManualButton.Opacity = 1.0;
+                ManualButton.ClearValue(Button.BackgroundProperty); // Reset to default background
+            }
+            
+            if (ManualButtonText != null)
+            {
+                ManualButtonText.Text = _resourceLoader.GetString("ManualButtonText") ?? "🎤 按住说话";
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to restore manual button state");
+        }
+    }
+
+    private void SetManualButtonRecordingState()
+    {
+        try
+        {
+            if (ManualButtonText != null)
+            {
+                ManualButtonText.Text = "🎤 松开结束";
+            }
+            
+            if (ManualButton != null)
+            {
+                ManualButton.Opacity = 0.8;
+                ManualButton.Background = Application.Current.Resources["SystemAccentColorBrush"] as Microsoft.UI.Xaml.Media.Brush;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to set manual button recording state");
+        }
+    }
+
+    private void SetManualButtonProcessingState()
+    {
+        try
+        {
+            if (ManualButtonText != null)
+            {
+                ManualButtonText.Text = "⏳ 处理中...";
+            }
+            
+            if (ManualButton != null)
+            {
+                ManualButton.IsEnabled = false;
+                ManualButton.Opacity = 0.6;
+                ManualButton.Background = Application.Current.Resources["SystemFillColorCautionBrush"] as Microsoft.UI.Xaml.Media.Brush;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to set manual button processing state");
         }
     }
 

@@ -146,9 +146,11 @@
   </data>
   <data name="OtaAddressTextBox.Header" xml:space="preserve">
     <value>OTA Server Address</value>
-  </data>
-  <data name="OtaAddressTextBox.PlaceholderText" xml:space="preserve">
+  </data>  <data name="OtaAddressTextBox.PlaceholderText" xml:space="preserve">
     <value>Enter OTA server address</value>
+  </data>
+  <data name="OtaProtocolComboBox.Header" xml:space="preserve">
+    <value>OTA Protocol</value>
   </data>
   <data name="WebSocketAddressLabel.Text" xml:space="preserve">
     <value>WebSocket Server Address</value>
@@ -158,6 +160,9 @@
   </data>
   <data name="WsAddressTextBox.PlaceholderText" xml:space="preserve">
     <value>Enter WebSocket server address</value>
+  </data>
+  <data name="WsProtocolComboBox.Header" xml:space="preserve">
+    <value>WebSocket Protocol</value>
   </data>
   <data name="WsTokenTextBox.Header" xml:space="preserve">
     <value>Access Token</value>
@@ -353,9 +358,11 @@
   </data>
   <data name="Info_ExportNotImplemented" xml:space="preserve">
     <value>Export settings feature will be implemented in future versions</value>
-  </data>
-  <data name="Error_ExportSettings" xml:space="preserve">
+  </data>  <data name="Error_ExportSettings" xml:space="preserve">
     <value>Error exporting settings: {0}</value>
+  </data>
+  <data name="Info_SettingsExported" xml:space="preserve">
+    <value>Settings have been exported successfully</value>
   </data>
   <data name="Info_ImportNotImplemented" xml:space="preserve">
     <value>Import settings feature will be implemented in future versions</value>
@@ -363,14 +370,22 @@
   <data name="Error_ImportSettings" xml:space="preserve">
     <value>Error importing settings: {0}</value>
   </data>
+  <data name="Info_SettingsImported" xml:space="preserve">
+    <value>Settings have been imported successfully</value>
+  </data>
   <data name="Info_SettingsReset" xml:space="preserve">
     <value>Settings have been reset to default values</value>
   </data>
   <data name="Error_ResetSettings" xml:space="preserve">
     <value>Error resetting settings: {0}</value>
-  </data>
-  <data name="Dialog_InfoTitle" xml:space="preserve">
+  </data>  <data name="Dialog_InfoTitle" xml:space="preserve">
     <value>Information</value>
+  </data>
+  <data name="Dialog_ErrorTitle" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="Dialog_OkButton" xml:space="preserve">
+    <value>OK</value>
   </data>
   <data name="RefreshAudioDevicesButton.Text" xml:space="preserve">
     <value>Refresh Audio Devices</value>

@@ -69,9 +69,7 @@ public class NAudioPlayer : IAudioPlayer, IDisposable
             _logger?.LogError(ex, "初始化音频播放器失败");
             throw new Exception($"初始化音频播放器失败: {ex.Message}", ex);
         }
-    }
-
-    public async Task PlayAsync(byte[] audioData, int sampleRate = 16000, int channels = 1)
+    }    public async Task PlayAsync(byte[] audioData, int sampleRate = 16000, int channels = 1)
     {
         try
         {
@@ -87,9 +85,19 @@ public class NAudioPlayer : IAudioPlayer, IDisposable
                 throw new InvalidOperationException("音频播放器未正确初始化");
             }
 
-            // 将音频数据添加到缓冲区
-            _bufferedProvider.AddSamples(audioData, 0, audioData.Length);
-            _lastDataTime = DateTime.Now;
+            lock (_lock)
+            {
+                // 清理可能存在的旧音频数据以避免杂音
+                if (_bufferedProvider.BufferedDuration.TotalMilliseconds > 2000) // 如果缓冲区超过2秒
+                {
+                    _bufferedProvider.ClearBuffer();
+                    _logger?.LogDebug("清理音频缓冲区以避免杂音");
+                }
+                
+                // 将音频数据添加到缓冲区
+                _bufferedProvider.AddSamples(audioData, 0, audioData.Length);
+                _lastDataTime = DateTime.Now;
+            }
 
             // 如果还没有开始播放，开始播放
             if (!_isPlaying && _waveOut.PlaybackState != PlaybackState.Playing)
@@ -98,7 +106,7 @@ public class NAudioPlayer : IAudioPlayer, IDisposable
                 _isPlaying = true;
                 
                 // 启动定时器检测播放完成
-                _playbackTimer.Change(500, 500); // 每500ms检查一次
+                _playbackTimer.Change(200, 200); // 每200ms检查一次，更频繁的检查
                 
                 _logger?.LogDebug("开始播放音频，数据长度: {Length}", audioData.Length);
             }
@@ -196,23 +204,69 @@ public class NAudioPlayer : IAudioPlayer, IDisposable
         {
             _logger?.LogError(ex, "检查播放完成状态时出错");
         }
-    }
-
+    }    
     public void Dispose()
     {
         try
         {
+            _playbackTimer?.Change(Timeout.Infinite, Timeout.Infinite);
             _playbackTimer?.Dispose();
-            StopAsync().Wait();
             
-            if (_waveOut != null)
+            // 确保停止播放并等待完成
+            try
             {
-                _waveOut.PlaybackStopped -= OnPlaybackStopped;
-                _waveOut.Dispose();
-                _waveOut = null;
+                StopAsync().Wait(1000); // 最多等待1秒
+            }
+            catch (TimeoutException)
+            {
+                _logger?.LogWarning("停止音频播放超时");
             }
             
-            _bufferedProvider = null;
+            lock (_lock)
+            {
+                if (_waveOut != null)
+                {
+                    try
+                    {
+                        _waveOut.PlaybackStopped -= OnPlaybackStopped;
+                        
+                        // 强制停止并释放
+                        if (_waveOut.PlaybackState == PlaybackState.Playing)
+                        {
+                            _waveOut.Stop();
+                        }
+                        
+                        _waveOut.Dispose();
+                        _waveOut = null;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "释放WaveOut时出错");
+                    }
+                }
+                
+                if (_bufferedProvider != null)
+                {
+                    try
+                    {
+                        _bufferedProvider.ClearBuffer();
+                        _bufferedProvider = null;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "清理缓冲区时出错");
+                    }
+                }
+                
+                // 清理音频队列
+                while (_audioQueue.TryDequeue(out _))
+                {
+                    // 清空队列
+                }
+            }
+            
+            _isInitialized = false;
+            _isPlaying = false;
         }
         catch (Exception ex)
         {

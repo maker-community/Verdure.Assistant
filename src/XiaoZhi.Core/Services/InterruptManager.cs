@@ -25,16 +25,16 @@ public class InterruptManager : IDisposable
 
     public bool IsVADEnabled { get; private set; } = true;
     public bool IsHotkeyEnabled { get; private set; } = true;
-    public AbortReason LastAbortReason => _lastAbortReason;
-
-    public InterruptManager(
+    public AbortReason LastAbortReason => _lastAbortReason;    public InterruptManager(
         IVoiceChatService voiceChatService,
         ILogger<InterruptManager>? logger = null)
     {
         _voiceChatService = voiceChatService;
-        _logger = logger;        // Initialize interrupt services
+        _logger = logger;
+          // Initialize interrupt services
+        // Pass null for audioRecorder since voice interruption is disabled
         _vadDetector = new VADDetectorService(_voiceChatService, null);
-        _hotkeyService = new GlobalHotkeyService(_voiceChatService, null);
+        _hotkeyService = new GlobalHotkeyService(_voiceChatService);
         
         // Subscribe to interrupt events
         _vadDetector.VoiceInterruptDetected += OnVADInterrupt;

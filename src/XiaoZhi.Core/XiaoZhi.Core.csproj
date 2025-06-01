@@ -9,7 +9,6 @@
     <PackageReference Include="MQTTnet" Version="5.0.1.1416" />
     <PackageReference Include="OpusSharp" Version="1.5.6" />
     <PackageReference Include="PortAudioSharp2" Version="1.0.4" />
-    <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="System.Text.Json" Version="9.0.5" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.5" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.5" />
