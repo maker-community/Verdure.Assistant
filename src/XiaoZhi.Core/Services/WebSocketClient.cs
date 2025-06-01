@@ -67,7 +67,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
             // 发送客户端Hello消息
             var helloMessage = WebSocketProtocol.CreateHelloMessage(
                 sessionId: null,
-                sampleRate: 24000,
+                sampleRate: 16000,
                 channels: 1,
                 frameDuration: 60
             );
