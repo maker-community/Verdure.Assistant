@@ -11,36 +11,40 @@
 
     <winuiex:WindowEx.SystemBackdrop>
         <MicaBackdrop Kind="Base" />
-    </winuiex:WindowEx.SystemBackdrop>    
+    </winuiex:WindowEx.SystemBackdrop>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Custom Title Bar -->
+        <!--  Custom Title Bar  -->
         <!--<Grid x:Name="TitleBarGrid" Grid.Row="0" Height="32" Background="Transparent">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            
-            --><!-- Logo and Title --><!--
+
+        -->
+        <!--  Logo and Title  -->
+        <!--
             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
                 <Image Source="ms-appx:///Assets/logo.png" Width="20" Height="20" Margin="0,0,8,0" />
-                <TextBlock Text="绿荫助手AI客户端" 
-                          VerticalAlignment="Center" 
+                <TextBlock Text="绿荫助手AI客户端"
+                          VerticalAlignment="Center"
                           FontSize="14"
                           FontWeight="SemiBold"
                           Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
             </StackPanel>
-            
-            --><!-- Drag Region --><!--
+
+        -->
+        <!--  Drag Region  -->
+        <!--
             <Border Grid.Column="1" Background="Transparent" />
         </Grid>-->
 
-        <!--  Navigation Header  -->
+        <!--  Navigation Header IsBackButtonVisible="{x:Bind _viewModel.IsBackEnabled, Mode=OneWay}"  -->
         <Border
             Grid.Row="0"
             Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
@@ -48,10 +52,10 @@
             BorderThickness="0,0,0,1">
             <NavigationView
                 x:Name="MainNavigationView"
-                IsBackButtonVisible="Collapsed"
                 IsPaneToggleButtonVisible="False"
                 IsSettingsVisible="False"
                 PaneDisplayMode="Top"
+                SelectedItem="{x:Bind _viewModel.SelectedNavigationItem, Mode=OneWay}"
                 SelectionChanged="MainNavigationView_SelectionChanged">
                 <NavigationView.MenuItems>
                     <NavigationViewItem

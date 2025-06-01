@@ -34,13 +34,13 @@
                         x:Name="StatusIcon"
                         FontSize="20"
                         Foreground="{ThemeResource SystemAccentColor}"
-                        Glyph="&#xE916;" />                    
+                        Glyph="&#xE916;" />
                     <TextBlock
                         x:Name="StatusText"
-                        x:Uid="StatusText"
                         VerticalAlignment="Center"
                         FontSize="14"
-                        FontWeight="SemiBold" />
+                        FontWeight="SemiBold"
+                        Text="{x:Bind ViewModel.StatusText, Mode=OneWay}" />
                 </StackPanel>
 
                 <StackPanel
@@ -52,12 +52,12 @@
                         Width="16"
                         Height="16"
                         Background="{ThemeResource SystemFillColorCriticalBrush}"
-                        CornerRadius="8" />                    
+                        CornerRadius="8" />
                     <TextBlock
                         x:Name="ConnectionStatusText"
-                        x:Uid="ConnectionStatusText"
                         VerticalAlignment="Center"
-                        FontSize="12" />
+                        FontSize="12"
+                        Text="{x:Bind ViewModel.ConnectionStatusText, Mode=OneWay}" />
                 </StackPanel>
             </Grid>
         </Border>
@@ -122,20 +122,20 @@
                         Padding="16"
                         Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
                         CornerRadius="8">
-                        <ScrollViewer MaxHeight="80" VerticalScrollBarVisibility="Auto">                            
+                        <ScrollViewer MaxHeight="80" VerticalScrollBarVisibility="Auto">
                             <TextBlock
                                 x:Name="TtsText"
-                                x:Uid="TtsText"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 FontSize="13"
+                                Text="{x:Bind ViewModel.TtsText, Mode=OneWay}"
                                 TextWrapping="Wrap" />
                         </ScrollViewer>
                     </Border>
 
                     <!--  Audio Controls Stack  -->
                     <Grid Grid.Row="2" Margin="0,15,0,0">
-                        <!--  Volume Control  -->                        
+                        <!--  Volume Control  -->
                         <StackPanel x:Name="VolumeControlPanel" Spacing="8">
                             <TextBlock
                                 x:Uid="VolumeControl_Header"
@@ -182,7 +182,7 @@
                             </Grid>
                         </StackPanel>
 
-                        <!--  Microphone Visualizer (Hidden by default)  -->                        
+                        <!--  Microphone Visualizer (Hidden by default)  -->
                         <StackPanel
                             x:Name="MicVisualizerPanel"
                             Spacing="8"
@@ -222,7 +222,7 @@
                             PointerCaptureLost="ManualButton_PointerCaptureLost"
                             PointerPressed="ManualButton_PointerPressed"
                             PointerReleased="ManualButton_PointerReleased"
-                            Style="{ThemeResource AccentButtonStyle}">                            
+                            Style="{ThemeResource AccentButtonStyle}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon FontSize="16" Glyph="&#xE720;" />
                                 <TextBlock x:Name="ManualButtonText" x:Uid="ManualButtonText" />
@@ -238,7 +238,7 @@
                             HorizontalAlignment="Stretch"
                             Click="AutoButton_Click"
                             Style="{ThemeResource AccentButtonStyle}"
-                            Visibility="Collapsed">                            
+                            Visibility="Collapsed">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon FontSize="16" Glyph="&#xE768;" />
                                 <TextBlock x:Name="AutoButtonText" x:Uid="AutoButtonText" />
@@ -252,7 +252,7 @@
                             Height="36"
                             Margin="0,0,0,8"
                             HorizontalAlignment="Stretch"
-                            Click="AbortButton_Click">                            
+                            Click="AbortButton_Click">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon FontSize="14" Glyph="&#xE71A;" />
                                 <TextBlock x:Uid="AbortButton_Content" />
@@ -266,7 +266,7 @@
                             Height="36"
                             HorizontalAlignment="Stretch"
                             Click="ModeToggleButton_Click"
-                            Style="{ThemeResource DefaultButtonStyle}">                            
+                            Style="{ThemeResource DefaultButtonStyle}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon FontSize="14" Glyph="&#xE8AB;" />
                                 <TextBlock x:Name="ModeToggleText" x:Uid="ModeToggleText" />
@@ -295,14 +295,14 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-
                         <Button
                             x:Name="ConnectButton"
                             Grid.Column="0"
                             Height="36"
                             Margin="0,0,5,0"
-                            Click="ConnectButton_Click"
-                            Style="{ThemeResource AccentButtonStyle}">                            
+                            Command="{x:Bind ViewModel.ConnectCommand}"
+                            IsEnabled="{x:Bind ViewModel.IsConnected, Mode=OneWay}"
+                            Style="{ThemeResource AccentButtonStyle}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon
                                     x:Name="ConnectIcon"
@@ -311,14 +311,14 @@
                                 <TextBlock x:Name="ConnectText" x:Uid="ConnectText" />
                             </StackPanel>
                         </Button>
-
                         <Button
                             x:Name="DisconnectButton"
                             Grid.Column="1"
                             Height="36"
                             Margin="5,0,0,0"
-                            Click="DisconnectButton_Click"
-                            IsEnabled="False">                            
+                            Command="{x:Bind ViewModel.DisconnectCommand}"
+                            IsEnabled="{x:Bind ViewModel.IsConnected, Mode=OneWay}"
+                            Style="{ThemeResource DefaultButtonStyle}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon FontSize="16" Glyph="&#xE711;" />
                                 <TextBlock x:Uid="DisconnectButton_Content" />
@@ -331,21 +331,20 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>                        
+                        </Grid.ColumnDefinitions>
                         <TextBox
                             x:Name="MessageTextBox"
-                            x:Uid="MessageTextBox"
                             Grid.Column="0"
                             Height="36"
                             Margin="0,0,10,0"
-                            KeyDown="MessageTextBox_KeyDown" />
-
+                            KeyDown="MessageTextBox_KeyDown"
+                            Text="{x:Bind ViewModel.MessageText, Mode=TwoWay}" />
                         <Button
                             x:Name="SendButton"
                             Grid.Column="1"
                             Height="36"
                             MinWidth="60"
-                            Click="SendButton_Click"
+                            Command="{x:Bind ViewModel.SendMessageCommand}"
                             Style="{ThemeResource AccentButtonStyle}">
                             <TextBlock x:Uid="SendButton_Content" />
                         </Button>
@@ -362,7 +361,7 @@
                             VerticalScrollBarVisibility="Auto"
                             ZoomMode="Disabled">
                             <StackPanel x:Name="MessagesPanel" Spacing="8">
-                                <!--  Messages will be added here programmatically  -->                                
+                                <!--  Messages will be added here programmatically  -->
                                 <TextBlock
                                     x:Uid="MessagesPanel_WaitingText"
                                     Margin="0,20"

@@ -51,9 +51,9 @@
 
         <Manifest Include="$(ApplicationManifest)" />
 
-        <PackageReference Include="NAudio" Version="2.2.1" />    </ItemGroup>    
-	<ItemGroup>
+        <PackageReference Include="NAudio" Version="2.2.1" />    </ItemGroup>    	<ItemGroup>
         <ProjectReference Include="..\Verdure.Assistant.Core\Verdure.Assistant.Core.csproj" />
+        <ProjectReference Include="..\Verdure.Assistant.ViewModels\Verdure.Assistant.ViewModels.csproj" />
     </ItemGroup>
 
     <!-- 

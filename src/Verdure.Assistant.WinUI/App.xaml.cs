@@ -1,13 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.UI.Xaml;
-using Verdure.Assistant.WinUI.Views;
-using Verdure.Assistant.WinUI.ViewModels;
-using Verdure.Assistant.WinUI.Services;
-using Verdure.Assistant.Core.Services;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
+using Verdure.Assistant.Core.Services;
+using Verdure.Assistant.ViewModels;
+using Verdure.Assistant.WinUI.Services;
 using Windows.Storage;
 
 namespace Verdure.Assistant.WinUI;
@@ -18,21 +16,21 @@ namespace Verdure.Assistant.WinUI;
 public partial class App : Application
 {
     private IHost? _host;
-    
+
     /// <summary>
     /// Gets the main window instance
     /// </summary>
     public static Window? MainWindow { get; private set; }    /// <summary>
-    /// Initializes the singleton application object.  This is the first line of authored code
-    /// executed, and as such is the logical equivalent of main() or WinMain().
-    /// </summary>    
+                                                              /// Initializes the singleton application object.  This is the first line of authored code
+                                                              /// executed, and as such is the logical equivalent of main() or WinMain().
+                                                              /// </summary>    
     public App()
     {
         InitializeComponent();
     }/// <summary>
-    /// Invoked when the application is launched.
-    /// </summary>
-    /// <param name="args">Details about the launch request and process.</param>
+     /// Invoked when the application is launched.
+     /// </summary>
+     /// <param name="args">Details about the launch request and process.</param>
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
         // Configure services
@@ -64,7 +62,7 @@ public partial class App : Application
             builder.SetMinimumLevel(LogLevel.Information);
         });        // Settings services
         services.AddSingleton<ISettingsService<AppSettings>, WindowsSettingsService<AppSettings>>();
-        
+
         // Theme service
         services.AddSingleton<ThemeService>();
 
@@ -89,17 +87,18 @@ public partial class App : Application
         services.AddSingleton<InterruptManager>();
 
         // Emotion Manager
-        services.AddSingleton<EmotionManager>();
-
-        // ViewModels
+        services.AddSingleton<IEmotionManager, EmotionManager>();        // ViewModels
+        services.AddTransient<MainWindowViewModel>();
+        services.AddTransient<HomePageViewModel>();
+        services.AddTransient<SettingsPageViewModel>();
 
         // Views
         services.AddTransient<HomePage>();
         services.AddTransient<SettingsPage>();
         services.AddTransient<MainWindow>();
     }    /// <summary>
-    /// Gets a service of the specified type from the dependency injection container
-    /// </summary>
+         /// Gets a service of the specified type from the dependency injection container
+         /// </summary>
     public static T? GetService<T>() where T : class
     {
         return ((App)Current)?._host?.Services.GetService<T>();
@@ -114,7 +113,7 @@ public partial class App : Application
         {
             var localSettings = ApplicationData.Current.LocalSettings;
             var theme = localSettings.Values["Theme"]?.ToString() ?? "Follow System";
-            
+
             ApplyTheme(theme);
         }
         catch (Exception ex)
@@ -147,8 +146,8 @@ public partial class App : Application
         // Apply the theme to the main window if it exists
         if (MainWindow?.Content is FrameworkElement rootElement)
         {
-            rootElement.RequestedTheme = requestedTheme == ApplicationTheme.Light 
-                ? ElementTheme.Light 
+            rootElement.RequestedTheme = requestedTheme == ApplicationTheme.Light
+                ? ElementTheme.Light
                 : ElementTheme.Dark;
         }
     }
@@ -162,7 +161,7 @@ public partial class App : Application
         {
             var uiSettings = new Windows.UI.ViewManagement.UISettings();
             var foreground = uiSettings.GetColorValue(Windows.UI.ViewManagement.UIColorType.Foreground);
-            
+
             // If foreground is light (close to white), system is using dark theme
             // If foreground is dark (close to black), system is using light theme
             var brightness = (foreground.R + foreground.G + foreground.B) / 3.0;

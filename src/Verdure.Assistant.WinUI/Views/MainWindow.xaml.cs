@@ -5,6 +5,7 @@ using System;
 using Microsoft.Extensions.Logging;
 using Microsoft.Windows.ApplicationModel.Resources;
 using WinUIEx;
+using Verdure.Assistant.ViewModels;
 
 namespace Verdure.Assistant.WinUI.Views;
 
@@ -14,42 +15,82 @@ namespace Verdure.Assistant.WinUI.Views;
 public sealed partial class MainWindow : WindowEx
 {
     private readonly ILogger<MainWindow>? _logger;
+    private readonly ResourceLoader _resourceLoader = new();
+    private readonly MainWindowViewModel _viewModel;
 
-    private readonly ResourceLoader _resourceLoader =new();    
     public MainWindow()
     {
         this.InitializeComponent();
         _logger = App.GetService<ILogger<MainWindow>>();
+        _viewModel = App.GetService<MainWindowViewModel>() ?? throw new InvalidOperationException("MainWindowViewModel not found");
 
-        // 配置自定义标题栏
-        //this.ExtendsContentIntoTitleBar = true;
-        //this.SetTitleBar(TitleBarGrid);
+        // 设置DataContext
+        //this.DataContext = _viewModel;
+
+        // 绑定ViewModel事件
+        _viewModel.NavigationRequested += OnNavigationRequested;
+        _viewModel.BackRequested += OnBackRequested;
+        _viewModel.WindowStateChangeRequested += OnWindowStateChangeRequested;
+
+        // 配置窗口
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/logo.ico"));
         Title = _resourceLoader.GetString("AppDisplayName");
         
         // 导航到默认页面 (HomePage)
         ContentFrame.Navigate(typeof(HomePage));
+
+        // 初始化ViewModel
+        _ = _viewModel.InitializeAsync();
+    }
+
+    private void OnNavigationRequested(object? sender, NavigationRequestedEventArgs e)
+    {
+        _logger?.LogInformation($"Navigating to: {e.PageTag}");
+
+        Type? pageType = e.PageTag switch
+        {
+            "HomePage" => typeof(HomePage),
+            "SettingsPage" => typeof(SettingsPage),
+            _ => null
+        };
+
+        if (pageType != null && ContentFrame.CurrentSourcePageType != pageType)
+        {
+            ContentFrame.Navigate(pageType, e.Parameter);
+        }
+    }
+
+    private void OnBackRequested(object? sender, EventArgs e)
+    {
+        if (ContentFrame.CanGoBack)
+        {
+            ContentFrame.GoBack();
+        }
+    }
+
+    private void OnWindowStateChangeRequested(object? sender, WindowStateChangeEventArgs e)
+    {
+        switch (e.State)
+        {
+            case Verdure.Assistant.ViewModels.WindowState.Minimized:
+                // 最小化窗口的逻辑
+                break;
+            case Verdure.Assistant.ViewModels.WindowState.Maximized:
+                // 最大化窗口的逻辑
+                break;
+            case Verdure.Assistant.ViewModels.WindowState.Closed:
+                this.Close();
+                break;
+        }
     }
 
     private void MainNavigationView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        if (args.SelectedItem is NavigationViewItem selectedItem)
-        {
-            var tag = selectedItem.Tag?.ToString();
+        _viewModel.OnNavigationSelectionChanged(args.SelectedItem);
+    }
 
-            _logger?.LogInformation($"Navigating to: {tag}");
-
-            Type? pageType = tag switch
-            {
-                "HomePage" => typeof(HomePage),
-                "SettingsPage" => typeof(SettingsPage),
-                _ => null
-            };
-
-            if (pageType != null && ContentFrame.CurrentSourcePageType != pageType)
-            {
-                ContentFrame.Navigate(pageType);
-            }
-        }
+    private void ContentFrame_Navigated(object sender, NavigationEventArgs e)
+    {
+        _viewModel.UpdateBackButtonState(ContentFrame.CanGoBack);
     }
 }

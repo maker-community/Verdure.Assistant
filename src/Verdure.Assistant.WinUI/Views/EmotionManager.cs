@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.WinUI;
 using Windows.ApplicationModel;
 using Windows.Storage;
@@ -14,7 +15,7 @@ namespace Verdure.Assistant.WinUI.Views
     /// Enhanced Emotion Manager for handling GIF animations and emotion display
     /// Similar to py-xiaozhi emotion system
     /// </summary>
-    public class EmotionManager
+    public class EmotionManager: IEmotionManager
     {
         private readonly ILogger<EmotionManager>? _logger;
         private readonly Dictionary<string, string> _emotionPaths = new();

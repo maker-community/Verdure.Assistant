@@ -5,7 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    mc:Ignorable="d">    
+    mc:Ignorable="d">
     <Page.Resources>
         <Style x:Key="SettingsExpanderStyle" TargetType="Expander">
             <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -15,16 +15,16 @@
             <Setter Property="Padding" Value="0,4,0,8" />
             <Setter Property="Margin" Value="0,0,0,8" />
         </Style>
-        
+
         <Style x:Key="SettingsLabelStyle" TargetType="TextBlock">
             <Setter Property="Margin" Value="0,0,0,4" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
-        
+
         <Style x:Key="SettingsControlStyle" TargetType="FrameworkElement">
             <Setter Property="Margin" Value="0,0,0,12" />
         </Style>
-    </Page.Resources>    
+    </Page.Resources>
     <ScrollViewer Padding="24" VerticalScrollBarVisibility="Auto">
         <StackPanel MaxWidth="680" Spacing="20">
             <!--  Page Title  -->
@@ -32,7 +32,7 @@
                 x:Uid="SettingsPageTitle"
                 Margin="0,0,0,16"
                 FontSize="28"
-                FontWeight="Bold" />            
+                FontWeight="Bold" />
             <!--  Wake Word Settings  -->
             <Expander
                 x:Uid="WakeWordSettings"
@@ -45,14 +45,13 @@
                     <ToggleSwitch
                         x:Name="WakeWordToggle"
                         x:Uid="WakeWordToggle"
-                        IsOn="False"
-                        Toggled="WakeWordToggle_Toggled"
-                        Style="{StaticResource SettingsControlStyle}" />
+                        IsOn="{x:Bind ViewModel.WakeWordEnabled, Mode=TwoWay}"
+                        Style="{StaticResource SettingsControlStyle}" />                    
                     <TextBox
                         x:Name="WakeWordsTextBox"
                         x:Uid="WakeWordsTextBox"
-                        Text=""
-                        Style="{StaticResource SettingsControlStyle}" />
+                        Style="{StaticResource SettingsControlStyle}"
+                        Text="{x:Bind ViewModel.WakeWords, Mode=TwoWay}" />
                 </StackPanel>
             </Expander>
             <!--  Device Settings  -->
@@ -64,31 +63,34 @@
                     Padding="16,12,16,0"
                     HorizontalAlignment="Stretch"
                     Spacing="16">
-                    <TextBox 
-                        x:Name="DeviceIdTextBox" 
+                    <TextBox
+                        x:Name="DeviceIdTextBox"
                         x:Uid="DeviceIdTextBox"
-                        Style="{StaticResource SettingsControlStyle}" />
+                        Style="{StaticResource SettingsControlStyle}"
+                        Text="{x:Bind ViewModel.DeviceId, Mode=TwoWay}" />
 
                     <StackPanel Spacing="8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>   
-                         <ComboBox
+                            </Grid.ColumnDefinitions>
+                            <ComboBox
                                 x:Name="OtaProtocolComboBox"
                                 x:Uid="OtaProtocolComboBox"
                                 Grid.Column="0"
                                 MinWidth="120"
                                 Margin="0,0,12,0"
-                                SelectedIndex="0">
+                                SelectedIndex="0"
+                                SelectedValue="{x:Bind ViewModel.OtaProtocol, Mode=TwoWay}">
                                 <ComboBoxItem Content="https://" />
                                 <ComboBoxItem Content="http://" />
                             </ComboBox>
                             <TextBox
                                 x:Name="OtaAddressTextBox"
                                 x:Uid="OtaAddressTextBox"
-                                Grid.Column="1" />
+                                Grid.Column="1"
+                                Text="{x:Bind ViewModel.OtaAddress, Mode=TwoWay}" />
                         </Grid>
                     </StackPanel>
 
@@ -97,30 +99,32 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>  
+                            </Grid.ColumnDefinitions>
                             <ComboBox
                                 x:Name="WsProtocolComboBox"
                                 x:Uid="WsProtocolComboBox"
                                 Grid.Column="0"
                                 MinWidth="120"
                                 Margin="0,0,12,0"
-                                SelectedIndex="0">
+                                SelectedIndex="0"
+                                SelectedValue="{x:Bind ViewModel.WsProtocol, Mode=TwoWay}">
                                 <ComboBoxItem Content="wss://" />
                                 <ComboBoxItem Content="ws://" />
                             </ComboBox>
                             <TextBox
                                 x:Name="WsAddressTextBox"
                                 x:Uid="WsAddressTextBox"
-                                Grid.Column="1" />
+                                Grid.Column="1"
+                                Text="{x:Bind ViewModel.WsAddress, Mode=TwoWay}" />
                         </Grid>
                     </StackPanel>
-
-                    <TextBox 
-                        x:Name="WsTokenTextBox" 
+                    <TextBox
+                        x:Name="WsTokenTextBox"
                         x:Uid="WsTokenTextBox"
-                        Style="{StaticResource SettingsControlStyle}" />
+                        Style="{StaticResource SettingsControlStyle}"
+                        Text="{x:Bind ViewModel.WsToken, Mode=TwoWay}" />
                 </StackPanel>
-            </Expander>            
+            </Expander>
             <!--  Audio Settings  -->
             <Expander
                 x:Uid="AudioSettings"
@@ -135,28 +139,29 @@
                         x:Uid="DefaultVolumeSlider"
                         Maximum="100"
                         Minimum="0"
-                        ValueChanged="DefaultVolumeSlider_ValueChanged"
-                        Value="80"
-                        Style="{StaticResource SettingsControlStyle}" />
+                        Style="{StaticResource SettingsControlStyle}"
+                        Value="{x:Bind ViewModel.DefaultVolume, Mode=TwoWay}" />
                     <ToggleSwitch
                         x:Name="AutoAdjustVolumeToggle"
                         x:Uid="AutoAdjustVolumeToggle"
-                        IsOn="True"
+                        IsOn="{x:Bind ViewModel.AutoAdjustVolume, Mode=TwoWay}"
                         Style="{StaticResource SettingsControlStyle}" />
                     <TextBox
                         x:Name="AudioInputDeviceTextBox"
                         x:Uid="AudioInputDeviceTextBox"
                         IsReadOnly="True"
-                        Style="{StaticResource SettingsControlStyle}" />
+                        Style="{StaticResource SettingsControlStyle}"
+                        Text="{x:Bind ViewModel.AudioInputDevice, Mode=OneWay}" />
                     <TextBox
                         x:Name="AudioOutputDeviceTextBox"
                         x:Uid="AudioOutputDeviceTextBox"
                         IsReadOnly="True"
-                        Style="{StaticResource SettingsControlStyle}" />
-                    <Button 
-                        x:Name="RefreshAudioDevicesButton" 
-                        Click="RefreshAudioDevicesButton_Click"
+                        Style="{StaticResource SettingsControlStyle}"
+                        Text="{x:Bind ViewModel.AudioOutputDevice, Mode=OneWay}" />                    
+                    <Button
+                        x:Name="RefreshAudioDevicesButton"
                         HorizontalAlignment="Left"
+                        Command="{x:Bind ViewModel.RefreshAudioDevicesCommand}"
                         Style="{StaticResource SettingsControlStyle}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon FontSize="16" Glyph="&#xE72C;" />
@@ -164,7 +169,7 @@
                         </StackPanel>
                     </Button>
                 </StackPanel>
-            </Expander>            
+            </Expander>
             <!--  Application Settings  -->
             <Expander
                 x:Uid="ApplicationSettings"
@@ -177,32 +182,32 @@
                     <ToggleSwitch
                         x:Name="AutoStartToggle"
                         x:Uid="AutoStartToggle"
-                        IsOn="False"
+                        IsOn="{x:Bind ViewModel.AutoStart, Mode=TwoWay}"
                         Style="{StaticResource SettingsControlStyle}" />
                     <ToggleSwitch
                         x:Name="MinimizeToTrayToggle"
                         x:Uid="MinimizeToTrayToggle"
-                        IsOn="True"
+                        IsOn="{x:Bind ViewModel.MinimizeToTray, Mode=TwoWay}"
                         Style="{StaticResource SettingsControlStyle}" />
                     <ToggleSwitch
                         x:Name="EnableLoggingToggle"
                         x:Uid="EnableLoggingToggle"
-                        IsOn="True"
+                        IsOn="{x:Bind ViewModel.EnableLogging, Mode=TwoWay}"
                         Style="{StaticResource SettingsControlStyle}" />
                     <ComboBox
                         x:Name="ThemeComboBox"
                         x:Uid="ThemeComboBox"
-                        SelectionChanged="ThemeComboBox_SelectionChanged"
-                        SelectedIndex="0"
                         MinWidth="120"
                         HorizontalAlignment="Left"
+                        SelectedIndex="0"
+                        SelectedValue="{x:Bind ViewModel.Theme, Mode=TwoWay}"
                         Style="{StaticResource SettingsControlStyle}">
                         <ComboBoxItem x:Name="Default" x:Uid="ThemeComboBoxFollowSystem" />
                         <ComboBoxItem x:Name="Light" x:Uid="ThemeComboBoxLight" />
                         <ComboBoxItem x:Name="Dark" x:Uid="ThemeComboBoxDark" />
                     </ComboBox>
                 </StackPanel>
-            </Expander>            
+            </Expander>
             <!--  Advanced Settings  -->
             <Expander
                 x:Uid="AdvancedSettings"
@@ -215,36 +220,37 @@
                     <NumberBox
                         x:Name="ConnectionTimeoutNumberBox"
                         x:Uid="ConnectionTimeoutNumberBox"
-                        Maximum="60"
-                        Minimum="5"
-                        Value="30"
                         MinWidth="120"
                         HorizontalAlignment="Left"
-                        Style="{StaticResource SettingsControlStyle}" />
+                        Maximum="60"
+                        Minimum="5"
+                        Style="{StaticResource SettingsControlStyle}"
+                        Value="{x:Bind ViewModel.ConnectionTimeout, Mode=TwoWay}" />
                     <NumberBox
                         x:Name="AudioSampleRateNumberBox"
                         x:Uid="AudioSampleRateNumberBox"
-                        Maximum="48000"
-                        Minimum="8000"
-                        Value="16000"
                         MinWidth="120"
                         HorizontalAlignment="Left"
-                        Style="{StaticResource SettingsControlStyle}" />
+                        Maximum="48000"
+                        Minimum="8000"
+                        Style="{StaticResource SettingsControlStyle}"
+                        Value="{x:Bind ViewModel.AudioSampleRate, Mode=TwoWay}" />
                     <NumberBox
                         x:Name="AudioChannelsNumberBox"
                         x:Uid="AudioChannelsNumberBox"
-                        Maximum="2"
-                        Minimum="1"
-                        Value="1"
                         MinWidth="120"
                         HorizontalAlignment="Left"
-                        Style="{StaticResource SettingsControlStyle}" />
+                        Maximum="2"
+                        Minimum="1"
+                        Style="{StaticResource SettingsControlStyle}"
+                        Value="{x:Bind ViewModel.AudioChannels, Mode=TwoWay}" />
                     <ComboBox
                         x:Name="AudioCodecComboBox"
                         x:Uid="AudioCodecComboBox"
-                        SelectedIndex="0"
                         MinWidth="120"
                         HorizontalAlignment="Left"
+                        SelectedIndex="0"
+                        SelectedValue="{x:Bind ViewModel.AudioCodec, Mode=TwoWay}"
                         Style="{StaticResource SettingsControlStyle}">
                         <ComboBoxItem Content="Opus" />
                         <ComboBoxItem Content="PCM" />
@@ -252,8 +258,8 @@
                     </ComboBox>
                     <Button
                         x:Name="ResetToDefaultsButton"
-                        Click="ResetToDefaultsButton_Click"
                         HorizontalAlignment="Left"
+                        Command="{x:Bind ViewModel.ResetSettingsCommand}"
                         Style="{StaticResource SettingsControlStyle}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon FontSize="16" Glyph="&#xE777;" />
@@ -261,7 +267,7 @@
                         </StackPanel>
                     </Button>
                 </StackPanel>
-            </Expander>            
+            </Expander>
             <!--  About Section  -->
             <Expander
                 x:Uid="AboutSection"
@@ -271,53 +277,49 @@
                     Padding="16,12,16,0"
                     HorizontalAlignment="Stretch"
                     Spacing="16">
-                    <TextBlock 
-                        x:Uid="AboutSectionVersion"
-                        Style="{StaticResource SettingsLabelStyle}" />
-                    <TextBlock 
-                        x:Uid="AboutSectionFramework" 
-                        Style="{StaticResource SettingsLabelStyle}" />
-                    <HyperlinkButton 
-                        x:Uid="AboutSectionSourceCode" 
+                    <TextBlock x:Uid="AboutSectionVersion" Style="{StaticResource SettingsLabelStyle}" />
+                    <TextBlock x:Uid="AboutSectionFramework" Style="{StaticResource SettingsLabelStyle}" />
+                    <HyperlinkButton
+                        x:Uid="AboutSectionSourceCode"
+                        HorizontalAlignment="Left"
                         NavigateUri="https://github.com/your-repo"
-                        HorizontalAlignment="Left"
                         Style="{StaticResource SettingsControlStyle}" />
-                    <HyperlinkButton 
-                        x:Uid="AboutSectionReportIssue" 
-                        NavigateUri="https://github.com/your-repo/issues"
+                    <HyperlinkButton
+                        x:Uid="AboutSectionReportIssue"
                         HorizontalAlignment="Left"
+                        NavigateUri="https://github.com/your-repo/issues"
                         Style="{StaticResource SettingsControlStyle}" />
                 </StackPanel>
-            </Expander>            
+            </Expander>
             <!--  Action Buttons  -->
             <StackPanel
                 Margin="0,24,0,0"
+                HorizontalAlignment="Left"
                 Orientation="Horizontal"
-                Spacing="16"
-                HorizontalAlignment="Left">
+                Spacing="16">
                 <Button
                     x:Name="SaveSettingsButton"
-                    Click="SaveSettingsButton_Click"
                     MinWidth="120"
+                    Command="{x:Bind ViewModel.SaveSettingsCommand}"
                     Style="{ThemeResource AccentButtonStyle}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon FontSize="16" Glyph="&#xE74E;" />
                         <TextBlock x:Uid="SaveSettingsButton" />
                     </StackPanel>
                 </Button>
-                <Button 
-                    x:Name="ExportSettingsButton" 
-                    Click="ExportSettingsButton_Click"
-                    MinWidth="120">
+                <Button
+                    x:Name="ExportSettingsButton"
+                    MinWidth="120"
+                    Command="{x:Bind ViewModel.ExportSettingsCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon FontSize="16" Glyph="&#xE74C;" />
                         <TextBlock x:Uid="ExportSettingsButton" />
                     </StackPanel>
                 </Button>
-                <Button 
-                    x:Name="ImportSettingsButton" 
-                    Click="ImportSettingsButton_Click"
-                    MinWidth="120">
+                <Button
+                    x:Name="ImportSettingsButton"
+                    MinWidth="120"
+                    Command="{x:Bind ViewModel.ImportSettingsCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon FontSize="16" Glyph="&#xE8B5;" />
                         <TextBlock x:Uid="ImportSettingsButton" />
