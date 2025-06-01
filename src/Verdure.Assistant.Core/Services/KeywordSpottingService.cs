@@ -1,13 +1,8 @@
 using Microsoft.CognitiveServices.Speech;
 using Microsoft.CognitiveServices.Speech.Audio;
 using Microsoft.Extensions.Logging;
-using System;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
 using Verdure.Assistant.Core.Constants;
 using Verdure.Assistant.Core.Interfaces;
-using Verdure.Assistant.Core.Models;
 
 namespace Verdure.Assistant.Core.Services;
 
@@ -134,7 +129,10 @@ public class KeywordSpottingService : IKeywordSpottingService
             }
 
             // 配置音频输入
-            var audioConfig = ConfigureAudioInput();
+            // var audioConfig = ConfigureAudioInput();
+
+            // 使用默认麦克风输入
+            var audioConfig = AudioConfig.FromDefaultMicrophoneInput();
             if (audioConfig == null)
             {
                 _logger?.LogError("配置音频输入失败");
@@ -186,8 +184,9 @@ public class KeywordSpottingService : IKeywordSpottingService
 
             // 优先使用xiaodian模型（对应py-xiaozhi的主要唤醒词）
             // With the correct method call based on the provided type signatures:  
-            _keywordRecognizer?.RecognizeOnceAsync(_keywordModel);
+
             var primaryModelPath = Path.Combine(keywordsPath, "keyword_xiaodian.table");
+
 
             if (!File.Exists(primaryModelPath))
             {
@@ -197,6 +196,8 @@ public class KeywordSpottingService : IKeywordSpottingService
 
             // 从.table文件创建关键词模型
             _keywordModel = KeywordRecognitionModel.FromFile(primaryModelPath);
+
+            //_keywordRecognizer?.RecognizeOnceAsync(_keywordModel);
 
             _logger?.LogInformation($"成功加载关键词模型: {primaryModelPath}");
             return true;

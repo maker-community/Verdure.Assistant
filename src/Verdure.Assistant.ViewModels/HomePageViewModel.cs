@@ -275,9 +275,7 @@ public partial class HomePageViewModel : ViewModelBase
                 AudioFormat = "opus"
             };
             
-            await _voiceChatService.InitializeAsync(config);
-
-            // Set up wake word detector coordination
+            await _voiceChatService.InitializeAsync(config);            // Set up wake word detector coordination
             if (_interruptManager != null)
             {
                 _voiceChatService.SetInterruptManager(_interruptManager);
@@ -292,6 +290,9 @@ public partial class HomePageViewModel : ViewModelBase
             {
                 AddMessage("连接成功");
                 StatusText = "已连接";
+                
+                // 启动关键词检测（对应py-xiaozhi的关键词唤醒功能）
+                await StartKeywordDetectionAsync();
             }
             else
             {
@@ -319,13 +320,14 @@ public partial class HomePageViewModel : ViewModelBase
                 IsPushToTalkActive = false;
                 IsWaitingForResponse = false;
                 RestoreManualButtonState();
-            }
-
-            // 停止当前语音对话
+            }            // 停止当前语音对话
             if (IsListening)
             {
                 await _voiceChatService.StopVoiceChatAsync();
             }
+
+            // 停止关键词检测
+            StopKeywordDetection();
 
             // 清理事件订阅
             CleanupEventSubscriptions();
@@ -474,24 +476,95 @@ public partial class HomePageViewModel : ViewModelBase
         IsAutoMode = !IsAutoMode;
         UpdateModeUI(IsAutoMode);
         AddMessage($"已切换到{(IsAutoMode ? "自动" : "手动")}对话模式");
-    }
-
-    [RelayCommand]
+    }    [RelayCommand]
     private void ToggleMute()
     {
         var isMuted = VolumeValue == 0;
         VolumeValue = isMuted ? 80 : 0;
     }
 
+    [RelayCommand]
+    private async Task ToggleKeywordDetectionAsync()
+    {
+        if (_voiceChatService == null || !IsConnected) return;
+
+        try
+        {
+            if (_voiceChatService.IsKeywordDetectionEnabled)
+            {
+                StopKeywordDetection();
+                AddMessage("🔇 关键词唤醒已关闭");
+            }
+            else
+            {
+                await StartKeywordDetectionAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "切换关键词检测状态失败");
+            AddMessage($"切换关键词检测失败: {ex.Message}", true);
+        }
+    }
+
     #endregion
 
-    #region 辅助方法
-
+    #region 辅助方法    
     private void UpdateConnectionState(bool connected)
     {
         IsConnected = connected;
         ConnectionStatusText = connected ? "在线" : "离线";
-    }    private void UpdateModeUI(bool isAutoMode)
+    }
+
+    /// <summary>
+    /// 启动关键词检测（对应py-xiaozhi的wake_word_detector启动）
+    /// </summary>
+    private async Task StartKeywordDetectionAsync()
+    {
+        if (_voiceChatService == null)
+        {
+            _logger?.LogWarning("VoiceChatService未设置，无法启动关键词检测");
+            return;
+        }
+
+        try
+        {
+            var success = await _voiceChatService.StartKeywordDetectionAsync();
+            if (success)
+            {
+                AddMessage("🎯 关键词唤醒功能已启用");
+                _logger?.LogInformation("关键词检测启动成功");
+            }
+            else
+            {
+                AddMessage("⚠️ 关键词唤醒功能启用失败", true);
+                _logger?.LogWarning("关键词检测启动失败");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "启动关键词检测时发生错误");
+            AddMessage($"关键词唤醒启动错误: {ex.Message}", true);
+        }
+    }
+
+    /// <summary>
+    /// 停止关键词检测
+    /// </summary>
+    private void StopKeywordDetection()
+    {
+        if (_voiceChatService == null) return;
+
+        try
+        {
+            _voiceChatService.StopKeywordDetection();
+            _logger?.LogInformation("关键词检测已停止");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "停止关键词检测时发生错误");
+        }
+    }private void UpdateModeUI(bool isAutoMode)
     {
         IsAutoMode = isAutoMode;
         ModeToggleText = isAutoMode ? "自动" : "手动";
