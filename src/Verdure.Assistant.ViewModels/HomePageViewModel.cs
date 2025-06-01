@@ -69,6 +69,9 @@ public partial class HomePageViewModel : ViewModelBase
     [ObservableProperty]
     private string _serverUrl = "ws://localhost:8080/ws";
 
+    // Manual按钮可用状态 - 基于连接状态、推送说话状态和等待响应状态
+    public bool IsManualButtonEnabled => IsConnected && !IsPushToTalkActive && !IsWaitingForResponse;
+
     #endregion
 
     #region 集合
@@ -474,16 +477,15 @@ public partial class HomePageViewModel : ViewModelBase
     {
         IsConnected = connected;
         ConnectionStatusText = connected ? "在线" : "离线";
-    }
-
-    private void UpdateModeUI(bool isAutoMode)
+    }    private void UpdateModeUI(bool isAutoMode)
     {
         IsAutoMode = isAutoMode;
         ModeToggleText = isAutoMode ? "自动" : "手动";
 
-        if (isAutoMode && _voiceChatService != null)
+        if (isAutoMode)
         {
-            if (_voiceChatService.KeepListening == true && IsListening)
+            // 进入自动模式时，设置Auto按钮文本
+            if (_voiceChatService != null && _voiceChatService.KeepListening == true && IsListening)
             {
                 AutoButtonText = "停止对话";
             }
@@ -491,6 +493,11 @@ public partial class HomePageViewModel : ViewModelBase
             {
                 AutoButtonText = "开始对话";
             }
+        }
+        else
+        {
+            // 进入手动模式时，重置Manual按钮文本
+            ManualButtonText = "按住说话";
         }
     }
 
@@ -658,6 +665,21 @@ public partial class HomePageViewModel : ViewModelBase
     partial void OnVolumeValueChanged(double value)
     {
         UpdateVolumeText(value);
+    }
+
+    partial void OnIsConnectedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsManualButtonEnabled));
+    }
+
+    partial void OnIsPushToTalkActiveChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsManualButtonEnabled));
+    }
+
+    partial void OnIsWaitingForResponseChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsManualButtonEnabled));
     }
 
     #endregion

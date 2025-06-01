@@ -10,6 +10,7 @@
     <Page.Resources>
         <!--  Converters  -->
         <converters:BoolNegationConverter x:Key="BoolNegationConverter" />
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
     </Page.Resources>
 
     <Grid>
@@ -211,8 +212,7 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
+                        </Grid.RowDefinitions>                        
                         <!--  Manual Mode Button  -->
                         <Button
                             x:Name="ManualButton"
@@ -220,13 +220,15 @@
                             Height="40"
                             Margin="0,0,0,8"
                             HorizontalAlignment="Stretch"
+                            IsEnabled="{x:Bind ViewModel.IsManualButtonEnabled, Mode=OneWay}"
                             PointerCaptureLost="ManualButton_PointerCaptureLost"
                             PointerPressed="ManualButton_PointerPressed"
                             PointerReleased="ManualButton_PointerReleased"
-                            Style="{ThemeResource AccentButtonStyle}">
+                            Style="{ThemeResource AccentButtonStyle}"
+                            Visibility="{x:Bind ViewModel.IsAutoMode, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=True}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon FontSize="16" Glyph="&#xE720;" />
-                                <TextBlock x:Name="ManualButtonText" x:Uid="ManualButtonText" />
+                                <TextBlock x:Name="ManualButtonText" Text="{x:Bind ViewModel.ManualButtonText, Mode=OneWay}" />
                             </StackPanel>
                         </Button>
 
@@ -238,29 +240,27 @@
                             Margin="0,0,0,8"
                             HorizontalAlignment="Stretch"
                             Command="{x:Bind ViewModel.ToggleAutoModeCommand}"
+                            IsEnabled="{x:Bind ViewModel.IsConnected, Mode=OneWay}"
                             Style="{ThemeResource AccentButtonStyle}"
-                            Visibility="Collapsed">
+                            Visibility="{x:Bind ViewModel.IsAutoMode, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon FontSize="16" Glyph="&#xE768;" />
-                                <TextBlock x:Name="AutoButtonText" x:Uid="AutoButtonText" />
+                                <TextBlock x:Name="AutoButtonText" Text="{x:Bind ViewModel.AutoButtonText, Mode=OneWay}" />
                             </StackPanel>
-                        </Button>
-
-                        <!--  Abort Button  -->
+                        </Button>                        <!--  Abort Button  -->
                         <Button
                             x:Name="AbortButton"
                             Grid.Row="1"
                             Height="36"
                             Margin="0,0,0,8"
                             HorizontalAlignment="Stretch"
-                            Command="{x:Bind ViewModel.AbortCommand}">
+                            Command="{x:Bind ViewModel.AbortCommand}"
+                            IsEnabled="{x:Bind ViewModel.IsListening, Mode=OneWay}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon FontSize="14" Glyph="&#xE71A;" />
                                 <TextBlock x:Uid="AbortButton_Content" />
                             </StackPanel>
-                        </Button>
-
-                        <!--  Mode Toggle Button  -->
+                        </Button><!--  Mode Toggle Button  -->
                         <Button
                             x:Name="ModeToggleButton"
                             Grid.Row="2"
@@ -270,7 +270,7 @@
                             Style="{ThemeResource DefaultButtonStyle}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon FontSize="14" Glyph="&#xE8AB;" />
-                                <TextBlock x:Name="ModeToggleText" x:Uid="ModeToggleText" />
+                                <TextBlock x:Name="ModeToggleText" Text="{x:Bind ViewModel.ModeToggleText, Mode=OneWay}" />
                             </StackPanel>
                         </Button>
                     </Grid>

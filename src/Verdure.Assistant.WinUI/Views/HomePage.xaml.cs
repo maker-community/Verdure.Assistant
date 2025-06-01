@@ -35,13 +35,20 @@ public sealed partial class HomePage : Page
         }
 
         // 设置DataContext
-        this.DataContext = _viewModel;
-
-        // 绑定ViewModel事件
+        this.DataContext = _viewModel;        // 绑定ViewModel事件
         BindViewModelEvents();
 
         // 初始化ViewModel
         _ = _viewModel.InitializeAsync();
+
+        // 页面加载时初始化UI状态
+        this.Loaded += OnPageLoaded;
+    }
+
+    private void OnPageLoaded(object sender, RoutedEventArgs e)
+    {
+        // 初始化连接指示器状态
+        UpdateConnectionIndicator();
     }
 
     private void BindViewModelEvents()
@@ -49,6 +56,7 @@ public sealed partial class HomePage : Page
         _viewModel.InterruptTriggered += OnInterruptTriggered;
         _viewModel.ScrollToBottomRequested += OnScrollToBottomRequested;
         _viewModel.ManualButtonStateChanged += OnManualButtonStateChanged;
+        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
     }
 
     #region ViewModel事件处理
@@ -68,7 +76,10 @@ public sealed partial class HomePage : Page
     private void OnScrollToBottomRequested(object? sender, EventArgs e)
     {
         // 滚动到底部
-        MessagesScrollViewer.ChangeView(null, MessagesScrollViewer.ScrollableHeight, null);
+        this.DispatcherQueue.TryEnqueue(() =>
+        {
+            MessagesScrollViewer.ChangeView(null, MessagesScrollViewer.ScrollableHeight, null);
+        });      
     }
 
     private void OnManualButtonStateChanged(object? sender, ManualButtonStateEventArgs e)
@@ -84,12 +95,42 @@ public sealed partial class HomePage : Page
             case ManualButtonState.Processing:
                 SetManualButtonProcessingVisualState();
                 break;
+        }    }
+
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        // 更新连接状态指示器颜色
+        if (e.PropertyName == nameof(HomePageViewModel.IsConnected))
+        {
+            UpdateConnectionIndicator();
         }
     }
 
-    #endregion
-
+    #endregion    
     #region UI状态更新辅助方法
+
+    private void UpdateConnectionIndicator()
+    {
+        try
+        {
+            if (ConnectionIndicator != null)
+            {
+                // 根据连接状态设置指示器颜色
+                var resourceKey = _viewModel.IsConnected
+                    ? "SystemFillColorSuccessBrush"  // 绿色 - 已连接
+                    : "SystemFillColorCriticalBrush"; // 红色 - 未连接
+
+                if (Application.Current.Resources.TryGetValue(resourceKey, out var brush))
+                {
+                    ConnectionIndicator.Background = brush as Microsoft.UI.Xaml.Media.Brush;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error updating connection indicator");
+        }
+    }
 
     private void RestoreManualButtonVisualState()
     {
@@ -179,12 +220,11 @@ public sealed partial class HomePage : Page
     private void HomePage_Unloaded(object sender, RoutedEventArgs e)
     {
         // 清理ViewModel
-        _viewModel.Cleanup();
-
-        // 清理UI事件订阅
+        _viewModel.Cleanup();        // 清理UI事件订阅
         _viewModel.InterruptTriggered -= OnInterruptTriggered;
         _viewModel.ScrollToBottomRequested -= OnScrollToBottomRequested;
         _viewModel.ManualButtonStateChanged -= OnManualButtonStateChanged;
+        _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
     }    
     #endregion
 }
