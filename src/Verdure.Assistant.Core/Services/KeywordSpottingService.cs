@@ -351,9 +351,9 @@ public class KeywordSpottingService : IKeywordSpottingService
             OnErrorOccurred($"关键词识别处理错误: {ex.Message}");
         }
     }
-    
-    /// <summary>
+      /// <summary>
     /// 处理关键词检测（实现py-xiaozhi的状态协调逻辑）
+    /// 只负责状态管理和暂停/恢复逻辑，不直接调用业务操作
     /// </summary>
     private void HandleKeywordDetection(string keyword)
     {
@@ -374,23 +374,19 @@ public class KeywordSpottingService : IKeywordSpottingService
                 switch (_lastDeviceState)
                 {
                     case DeviceState.Idle:
-                        // 在空闲状态检测到关键词，启动对话（对应py-xiaozhi的唤醒逻辑）
-                        _logger?.LogInformation("在空闲状态检测到关键词，启动语音对话");
+                        // 在空闲状态检测到关键词，暂停检测避免干扰
+                        _logger?.LogInformation("在空闲状态检测到关键词，暂停关键词检测");
                         Pause(); // 暂停检测避免干扰
                         
                         // 短暂延迟确保暂停操作完成
                         await Task.Delay(100);
-                        await _voiceChatService.StartVoiceChatAsync();
+                        // 注意：不在这里调用 StartVoiceChatAsync，让 VoiceChatService 的事件处理负责
                         break;
 
                     case DeviceState.Speaking:
-                        // 在AI说话时检测到关键词，中断对话（对应py-xiaozhi的中断逻辑）
-                        _logger?.LogInformation("在AI说话时检测到关键词，中断当前对话");
-                        await _voiceChatService.StopVoiceChatAsync();
-                        
-                        // 短暂延迟后恢复关键词检测以继续监听
-                        await Task.Delay(200);
-                        Resume();
+                        // 在AI说话时检测到关键词，准备中断对话
+                        _logger?.LogInformation("在AI说话时检测到关键词，准备中断当前对话");
+                        // 注意：不在这里调用 StopVoiceChatAsync，让 VoiceChatService 的事件处理负责
                         break;
 
                     case DeviceState.Listening:
@@ -414,7 +410,7 @@ public class KeywordSpottingService : IKeywordSpottingService
                 _stateChangeSemaphore.Release();
             }
         });
-    }    
+    }
       /// <summary>
     /// 识别取消事件处理
     /// </summary>

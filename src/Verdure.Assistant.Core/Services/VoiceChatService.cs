@@ -256,15 +256,24 @@ public class VoiceChatService : IVoiceChatService
                     // 添加小延迟确保keyword detection pause完成，避免音频流冲突
                     await Task.Delay(50);
                     await StartVoiceChatAsync();
-                    break;
-
-                case DeviceState.Speaking:
+                    break;                case DeviceState.Speaking:
                     // 在AI说话时检测到关键词，中断对话（对应py-xiaozhi的中断逻辑）
                     _logger?.LogInformation("在AI说话时检测到关键词，中断当前对话");
                     
                     // 立即停止对话，然后短暂延迟以确保音频流同步
                     await StopVoiceChatAsync();
                     await Task.Delay(50);
+                    
+                    // 恢复关键词检测服务，准备下一次唤醒
+                    try
+                    {
+                        _keywordSpottingService?.Resume();
+                        _logger?.LogDebug("关键词检测服务已恢复");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "恢复关键词检测服务时出错");
+                    }
                     break;
 
                 case DeviceState.Listening:
