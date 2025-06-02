@@ -46,10 +46,12 @@ class Program
             // Set up wake word detector coordination (matches py-xiaozhi behavior)
             _voiceChatService.SetInterruptManager(interruptManager);
             await interruptManager.InitializeAsync();
-            
-            // Set up Microsoft Cognitive Services keyword spotting (matches py-xiaozhi wake word detector)
+              // Set up Microsoft Cognitive Services keyword spotting (matches py-xiaozhi wake word detector)
             _voiceChatService.SetKeywordSpottingService(keywordSpottingService);
             System.Console.WriteLine("关键词唤醒功能已启用（基于Microsoft认知服务）");
+            
+            // Initialize IoT devices (similar to py-xiaozhi's _initialize_iot_devices)
+            InitializeIoTDevices(host.Services);
             
             System.Console.WriteLine($"已连接到服务器: {(_config.UseWebSocket ? _config.ServerUrl : $"{_config.MqttBroker}:{_config.MqttPort}")}");
             System.Console.WriteLine();
@@ -81,8 +83,7 @@ class Program
                 
                 // Add InterruptManager for wake word detector coordination
                 services.AddSingleton<InterruptManager>();
-                
-                // Add Microsoft Cognitive Services keyword spotting service
+                  // Add Microsoft Cognitive Services keyword spotting service
                 services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
 
                 // 注册 AudioStreamManager 单例（使用正确的方式）
@@ -91,6 +92,12 @@ class Program
                     var logger = provider.GetService<ILogger<AudioStreamManager>>();
                     return AudioStreamManager.GetInstance(logger);
                 });
+
+                // Register IoT Device Manager and devices (similar to py-xiaozhi's _initialize_iot_devices)
+                services.AddSingleton<IoTDeviceManager>();
+                services.AddSingleton<MusicPlayerIoTDevice>();
+                services.AddSingleton<LampIoTDevice>();
+                services.AddSingleton<SpeakerIoTDevice>();
 
             });
 

@@ -54,7 +54,7 @@ public partial class App : Application
         }
 
         // Initialize IoT device management (similar to py-xiaozhi's _initialize_iot_devices)
-        await InitializeIoTDevicesAsync();
+        InitializeIoTDevices();
     }
     private void ConfigureServices(IServiceCollection services)
     {
@@ -137,7 +137,7 @@ public partial class App : Application
     /// <summary>
     /// Initialize IoT devices and setup integration (similar to py-xiaozhi's _initialize_iot_devices)
     /// </summary>
-    private async Task InitializeIoTDevicesAsync()
+    private void InitializeIoTDevices()
     {
         try
         {
