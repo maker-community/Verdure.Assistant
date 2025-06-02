@@ -14,7 +14,7 @@ using Verdure.Assistant.Core.Models;
 namespace Verdure.Assistant.Core.Services
 {
     /// <summary>
-    /// 酷狗音乐播放服务实现 - 平台无关版本
+    /// 酷我音乐播放服务实现 - 兼容py-xiaozhi的酷我API
     /// 基于py-xiaozhi的音乐播放器实现，提供音乐搜索、播放、缓存等功能
     /// </summary>
     public class KugouMusicService : IMusicPlayerService, IDisposable
@@ -62,29 +62,20 @@ namespace Verdure.Assistant.Core.Services
             string? cacheDirectory = null)
         {
             _logger = logger;
-            _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
+            _httpClient = new HttpClient();
+            _audioPlayer = audioPlayer;
             _operationSemaphore = new SemaphoreSlim(1, 1);
 
-            // 初始化缓存目录
-            _cacheDirectory = cacheDirectory ?? Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), 
-                "Verdure.Assistant", 
-                "MusicCache");
+            _cacheDirectory = cacheDirectory ?? Path.Combine(Path.GetTempPath(), "VerdureMusicCache");
             Directory.CreateDirectory(_cacheDirectory);
 
-            // 配置HTTP客户端
-            _httpClient = new HttpClient();
             _config = CreateDefaultConfig();
             ConfigureHttpClient();
 
-            // 绑定音频播放器事件
             _audioPlayer.StateChanged += OnAudioPlayerStateChanged;
             _audioPlayer.ProgressUpdated += OnAudioPlayerProgressUpdated;
 
-            // 初始化进度更新定时器
             _progressTimer = new Timer(UpdateProgress, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
-
-            _logger.LogInformation("酷狗音乐播放服务初始化完成");
         }
 
         public async Task<PlaybackResult> SearchAndPlayAsync(string songName, CancellationToken cancellationToken = default)
@@ -92,7 +83,9 @@ namespace Verdure.Assistant.Core.Services
             await _operationSemaphore.WaitAsync(cancellationToken);
             try
             {
-                _logger.LogInformation("搜索并播放歌曲: {SongName}", songName);                // 搜索歌曲
+                _logger.LogInformation("搜索并播放歌曲: {SongName}", songName);
+                
+                // 搜索歌曲
                 var searchResult = await SearchSongAsync(songName, cancellationToken);
                 if (!searchResult.Success || searchResult.Track == null)
                 {
@@ -141,51 +134,77 @@ namespace Verdure.Assistant.Core.Services
             {
                 _logger.LogInformation("搜索歌曲: {SongName}", songName);
 
-                var searchUrl = $"{_config.BaseUrl}/v1/search/song?keyword={Uri.EscapeDataString(songName)}&page=1&pagesize=10";
+                // 构建搜索参数 - 兼容酷我API
+                var searchParams = new Dictionary<string, string>(_config.SearchParams)
+                {
+                    ["all"] = songName
+                };
+
+                // 构建完整的搜索URL
+                var queryString = string.Join("&", searchParams.Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value)}"));
+                var searchUrl = $"{_config.SearchUrl}?{queryString}";
+
+                _logger.LogInformation("搜索URL: {SearchUrl}", searchUrl);
+
                 var response = await _httpClient.GetStringAsync(searchUrl, cancellationToken);
                 
-                var jsonDoc = JsonDocument.Parse(response);
-                var root = jsonDoc.RootElement;                
-                
-                if (!root.TryGetProperty("data", out var dataElement) ||
-                    !dataElement.TryGetProperty("lists", out var listsElement))
-                {
-                    return SearchResult.CreateError("搜索结果格式不正确");
-                }
+                _logger.LogDebug("搜索API响应内容: {Response}", response.Substring(0, Math.Min(200, response.Length)));
 
-                var tracks = new List<MusicTrack>();
-                foreach (var item in listsElement.EnumerateArray())
-                {
-                    if (item.TryGetProperty("SongName", out var songNameProp) &&
-                        item.TryGetProperty("SingerName", out var artistProp) &&
-                        item.TryGetProperty("FileHash", out var hashProp))
-                    {                        var track = new MusicTrack
-                        {
-                            Id = hashProp.GetString() ?? "",
-                            Name = songNameProp.GetString() ?? "",
-                            Artist = artistProp.GetString() ?? "",
-                            Album = item.TryGetProperty("AlbumName", out var albumProp) ? albumProp.GetString() ?? "" : "",
-                            Duration = item.TryGetProperty("Duration", out var durationProp) ? durationProp.GetInt32() : 0
-                        };
-                        tracks.Add(track);
-                    }
-                }                
-                if (tracks.Count == 0)
+                // 处理响应文本 - 酷我API可能返回不标准的JSON
+                var responseText = response.Replace("'", "\"");
+
+                // 提取歌曲信息 - 按照py-xiaozhi的解析方式
+                var songId = ExtractFieldFromResponse(responseText, "DC_TARGETID");
+                if (string.IsNullOrEmpty(songId))
                 {
                     return SearchResult.CreateError("未找到匹配的歌曲");
                 }
 
-                return SearchResult.CreateSuccess("搜索成功", tracks.First());
-            }            catch (Exception ex)
+                var songName_extracted = ExtractFieldFromResponse(responseText, "NAME") ?? songName;
+                var artist = ExtractFieldFromResponse(responseText, "ARTIST") ?? "";
+                var album = ExtractFieldFromResponse(responseText, "ALBUM") ?? "";
+                var durationStr = ExtractFieldFromResponse(responseText, "DURATION") ?? "0";
+                
+                if (!int.TryParse(durationStr, out var duration))
+                {
+                    duration = 0;
+                }
+
+                var track = new MusicTrack
+                {
+                    Id = songId,
+                    Name = songName_extracted,
+                    Artist = artist,
+                    Album = album,
+                    Duration = duration
+                };
+
+                _logger.LogInformation("找到歌曲: {Track}", $"{track.Name} - {track.Artist}");
+                return SearchResult.CreateSuccess("搜索成功", track);
+            }
+            catch (Exception ex)
             {
                 _logger.LogError(ex, "搜索歌曲失败: {SongName}", songName);
                 return SearchResult.CreateError(ex.Message, ex.ToString());
             }
         }
 
+        private string? ExtractFieldFromResponse(string responseText, string fieldName)
+        {
+            var searchPattern = $"\"{fieldName}\":\"";
+            var startPos = responseText.IndexOf(searchPattern);
+            if (startPos == -1) return null;
+
+            startPos += searchPattern.Length;
+            var endPos = responseText.IndexOf("\"", startPos);
+            if (endPos == -1) return null;
+
+            return responseText.Substring(startPos, endPos - startPos);
+        }
+
         public async Task<PlaybackResult> PlayTrackAsync(MusicTrack track, CancellationToken cancellationToken = default)
         {
-            await _operationSemaphore.WaitAsync(cancellationToken);
+            //await _operationSemaphore.WaitAsync(cancellationToken);
             try
             {
                 _logger.LogInformation("播放歌曲: {TrackName} - {Artist}", track.Name, track.Artist);                
@@ -202,12 +221,8 @@ namespace Verdure.Assistant.Core.Services
                 var lyrics = await GetLyricsAsync(track.Id, cancellationToken);
                 _currentLyrics = lyrics ?? new List<LyricLine>();
                 _currentLyricIndex = -1;                
-                
-                // 检查缓存
+                  // 检查缓存
                 var cachedFile = await GetCachedFileAsync(track.Id, playUrl, cancellationToken);
-                
-                // 加载到音频播放器
-                _currentTrack = track;
                 
                 if (!string.IsNullOrEmpty(cachedFile))
                 {
@@ -216,52 +231,41 @@ namespace Verdure.Assistant.Core.Services
                 else
                 {
                     await _audioPlayer.LoadFromUrlAsync(playUrl);
-                }                
-                
-                // 开始播放
-                await _audioPlayer.PlayAsync();
-                // 触发播放状态变化事件
-                OnPlaybackStateChanged("Playing", null);
+                }
 
+                await _audioPlayer.PlayAsync();
+                _currentTrack = track;
+                
+                OnPlaybackStateChanged("Playing", null);
                 return new PlaybackResult { Success = true };
-            }            
+            }
             catch (Exception ex)
-            {                _logger.LogError(ex, "播放歌曲失败: {TrackName}", track.Name);
+            {
+                _logger.LogError(ex, "播放歌曲失败: {TrackName}", track.Name);
                 OnPlaybackStateChanged("Failed", ex.Message);
                 return new PlaybackResult
                 {
                     Success = false,
-                    Message = ex.Message
+                    Message = $"播放失败: {ex.Message}"
                 };
             }
             finally
             {
-                _operationSemaphore.Release();
+                //_operationSemaphore.Release();
             }
         }
 
         public async Task<PlaybackResult> TogglePlayPauseAsync(CancellationToken cancellationToken = default)
         {
-            try
+            if (IsPlaying)
             {
-                if (IsPlaying)
-                {
-                    await PauseAsync(cancellationToken);
-                }
-                else
-                {
-                    await ResumeAsync(cancellationToken);                
-                }
-                return new PlaybackResult { Success = true };
+                await PauseAsync(cancellationToken);
             }
-            catch (Exception ex)
-            {                _logger.LogError(ex, "切换播放/暂停失败");
-                return new PlaybackResult
-                {
-                    Success = false,
-                    Message = ex.Message
-                };
+            else if (IsPaused)
+            {
+                await ResumeAsync(cancellationToken);
             }
+            return new PlaybackResult { Success = true };
         }
 
         public async Task PauseAsync(CancellationToken cancellationToken = default)
@@ -283,33 +287,27 @@ namespace Verdure.Assistant.Core.Services
                 await _audioPlayer.StopAsync();
                 _currentTrack = null;
                 _currentLyrics.Clear();
-                _currentLyricIndex = -1;
                 OnPlaybackStateChanged("Stopped", null);
                 return new PlaybackResult { Success = true };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "停止播放失败");
-                return new PlaybackResult
-                {
-                    Success = false,
-                    Message = ex.Message
-                };
+                return PlaybackResult.CreateError("stop", ex.Message);
             }
-        }        
+        }
         
         public async Task<PlaybackResult> SeekAsync(double position, CancellationToken cancellationToken = default)
         {
             try
             {
                 await _audioPlayer.SeekAsync(TimeSpan.FromSeconds(position));
-                var timeStr = $"{TimeSpan.FromSeconds(position):mm\\:ss}";
-                return PlaybackResult.CreateSuccess("seek", $"已跳转到 {timeStr}");
+                return new PlaybackResult { Success = true };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "跳转失败");
-                return PlaybackResult.CreateError("seek", "跳转失败", ex.Message);
+                return PlaybackResult.CreateError("seek", ex.Message);
             }
         }
 
@@ -343,7 +341,8 @@ namespace Verdure.Assistant.Core.Services
             {
                 _logger.LogError(ex, "清理缓存失败");
                 throw;
-            }        }
+            }
+        }
 
         public Task<PlaybackResult> SetVolumeAsync(double volume)
         {
@@ -354,13 +353,12 @@ namespace Verdure.Assistant.Core.Services
         {
             try
             {
-                _audioPlayer.Volume = Math.Max(0, Math.Min(100, volume));
-                return Task.FromResult(PlaybackResult.CreateSuccess("set_volume", $"音量已设置为 {volume:F0}%"));
+                // TODO: 实现音量控制
+                return Task.FromResult(new PlaybackResult { Success = true });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "设置音量失败");
-                return Task.FromResult(PlaybackResult.CreateError("set_volume", "设置音量失败", ex.Message));
+                return Task.FromResult(PlaybackResult.CreateError("volume", ex.Message));
             }
         }
 
@@ -370,139 +368,154 @@ namespace Verdure.Assistant.Core.Services
         {
             return new KugouMusicConfig
             {
-                BaseUrl = "http://mobilecdnbj.kugou.com",
-                UserAgent = "KuGou2012-8275-ExpandSearchResult",
+                SearchUrl = "http://search.kuwo.cn/r.s",
+                PlayUrl = "http://api.xiaodaokg.com/kuwo.php",
+                LyricUrl = "http://m.kuwo.cn/newh5/singles/songinfoandlrc",
                 Timeout = TimeSpan.FromSeconds(30)
             };
         }
 
         private void ConfigureHttpClient()
         {
-            _httpClient.DefaultRequestHeaders.Add("User-Agent", _config.UserAgent);
+            _httpClient.DefaultRequestHeaders.Clear();
+            
+            // 添加所有必要的请求头
+            foreach (var header in _config.Headers)
+            {
+                if (header.Key.Equals("User-Agent", StringComparison.OrdinalIgnoreCase))
+                {
+                    _httpClient.DefaultRequestHeaders.Add("User-Agent", header.Value);
+                }
+                else if (!header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
+                {
+                    _httpClient.DefaultRequestHeaders.Add(header.Key, header.Value);
+                }
+            }
+            
             _httpClient.Timeout = _config.Timeout;
         }
 
-        private async Task<string?> GetPlayUrlAsync(string hash, CancellationToken cancellationToken)
+        private async Task<string?> GetPlayUrlAsync(string songId, CancellationToken cancellationToken)
         {
             // 检查缓存
-            if (_urlCache.TryGetValue(hash, out var cachedUrl))
+            if (_urlCache.TryGetValue(songId, out var cachedUrl))
             {
                 return cachedUrl;
             }
 
             try
             {
-                var urlApiUrl = $"{_config.BaseUrl}/v1/audio/urlv2?hash={hash}&cmd=playInfo";
-                var response = await _httpClient.GetStringAsync(urlApiUrl, cancellationToken);
+                var playApiUrl = $"{_config.PlayUrl}?ID={songId}";
+                _logger.LogInformation("获取播放URL: {PlayApiUrl}", playApiUrl);
                 
-                var jsonDoc = JsonDocument.Parse(response);
-                var root = jsonDoc.RootElement;
+                var response = await _httpClient.GetStringAsync(playApiUrl, cancellationToken);
+                var playUrl = response.Trim();
 
-                if (root.TryGetProperty("data", out var dataElement) &&
-                    dataElement.TryGetProperty("url", out var urlElement))
+                // 检查URL是否有效
+                if (string.IsNullOrEmpty(playUrl) || !playUrl.StartsWith("http"))
                 {
-                    var playUrl = urlElement.GetString();
-                    if (!string.IsNullOrEmpty(playUrl))
-                    {
-                        // 缓存URL
-                        _urlCache[hash] = playUrl;
-                        return playUrl;
-                    }
+                    _logger.LogWarning("返回的播放链接格式不正确: {PlayUrl}", playUrl);
+                    return null;
                 }
 
-                return null;
+                // 缓存URL
+                _urlCache[songId] = playUrl;
+                _logger.LogInformation("获取到有效播放URL: {PlayUrl}", playUrl.Substring(0, Math.Min(60, playUrl.Length)));
+                return playUrl;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "获取播放URL失败: {Hash}", hash);
+                _logger.LogError(ex, "获取播放URL失败: {SongId}", songId);
                 return null;
             }
         }
 
-        private async Task<List<LyricLine>?> GetLyricsAsync(string hash, CancellationToken cancellationToken)
+        private async Task<List<LyricLine>?> GetLyricsAsync(string songId, CancellationToken cancellationToken)
         {
             try
             {
-                var lyricsUrl = $"{_config.BaseUrl}/v1/audio/lrc?hash={hash}&cmd=100&timelength=999999";
+                var lyricsUrl = $"{_config.LyricUrl}?musicId={songId}";
+                _logger.LogInformation("获取歌词URL: {LyricsUrl}", lyricsUrl);
+                
                 var response = await _httpClient.GetStringAsync(lyricsUrl, cancellationToken);
                 
                 var jsonDoc = JsonDocument.Parse(response);
                 var root = jsonDoc.RootElement;
 
-                if (root.TryGetProperty("data", out var dataElement) &&
-                    dataElement.TryGetProperty("lrc", out var lrcElement))
+                if (root.TryGetProperty("status", out var statusElement) && statusElement.GetInt32() == 200 &&
+                    root.TryGetProperty("data", out var dataElement) &&
+                    dataElement.TryGetProperty("lrclist", out var lrcListElement))
                 {
-                    var lrcContent = lrcElement.GetString();
-                    if (!string.IsNullOrEmpty(lrcContent))
+                    var lyrics = new List<LyricLine>();
+                    
+                    foreach (var lrcItem in lrcListElement.EnumerateArray())
                     {
-                        return ParseLyrics(lrcContent);
+                        if (lrcItem.TryGetProperty("time", out var timeElement) &&
+                            lrcItem.TryGetProperty("lineLyric", out var textElement))
+                        {
+                            var timeSec = timeElement.GetDouble();
+                            var text = textElement.GetString()?.Trim();
+                              // 跳过空歌词和元信息歌词
+                            if (!string.IsNullOrEmpty(text) && 
+                                !text.StartsWith("作词") && 
+                                !text.StartsWith("作曲") && 
+                                !text.StartsWith("编曲"))
+                            {
+                                lyrics.Add(new LyricLine
+                                {
+                                    Time = timeSec,
+                                    Text = text
+                                });
+                            }
+                        }
                     }
+                    
+                    _logger.LogInformation("成功获取歌词，共 {Count} 行", lyrics.Count);
+                    return lyrics;
                 }
 
+                _logger.LogWarning("未获取到歌词或歌词格式错误");
                 return new List<LyricLine>();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "获取歌词失败: {Hash}", hash);
+                _logger.LogError(ex, "获取歌词失败: {SongId}", songId);
                 return new List<LyricLine>();
             }
         }
 
-        private List<LyricLine> ParseLyrics(string lrcContent)
+        private async Task<string?> GetCachedFileAsync(string songId, string playUrl, CancellationToken cancellationToken)
         {
-            var lyrics = new List<LyricLine>();
-            var regex = new Regex(@"\[(\d{2}):(\d{2})\.(\d{2})\](.*)");
-
-            foreach (var line in lrcContent.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-            {
-                var match = regex.Match(line.Trim());
-                if (match.Success)
-                {
-                    var minutes = int.Parse(match.Groups[1].Value);
-                    var seconds = int.Parse(match.Groups[2].Value);
-                    var milliseconds = int.Parse(match.Groups[3].Value) * 10;
-                    var text = match.Groups[4].Value.Trim();
-
-                    if (!string.IsNullOrEmpty(text))
-                    {                        lyrics.Add(new LyricLine
-                        {
-                            Time = new TimeSpan(0, 0, minutes, seconds, milliseconds).TotalSeconds,
-                            Text = text
-                        });
-                    }
-                }
-            }
-
-            return lyrics.OrderBy(l => l.Time).ToList();
-        }
-
-        private async Task<string?> GetCachedFileAsync(string hash, string playUrl, CancellationToken cancellationToken)
-        {
-            var fileName = $"{hash}.mp3";
-            var filePath = Path.Combine(_cacheDirectory, fileName);
-
-            if (File.Exists(filePath))
-            {
-                _logger.LogDebug("使用缓存文件: {FilePath}", filePath);
-                return filePath;
-            }
-
             try
             {
-                _logger.LogInformation("下载音乐文件: {Hash}", hash);
-                var response = await _httpClient.GetByteArrayAsync(playUrl, cancellationToken);
+                var cacheFileName = $"{songId}.mp3";
+                var filePath = Path.Combine(_cacheDirectory, cacheFileName);
                 
-                // 原子性写入
-                var tempPath = filePath + ".tmp";
-                await File.WriteAllBytesAsync(tempPath, response, cancellationToken);
-                File.Move(tempPath, filePath);
+                if (File.Exists(filePath))
+                {
+                    _logger.LogInformation("使用缓存文件: {FilePath}", filePath);
+                    return filePath;
+                }
 
-                _logger.LogInformation("音乐文件缓存完成: {FilePath}", filePath);
+                // 下载到缓存
+                _logger.LogInformation("下载音乐文件: {SongId}", songId);
+                using var response = await _httpClient.GetAsync(playUrl, cancellationToken);
+                response.EnsureSuccessStatusCode();
+
+                var tempFilePath = filePath + ".tmp";
+                using (var fileStream = File.Create(tempFilePath))
+                {
+                    await response.Content.CopyToAsync(fileStream, cancellationToken);
+                }
+
+                // 原子性写入
+                File.Move(tempFilePath, filePath);
+                _logger.LogInformation("音乐文件已缓存: {FilePath}", filePath);
                 return filePath;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "下载音乐文件失败: {Hash}", hash);
+                _logger.LogError(ex, "下载音乐文件失败: {SongId}", songId);
                 return null; // 返回null，使用流播放
             }
         }
@@ -544,7 +557,7 @@ namespace Verdure.Assistant.Core.Services
             };
             PlaybackStateChanged?.Invoke(this, args);
         }        
-        
+
         private void UpdateProgress(object? state)
         {
             if (_currentTrack == null || !IsPlaying) return;
@@ -570,8 +583,7 @@ namespace Verdure.Assistant.Core.Services
                 _logger.LogError(ex, "更新播放进度失败");
             }
         }        
-        
-        private void UpdateCurrentLyric(double currentPosition)
+          private void UpdateCurrentLyric(double currentPosition)
         {
             if (_currentLyrics.Count == 0) return;
 
@@ -609,15 +621,4 @@ namespace Verdure.Assistant.Core.Services
             _operationSemaphore?.Dispose();
         }
     }    
-    
-    
-    /// <summary>
-    /// 酷狗音乐配置
-    /// </summary>
-    public class KugouMusicConfig
-    {
-        public string BaseUrl { get; set; } = "http://mobilecdnbj.kugou.com";
-        public string UserAgent { get; set; } = "KuGou2012-8275-ExpandSearchResult";
-        public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
-    }
 }

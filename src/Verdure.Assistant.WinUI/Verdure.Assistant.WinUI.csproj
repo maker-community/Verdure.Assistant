@@ -13,7 +13,7 @@
         <Nullable>enable</Nullable>
         <LangVersion>latest</LangVersion>        
 		<ImplicitUsings>enable</ImplicitUsings>
-        <RootNamespace>Verdure.Assistant.WinUI</RootNamespace>       
+        <RootNamespace>Verdure.Assistant.WinUI</RootNamespace>        
 		<!-- App Options -->
         <UseRidGraph>true</UseRidGraph>
         <Platforms>x86;x64;ARM64</Platforms>        

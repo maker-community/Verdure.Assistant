@@ -196,7 +196,7 @@ public class SearchResult
 }
 
 /// <summary>
-/// 酷狗音乐API配置
+/// 酷我音乐API配置 (兼容py-xiaozhi)
 /// </summary>
 public class KugouMusicConfig
 {
@@ -225,6 +225,35 @@ public class KugouMusicConfig
         ["Accept-Encoding"] = "identity",
         ["Connection"] = "keep-alive",
         ["Referer"] = "https://y.kuwo.cn/",
-        ["Cookie"] = ""
+        //["Cookie"] = ""
     };
+
+    /// <summary>
+    /// 搜索参数配置
+    /// </summary>
+    public Dictionary<string, string> SearchParams { get; set; } = new()
+    {
+        ["ft"] = "music",
+        ["newsearch"] = "1",
+        ["alflac"] = "1",
+        ["itemset"] = "web_2013",
+        ["client"] = "kt",
+        ["cluster"] = "0",
+        ["pn"] = "0",
+        ["rn"] = "1",
+        ["vermerge"] = "1",
+        ["rformat"] = "json",
+        ["encoding"] = "utf8",
+        ["show_copyright_off"] = "1",
+        ["pcmp4"] = "1",
+        ["ver"] = "mbox",
+        ["vipver"] = "MUSIC_8.7.6.0.BCS31",
+        ["plat"] = "pc",
+        ["devid"] = "0"
+    };
+
+    /// <summary>
+    /// 超时时间
+    /// </summary>
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
 }
