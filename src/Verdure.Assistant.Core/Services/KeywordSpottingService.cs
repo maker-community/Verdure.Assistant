@@ -415,8 +415,7 @@ public class KeywordSpottingService : IKeywordSpottingService
             }
         });
     }    
-    
-    /// <summary>
+      /// <summary>
     /// 识别取消事件处理
     /// </summary>
     private void OnRecognitionCanceled(object? sender, SpeechRecognitionCanceledEventArgs e)
@@ -425,18 +424,32 @@ public class KeywordSpottingService : IKeywordSpottingService
 
         if (e.Reason == CancellationReason.Error)
         {
-            OnErrorOccurred($"识别错误: {e.ErrorDetails}");
+            // 检查是否是已知的Microsoft Speech SDK错误
+            if (e.ErrorDetails.Contains("SPXERR_INVALID_HANDLE"))
+            {
+                _logger?.LogWarning("检测到Microsoft Speech SDK句柄错误，这是快速重启时的已知问题");
+                // 对于句柄错误，我们不触发错误事件，因为这不是真正的错误
+            }
+            else
+            {
+                OnErrorOccurred($"识别错误: {e.ErrorDetails}");
+            }
         }
         
         // 如果是因为错误被取消且服务仍在运行，尝试重启识别
         if (e.Reason == CancellationReason.Error && _isRunning && !_isPaused)
         {
             _logger?.LogInformation("检测到识别错误，尝试重启关键词识别");
-            RestartContinuousRecognition();
+            // 为了避免快速重启导致的句柄问题，添加延迟
+            Task.Delay(200).ContinueWith(_ =>
+            {
+                if (_isRunning && !_isPaused)
+                {
+                    RestartContinuousRecognition();
+                }
+            });
         }
-    }
-
-    /// <summary>
+    }/// <summary>
     /// 重启连续关键词识别（实现持续检测功能）
     /// Microsoft Cognitive Services的KeywordRecognizer在检测到关键词后会停止，需要手动重启以实现连续检测
     /// </summary>
@@ -452,21 +465,62 @@ public class KeywordSpottingService : IKeywordSpottingService
         {
             try
             {
-                // 短暂延迟，确保之前的识别完全停止
-                await Task.Delay(50);
+                // 增加延迟时间以确保SDK完全释放资源
+                await Task.Delay(150);
                 
-                // 重新启动关键词识别
-                if (_isRunning && !_isPaused && _keywordRecognizer != null && _keywordModel != null)
+                // 再次检查状态，防止在延迟期间服务被停止
+                if (!_isRunning || _isPaused || _keywordRecognizer == null || _keywordModel == null)
                 {
-                    await _keywordRecognizer.RecognizeOnceAsync(_keywordModel);
-                    _logger?.LogDebug("关键词识别已重新启动，继续监听");
+                    _logger?.LogDebug("服务状态已变更，跳过重启识别");
+                    return;
+                }
+
+                // 使用信号量确保线程安全
+                await _semaphore.WaitAsync();
+                try
+                {
+                    // 最终状态检查
+                    if (_isRunning && !_isPaused && _keywordRecognizer != null && _keywordModel != null)
+                    {
+                        _logger?.LogDebug("尝试重新启动关键词识别...");
+                        await _keywordRecognizer.RecognizeOnceAsync(_keywordModel);
+                        _logger?.LogDebug("关键词识别已重新启动，继续监听");
+                    }
+                }
+                finally
+                {
+                    _semaphore.Release();
                 }
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "重启连续关键词识别时发生错误");
-                // 如果重启失败，触发错误事件
-                OnErrorOccurred($"重启关键词识别失败: {ex.Message}");
+                // 详细记录错误信息，特别是Microsoft Speech SDK错误
+                if (ex.Message.Contains("SPXERR_INVALID_HANDLE") || ex.Message.Contains("0x21"))
+                {
+                    _logger?.LogWarning(ex, "检测到Microsoft Speech SDK句柄错误 (SPXERR_INVALID_HANDLE)，这是SDK在快速重启时的已知问题，不影响功能");
+                    
+                    // 对于句柄错误，尝试延迟后再次重启
+                    await Task.Delay(300);
+                    if (_isRunning && !_isPaused && _keywordRecognizer != null && _keywordModel != null)
+                    {
+                        try
+                        {
+                            _logger?.LogDebug("延迟后重试启动关键词识别...");
+                            await _keywordRecognizer.RecognizeOnceAsync(_keywordModel);
+                            _logger?.LogDebug("延迟重试成功，关键词识别已启动");
+                        }
+                        catch (Exception retryEx)
+                        {
+                            _logger?.LogError(retryEx, "延迟重试仍然失败");
+                        }
+                    }
+                }
+                else
+                {
+                    _logger?.LogError(ex, "重启连续关键词识别时发生未知错误");
+                    // 对于其他错误，触发错误事件
+                    OnErrorOccurred($"重启关键词识别失败: {ex.Message}");
+                }
             }
         });
     }
