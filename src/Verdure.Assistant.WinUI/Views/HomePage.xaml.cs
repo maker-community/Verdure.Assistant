@@ -243,8 +243,7 @@ public sealed partial class HomePage : Page
     
     #endregion
 
-    #region 表情动画处理
-
+    #region 表情动画处理    
     /// <summary>
     /// 更新表情显示，支持GIF动画切换，类似py-xiaozhi的表情切换效果
     /// </summary>
@@ -252,40 +251,54 @@ public sealed partial class HomePage : Page
     {
         try
         {
-            this.DispatcherQueue.TryEnqueue(async () =>
+            // 使用TaskCompletionSource确保在UI线程上执行
+            var tcs = new TaskCompletionSource<bool>();
+            
+            this.DispatcherQueue.TryEnqueue(() =>
             {
-                if (!string.IsNullOrEmpty(gifPath) && File.Exists(gifPath))
+                try
                 {
-                    // 显示GIF动画
-                    try
+                    if (!string.IsNullOrEmpty(gifPath) && File.Exists(gifPath))
                     {
-                        var bitmapImage = new BitmapImage();
-                        bitmapImage.UriSource = new Uri(gifPath);
-                        
-                        EmotionImage.Source = bitmapImage;
-                        EmotionImage.Visibility = Visibility.Visible;
-                        DefaultEmotionText.Visibility = Visibility.Collapsed;
-                        
-                        _logger?.LogDebug($"Switched to GIF emotion: {emotionName} -> {gifPath}");
+                        // 显示GIF动画
+                        try
+                        {
+                            var bitmapImage = new BitmapImage();
+                            bitmapImage.UriSource = new Uri(gifPath);
+                            
+                            EmotionImage.Source = bitmapImage;
+                            EmotionImage.Visibility = Visibility.Visible;
+                            DefaultEmotionText.Visibility = Visibility.Collapsed;
+                            
+                            _logger?.LogDebug($"Switched to GIF emotion: {emotionName} -> {gifPath}");
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogWarning(ex, "Failed to load GIF emotion: {GifPath}", gifPath);
+                            
+                            // 回退到文本显示
+                            EmotionImage.Visibility = Visibility.Collapsed;
+                            DefaultEmotionText.Visibility = Visibility.Visible;
+                        }
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        _logger?.LogWarning(ex, "Failed to load GIF emotion: {GifPath}", gifPath);
-                        
-                        // 回退到文本显示
+                        // 显示文本表情
                         EmotionImage.Visibility = Visibility.Collapsed;
                         DefaultEmotionText.Visibility = Visibility.Visible;
+                        
+                        _logger?.LogDebug($"Switched to text emotion: {emotionName}");
                     }
-                }
-                else
-                {
-                    // 显示文本表情
-                    EmotionImage.Visibility = Visibility.Collapsed;
-                    DefaultEmotionText.Visibility = Visibility.Visible;
                     
-                    _logger?.LogDebug($"Switched to text emotion: {emotionName}");
+                    tcs.SetResult(true);
+                }
+                catch (Exception ex)
+                {
+                    tcs.SetException(ex);
                 }
             });
+            
+            await tcs.Task;
         }
         catch (Exception ex)
         {
