@@ -11,10 +11,10 @@
         <!--  Converters  -->
         <converters:BoolNegationConverter x:Key="BoolNegationConverter" />
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
-    </Page.Resources>
-
+    </Page.Resources>    
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
@@ -66,10 +66,114 @@
                         Text="{x:Bind ViewModel.ConnectionStatusText, Mode=OneWay}" />
                 </StackPanel>
             </Grid>
-        </Border>
-
-        <!--  Main Content Grid  -->
-        <Grid Grid.Row="1" Margin="20,0,20,20">
+        </Border>        <!--  Verification Code Panel  -->
+        <Border
+            Grid.Row="1"
+            Margin="20,0,20,10"
+            Padding="20"
+            Background="{ThemeResource SystemFillColorCautionBrush}"
+            CornerRadius="12"
+            Visibility="{x:Bind ViewModel.IsVerificationCodeVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                
+                <!--  Header with dismiss button  -->
+                <Grid Grid.Row="0" Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    
+                    <FontIcon
+                        Grid.Column="0"
+                        FontSize="20"
+                        Glyph="&#xE72E;" />
+                    
+                    <TextBlock
+                        Grid.Column="1"
+                        Margin="12,0,0,0"
+                        VerticalAlignment="Center"
+                        FontSize="16"
+                        FontWeight="SemiBold"
+                        Text="OTA验证码" />
+                    
+                    <Button
+                        Grid.Column="2"
+                        Width="32"
+                        Height="32"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Command="{x:Bind ViewModel.DismissVerificationCodeCommand}"
+                        CornerRadius="16">
+                        <FontIcon
+                            FontSize="12"
+                            Glyph="&#xE711;" />
+                    </Button>
+                </Grid>
+                
+                <!--  Verification Code Message  -->
+                <TextBlock
+                    Grid.Row="1"
+                    Margin="0,0,0,16"
+                    FontSize="14"
+                    Text="{x:Bind ViewModel.VerificationCodeMessage, Mode=OneWay}"
+                    TextWrapping="Wrap" />
+                
+                <!--  Verification Code Display and Actions  -->
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    
+                    <!--  Verification Code Display  -->
+                    <Border
+                        Grid.Column="0"
+                        Padding="16,12"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8">
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontFamily="Consolas"
+                            FontSize="18"
+                            FontWeight="Bold"
+                            Foreground="{ThemeResource SystemAccentColor}"
+                            Text="{x:Bind ViewModel.VerificationCode, Mode=OneWay}" />
+                    </Border>
+                    
+                    <!--  Copy Button  -->
+                    <Button
+                        Grid.Column="1"
+                        Margin="12,0,0,0"
+                        Command="{x:Bind ViewModel.CopyVerificationCodeCommand}"
+                        Style="{ThemeResource AccentButtonStyle}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon FontSize="16" Glyph="&#xE8C8;" />
+                            <TextBlock Text="复制" />
+                        </StackPanel>
+                    </Button>
+                    
+                    <!--  Open Login Page Button  -->
+                    <Button
+                        Grid.Column="2"
+                        Margin="8,0,0,0"
+                        Command="{x:Bind ViewModel.OpenLoginPageCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon FontSize="16" Glyph="&#xE774;" />
+                            <TextBlock Text="打开登录页" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Grid>
+        </Border>        <!--  Main Content Grid  -->
+        <Grid Grid.Row="2" Margin="20,0,20,20">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1*" MinWidth="350" />
                 <ColumnDefinition Width="15" />

@@ -85,6 +85,13 @@ class Program
                 // Add Microsoft Cognitive Services keyword spotting service
                 services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
 
+                // 注册 AudioStreamManager 单例（使用正确的方式）
+                services.AddSingleton<AudioStreamManager>(provider =>
+                {
+                    var logger = provider.GetService<ILogger<AudioStreamManager>>();
+                    return AudioStreamManager.GetInstance(logger);
+                });
+
             });
 
     static VerdureConfig LoadConfiguration()

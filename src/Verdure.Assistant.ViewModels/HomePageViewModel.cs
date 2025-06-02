@@ -13,10 +13,10 @@ namespace Verdure.Assistant.ViewModels;
 /// 主页ViewModel - 语音对话界面逻辑
 /// </summary>
 public partial class HomePageViewModel : ViewModelBase
-{
-    private readonly IVoiceChatService? _voiceChatService;
+{    private readonly IVoiceChatService? _voiceChatService;
     private readonly IEmotionManager? _emotionManager;
     private readonly IKeywordSpottingService? _keywordSpottingService;
+    private readonly IVerificationService? _verificationService;
 
     // UI thread dispatcher for cross-platform thread marshaling
     private IUIDispatcher _uiDispatcher;
@@ -77,6 +77,16 @@ public partial class HomePageViewModel : ViewModelBase
     [ObservableProperty]
     private string _serverUrl = "ws://localhost:8080/ws";
 
+    // 验证码相关属性
+    [ObservableProperty]
+    private bool _isVerificationCodeVisible = false;
+
+    [ObservableProperty]
+    private string _verificationCode = string.Empty;
+
+    [ObservableProperty]
+    private string _verificationCodeMessage = string.Empty;
+
     // Manual按钮可用状态 - 基于连接状态、推送说话状态和等待响应状态
     public bool IsManualButtonEnabled => IsConnected && !IsPushToTalkActive && !IsWaitingForResponse;
 
@@ -86,18 +96,20 @@ public partial class HomePageViewModel : ViewModelBase
 
     public ObservableCollection<ChatMessageViewModel> Messages { get; } = new();
 
-    #endregion    
+    #endregion      
     public HomePageViewModel(ILogger<HomePageViewModel> logger,
         IVoiceChatService? voiceChatService = null,
         IEmotionManager? emotionManager = null,
         InterruptManager? interruptManager = null,
         IKeywordSpottingService? keywordSpottingService = null,
+        IVerificationService? verificationService = null,
         IUIDispatcher? uiDispatcher = null) : base(logger)
     {
         _voiceChatService = voiceChatService;
         _emotionManager = emotionManager;
         _interruptManager = interruptManager;
         _keywordSpottingService = keywordSpottingService;
+        _verificationService = verificationService;
 
         // 设置初始状态
         InitializeDefaultState();
@@ -228,9 +240,7 @@ public partial class HomePageViewModel : ViewModelBase
             }
 
         });            
-    }
-
-    private void OnMessageReceived(object? sender, ChatMessage message)
+    }    private void OnMessageReceived(object? sender, ChatMessage message)
     {
         // 使用UI调度器确保线程安全的事件处理
         _ = _uiDispatcher.InvokeAsync(() =>
@@ -248,6 +258,9 @@ public partial class HomePageViewModel : ViewModelBase
             if (message.Role == "assistant")
             {
                 TtsText = message.Content;
+                
+                // 检查是否包含验证码
+                _ = HandleVerificationCodeAsync(message.Content);
             }
         });
     }
@@ -528,6 +541,7 @@ public partial class HomePageViewModel : ViewModelBase
             else
             {
                 await StartKeywordDetectionAsync();
+                AddMessage("🎯 关键词唤醒已启用");
             }
         }
         catch (Exception ex)
@@ -535,6 +549,59 @@ public partial class HomePageViewModel : ViewModelBase
             _logger?.LogError(ex, "切换关键词检测状态失败");
             AddMessage($"切换关键词检测失败: {ex.Message}", true);
         }
+    }
+
+    [RelayCommand]
+    private async Task CopyVerificationCodeAsync()
+    {
+        if (_verificationService == null || string.IsNullOrEmpty(VerificationCode))
+        {
+            _logger?.LogWarning("验证码服务未设置或验证码为空");
+            return;
+        }
+
+        try
+        {
+            await _verificationService.CopyToClipboardAsync(VerificationCode);
+            AddMessage($"✅ 验证码 {VerificationCode} 已复制到剪贴板");
+            _logger?.LogInformation("验证码已复制到剪贴板: {Code}", VerificationCode);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "复制验证码失败");
+            AddMessage("❌ 复制验证码失败", true);
+        }
+    }
+
+    [RelayCommand]
+    private async Task OpenLoginPageAsync()
+    {
+        if (_verificationService == null)
+        {
+            _logger?.LogWarning("验证码服务未设置");
+            return;
+        }
+
+        try
+        {
+            await _verificationService.OpenBrowserAsync("https://xiaozhi.me/login");
+            AddMessage("🌐 已打开登录页面");
+            _logger?.LogInformation("已打开登录页面");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "打开登录页面失败");
+            AddMessage("❌ 打开登录页面失败", true);
+        }
+    }
+
+    [RelayCommand]
+    private void DismissVerificationCode()
+    {
+        IsVerificationCodeVisible = false;
+        VerificationCode = string.Empty;
+        VerificationCodeMessage = string.Empty;
+        _logger?.LogInformation("验证码提示已关闭");
     }
 
     #endregion
@@ -682,8 +749,63 @@ public partial class HomePageViewModel : ViewModelBase
         ManualButtonText = "处理中...";
         ManualButtonStateChanged?.Invoke(this, new ManualButtonStateEventArgs
         {
-            State = ManualButtonState.Processing
-        });
+            State = ManualButtonState.Processing        });
+    }
+
+    /// <summary>
+    /// 处理验证码信息（对应py-xiaozhi的_handle_verification_code功能）
+    /// </summary>
+    private async Task HandleVerificationCodeAsync(string text)
+    {
+        if (_verificationService == null)
+        {
+            _logger?.LogWarning("验证码服务未设置，无法处理验证码");
+            return;
+        }
+
+        try
+        {
+            // 使用验证码服务提取验证码
+            var code = await _verificationService.ExtractVerificationCodeAsync(text);
+            if (!string.IsNullOrEmpty(code))
+            {
+                // 设置验证码相关属性
+                VerificationCode = code;
+                VerificationCodeMessage = $"您的验证码是: {code}";
+                IsVerificationCodeVisible = true;
+
+                // 自动复制到剪贴板
+                try
+                {
+                    await _verificationService.CopyToClipboardAsync(code);
+                    AddMessage($"🔑 验证码 {code} 已提取并复制到剪贴板");
+                    _logger?.LogInformation("验证码已提取并复制到剪贴板: {Code}", code);
+                }
+                catch (Exception copyEx)
+                {
+                    _logger?.LogWarning(copyEx, "复制验证码到剪贴板失败");
+                    AddMessage($"🔑 验证码 {code} 已提取，但复制到剪贴板失败");
+                }
+
+                // 尝试打开浏览器（可选）
+                try
+                {
+                    await _verificationService.OpenBrowserAsync("https://xiaozhi.me/login");
+                    AddMessage("🌐 已自动打开登录页面");
+                    _logger?.LogInformation("已自动打开登录页面");
+                }
+                catch (Exception browserEx)
+                {
+                    _logger?.LogWarning(browserEx, "打开浏览器失败");
+                    // 不显示错误消息，因为这是可选操作
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "处理验证码时发生错误");
+            AddMessage("❌ 处理验证码时发生错误", true);
+        }
     }
 
     private void CleanupEventSubscriptions()
