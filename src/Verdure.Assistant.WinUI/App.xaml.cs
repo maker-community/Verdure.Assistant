@@ -77,6 +77,8 @@ public partial class App : Application
             var logger = provider.GetService<ILogger<AudioStreamManager>>();
             return AudioStreamManager.GetInstance(logger);
         });
+
+
         services.AddSingleton<IAudioRecorder>(provider => provider.GetService<AudioStreamManager>()!);
         services.AddSingleton<IAudioPlayer, PortAudioPlayer>();
         services.AddSingleton<IAudioCodec, OpusSharpAudioCodec>();
@@ -96,10 +98,14 @@ public partial class App : Application
                 throw new InvalidOperationException("No DispatcherQueue available for current thread. This service must be resolved on the UI thread.");
             }
             return new WinUIDispatcher(dispatcherQueue);
-        });
-
+        });        
+        
         // Voice chat service
-        services.AddSingleton<IVoiceChatService, VoiceChatService>();
+        services.AddSingleton<IVoiceChatService, VoiceChatService>();        
+        
+        // Music player service
+        services.AddSingleton<IMusicAudioPlayer, WinUIMusicAudioPlayer>();
+        services.AddSingleton<IMusicPlayerService, KugouMusicService>();
 
         // Interrupt manager and related services
         services.AddSingleton<InterruptManager>();

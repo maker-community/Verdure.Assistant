@@ -17,6 +17,7 @@ public partial class HomePageViewModel : ViewModelBase
     private readonly IEmotionManager? _emotionManager;
     private readonly IKeywordSpottingService? _keywordSpottingService;
     private readonly IVerificationService? _verificationService;
+    private readonly IMusicPlayerService? _musicPlayerService;
 
     // UI thread dispatcher for cross-platform thread marshaling
     private IUIDispatcher _uiDispatcher;
@@ -125,13 +126,15 @@ public partial class HomePageViewModel : ViewModelBase
 
     public ObservableCollection<ChatMessageViewModel> Messages { get; } = new();
 
-    #endregion      
+    #endregion        
+    
     public HomePageViewModel(ILogger<HomePageViewModel> logger,
         IVoiceChatService? voiceChatService = null,
         IEmotionManager? emotionManager = null,
         InterruptManager? interruptManager = null,
         IKeywordSpottingService? keywordSpottingService = null,
         IVerificationService? verificationService = null,
+        IMusicPlayerService? musicPlayerService = null,
         IUIDispatcher? uiDispatcher = null) : base(logger)
     {
         _voiceChatService = voiceChatService;
@@ -139,6 +142,7 @@ public partial class HomePageViewModel : ViewModelBase
         _interruptManager = interruptManager;
         _keywordSpottingService = keywordSpottingService;
         _verificationService = verificationService;
+        _musicPlayerService = musicPlayerService;
 
         // 设置初始状态
         InitializeDefaultState();
@@ -157,7 +161,9 @@ public partial class HomePageViewModel : ViewModelBase
         ManualButtonText = "按住说话";
         AutoButtonText = "开始对话";
         SetEmotion("neutral");
-    }    public override async Task InitializeAsync()
+    }    
+    
+    public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
 
@@ -192,7 +198,18 @@ public partial class HomePageViewModel : ViewModelBase
             _voiceChatService.IotMessageReceived += OnIotMessageReceived;
             _voiceChatService.LlmMessageReceived += OnLlmMessageReceived;
             _voiceChatService.TtsStateChanged += OnTtsStateChanged;
-        }// 初始化和绑定InterruptManager事件
+        }
+
+        // 绑定音乐播放服务事件
+        if (_musicPlayerService != null)
+        {
+            _musicPlayerService.PlaybackStateChanged += OnMusicPlaybackStateChanged;
+            _musicPlayerService.LyricUpdated += OnMusicLyricUpdated;
+            _musicPlayerService.ProgressUpdated += OnMusicProgressUpdated;
+            _logger?.LogInformation("音乐播放服务事件已绑定");
+        }
+
+        // 初始化和绑定InterruptManager事件
         if (_interruptManager != null)
         {
             try
@@ -285,7 +302,9 @@ public partial class HomePageViewModel : ViewModelBase
             }
 
         });            
-    }    private void OnMessageReceived(object? sender, ChatMessage message)
+    }    
+    
+    private void OnMessageReceived(object? sender, ChatMessage message)
     {
         // 使用UI调度器确保线程安全的事件处理
         _ = _uiDispatcher.InvokeAsync(() =>
@@ -377,7 +396,74 @@ public partial class HomePageViewModel : ViewModelBase
                 case "seek":
                     MusicPosition = message.Position;
                     break;
+            }        });
+    }
+
+    // 音乐播放服务事件处理
+    private void OnMusicPlaybackStateChanged(object? sender, MusicPlaybackEventArgs e)
+    {
+        _ = _uiDispatcher.InvokeAsync(() =>
+        {            if (e.Track != null)
+            {
+                CurrentSongName = e.Track.Name;
+                CurrentArtist = e.Track.Artist;
+                MusicDuration = e.Track.Duration;
+            }MusicStatus = e.Status switch
+            {
+                "Playing" => "播放中",
+                "Paused" => "暂停",
+                "Stopped" => "停止",
+                "Ended" => "播放完毕",
+                "Failed" => "播放失败",
+                _ => "未知状态"
+            };
+
+            var stateEmoji = e.Status switch
+            {
+                "Playing" => "🎵",
+                "Paused" => "⏸️",
+                "Stopped" => "⏹️",
+                "Ended" => "🔚",
+                "Failed" => "❌",
+                _ => "🎶"
+            };
+
+            if (e.Track != null)
+            {
+                AddMessage($"{stateEmoji} {MusicStatus}: {e.Track.DisplayName}", e.Status == "Failed");
             }
+            else
+            {
+                AddMessage($"{stateEmoji} 音乐播放状态: {MusicStatus}", e.Status == "Failed");
+            }
+
+            if (e.Status == "Failed" && !string.IsNullOrEmpty(e.Message))
+            {
+                AddMessage($"错误详情: {e.Message}", true);
+            }
+        });
+    }    private void OnMusicLyricUpdated(object? sender, LyricUpdateEventArgs e)
+    {
+        _ = _uiDispatcher.InvokeAsync(() =>
+        {
+            if (!string.IsNullOrEmpty(e.LyricText))
+            {
+                var timeStr = FormatTime(e.Position);
+                CurrentLyric = $"[{timeStr}] {e.LyricText}";
+                
+                // 只有当前歌词有意义时才显示在消息中
+                if (!string.IsNullOrWhiteSpace(e.LyricText))
+                {
+                    AddMessage($"🎤 {CurrentLyric}", false);
+                }
+            }
+        });
+    }    private void OnMusicProgressUpdated(object? sender, ProgressUpdateEventArgs e)
+    {
+        _ = _uiDispatcher.InvokeAsync(() =>
+        {
+            MusicPosition = e.Position;
+            // 注意：不在这里添加消息，避免UI过度刷新
         });
     }
 
@@ -752,15 +838,152 @@ public partial class HomePageViewModel : ViewModelBase
             _logger?.LogError(ex, "打开登录页面失败");
             AddMessage("❌ 打开登录页面失败", true);
         }
-    }
-
-    [RelayCommand]
+    }    [RelayCommand]
     private void DismissVerificationCode()
     {
         IsVerificationCodeVisible = false;
         VerificationCode = string.Empty;
         VerificationCodeMessage = string.Empty;
         _logger?.LogInformation("验证码提示已关闭");
+    }
+
+    // 音乐控制命令
+    [RelayCommand]
+    private async Task PlayMusicAsync(string? query = null)
+    {
+        if (_musicPlayerService == null) 
+        {
+            AddMessage("❌ 音乐播放服务未可用", true);
+            return;
+        }
+
+        try
+        {            
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                // 如果没有搜索词，尝试切换播放/暂停状态
+                await _musicPlayerService.TogglePlayPauseAsync();
+                AddMessage("▶️ 切换播放状态");
+            }
+            else
+            {
+                // 搜索并播放指定音乐
+                AddMessage($"🔍 搜索音乐: {query}");
+                await _musicPlayerService.SearchAndPlayAsync(query);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "播放音乐失败: {Query}", query);
+            AddMessage($"❌ 播放失败: {ex.Message}", true);
+        }
+    }    
+    
+    [RelayCommand]
+    private async Task PauseMusicAsync()
+    {
+        if (_musicPlayerService == null) 
+        {
+            AddMessage("❌ 音乐播放服务未可用", true);
+            return;
+        }
+
+        try
+        {
+            await _musicPlayerService.TogglePlayPauseAsync();
+            AddMessage("⏸️ 切换播放状态");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "暂停音乐失败");
+            AddMessage($"❌ 暂停失败: {ex.Message}", true);
+        }
+    }
+
+    [RelayCommand]
+    private async Task ResumeMusicAsync()
+    {
+        if (_musicPlayerService == null) 
+        {
+            AddMessage("❌ 音乐播放服务未可用", true);
+            return;
+        }
+
+        try
+        {
+            await _musicPlayerService.TogglePlayPauseAsync();
+            AddMessage("▶️ 切换播放状态");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "恢复音乐失败");
+            AddMessage($"❌ 恢复失败: {ex.Message}", true);
+        }
+    }
+
+    [RelayCommand]
+    private async Task StopMusicAsync()
+    {
+        if (_musicPlayerService == null) 
+        {
+            AddMessage("❌ 音乐播放服务未可用", true);
+            return;
+        }
+
+        try
+        {
+            await _musicPlayerService.StopAsync();
+            AddMessage("⏹️ 音乐已停止");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "停止音乐失败");
+            AddMessage($"❌ 停止失败: {ex.Message}", true);
+        }
+    }
+
+    [RelayCommand]
+    private async Task SeekMusicAsync(double position)
+    {
+        if (_musicPlayerService == null) 
+        {
+            AddMessage("❌ 音乐播放服务未可用", true);
+            return;
+        }        try
+        {
+            await _musicPlayerService.SeekAsync(position);
+            
+            var timeStr = FormatTime(position);
+            AddMessage($"⏭️ 跳转到: {timeStr}");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "音乐跳转失败");
+            AddMessage($"❌ 跳转失败: {ex.Message}", true);
+        }
+    }
+
+    [RelayCommand]
+    private async Task SetMusicVolumeAsync(double volume)
+    {
+        if (_musicPlayerService == null) 
+        {
+            AddMessage("❌ 音乐播放服务未可用", true);
+            return;
+        }
+
+        try
+        {
+            // 确保音量在0-100范围内
+            volume = Math.Max(0, Math.Min(100, volume));
+            await _musicPlayerService.SetVolumeAsync(volume);
+            AddMessage($"🔊 音量已设置为: {volume:F0}%");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "设置音量失败");
+            AddMessage($"❌ 音量设置失败: {ex.Message}", true);
+        }
     }
 
     #endregion
@@ -1017,7 +1240,9 @@ public partial class HomePageViewModel : ViewModelBase
             _logger?.LogError(ex, "处理验证码时发生错误");
             AddMessage("❌ 处理验证码时发生错误", true);
         }
-    }    private void CleanupEventSubscriptions()
+    }    
+    
+    private void CleanupEventSubscriptions()
     {
         if (_voiceChatService != null)
         {

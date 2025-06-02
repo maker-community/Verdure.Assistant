@@ -11,8 +11,8 @@
         <!--  Converters  -->
         <converters:BoolNegationConverter x:Key="BoolNegationConverter" />
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
-    </Page.Resources>    
-    <Grid>        
+    </Page.Resources>
+    <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -67,7 +67,8 @@
                         Text="{x:Bind ViewModel.ConnectionStatusText, Mode=OneWay}" />
                 </StackPanel>
             </Grid>
-        </Border>        <!--  Verification Code Panel  -->
+        </Border>
+        <!--  Verification Code Panel  -->
         <Border
             Grid.Row="1"
             Margin="20,0,20,10"
@@ -81,7 +82,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                
+
                 <!--  Header with dismiss button  -->
                 <Grid Grid.Row="0" Margin="0,0,0,12">
                     <Grid.ColumnDefinitions>
@@ -89,12 +90,12 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    
+
                     <FontIcon
                         Grid.Column="0"
                         FontSize="20"
                         Glyph="&#xE72E;" />
-                    
+
                     <TextBlock
                         Grid.Column="1"
                         Margin="12,0,0,0"
@@ -102,7 +103,7 @@
                         FontSize="16"
                         FontWeight="SemiBold"
                         Text="OTA验证码" />
-                    
+
                     <Button
                         Grid.Column="2"
                         Width="32"
@@ -111,12 +112,10 @@
                         BorderThickness="0"
                         Command="{x:Bind ViewModel.DismissVerificationCodeCommand}"
                         CornerRadius="16">
-                        <FontIcon
-                            FontSize="12"
-                            Glyph="&#xE711;" />
+                        <FontIcon FontSize="12" Glyph="&#xE711;" />
                     </Button>
                 </Grid>
-                
+
                 <!--  Verification Code Message  -->
                 <TextBlock
                     Grid.Row="1"
@@ -124,7 +123,7 @@
                     FontSize="14"
                     Text="{x:Bind ViewModel.VerificationCodeMessage, Mode=OneWay}"
                     TextWrapping="Wrap" />
-                
+
                 <!--  Verification Code Display and Actions  -->
                 <Grid Grid.Row="2">
                     <Grid.ColumnDefinitions>
@@ -132,7 +131,7 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    
+
                     <!--  Verification Code Display  -->
                     <Border
                         Grid.Column="0"
@@ -148,7 +147,7 @@
                             Foreground="{ThemeResource SystemAccentColor}"
                             Text="{x:Bind ViewModel.VerificationCode, Mode=OneWay}" />
                     </Border>
-                    
+
                     <!--  Copy Button  -->
                     <Button
                         Grid.Column="1"
@@ -160,7 +159,7 @@
                             <TextBlock Text="复制" />
                         </StackPanel>
                     </Button>
-                    
+
                     <!--  Open Login Page Button  -->
                     <Button
                         Grid.Column="2"
@@ -173,8 +172,8 @@
                     </Button>
                 </Grid>
             </Grid>
-        </Border>        
-        <!-- Protocol Information Panel -->
+        </Border>
+        <!--  Protocol Information Panel  -->
         <Border
             Grid.Row="2"
             Margin="20,0,20,10"
@@ -187,87 +186,159 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-
-                <!-- Music Player Info -->
+                <!--  Music Player Controls  -->
                 <StackPanel Grid.Column="0" Spacing="8">
                     <TextBlock
                         FontSize="12"
                         FontWeight="SemiBold"
                         Foreground="{ThemeResource SystemAccentColor}"
                         Text="🎵 音乐播放器" />
-                    
-                    <StackPanel Spacing="4">
+
+                    <!--  Song Info  -->
+                    <StackPanel Spacing="2">
                         <TextBlock
                             FontSize="11"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}">
-                            <Run Text="歌曲: " />
-                            <Run Text="{x:Bind ViewModel.CurrentSongName, Mode=OneWay}" />
-                        </TextBlock>
-                        
-                        <TextBlock
-                            FontSize="11"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}">
-                            <Run Text="艺术家: " />
-                            <Run Text="{x:Bind ViewModel.CurrentArtist, Mode=OneWay}" />
-                        </TextBlock>
-                        
-                        <TextBlock
-                            FontSize="11"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}">
-                            <Run Text="状态: " />
-                            <Run Text="{x:Bind ViewModel.MusicStatus, Mode=OneWay}" />
-                        </TextBlock>
-                        
+                            FontWeight="SemiBold"
+                            MaxLines="1"
+                            Text="{x:Bind ViewModel.CurrentSongName, Mode=OneWay}"
+                            TextTrimming="CharacterEllipsis" />
+
                         <TextBlock
                             FontSize="10"
-                            FontFamily="Consolas"
-                            Text="{x:Bind ViewModel.CurrentLyric, Mode=OneWay}"
-                            TextWrapping="Wrap"
-                            MaxLines="2" />
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            MaxLines="1"
+                            Text="{x:Bind ViewModel.CurrentArtist, Mode=OneWay}"
+                            TextTrimming="CharacterEllipsis" />
                     </StackPanel>
+
+                    <!--  Progress Bar  -->
+                    <Slider
+                        x:Name="MusicProgressSlider"
+                        IsThumbToolTipEnabled="False"
+                        Maximum="{x:Bind ViewModel.MusicDuration, Mode=OneWay}"
+                        Minimum="0"
+                        PointerReleased="MusicProgressSlider_PointerReleased"
+                        ThumbToolTipValueConverter="{x:Null}"
+                        Value="{x:Bind ViewModel.MusicPosition, Mode=OneWay}" />
+
+                    <!--  Playback Controls  -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!--  Play/Pause Button  -->
+                        <Button
+                            x:Name="PlayPauseButton"
+                            Grid.Column="0"
+                            Width="32"
+                            Height="32"
+                            Margin="0,0,4,0"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Click="PlayPauseButton_Click">
+                            <FontIcon
+                                x:Name="PlayPauseIcon"
+                                FontSize="14"
+                                Glyph="&#xE768;" />
+                        </Button>
+
+                        <!--  Stop Button  -->
+                        <Button
+                            Grid.Column="1"
+                            Width="32"
+                            Height="32"
+                            Margin="0,0,4,0"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Command="{x:Bind ViewModel.StopMusicCommand}">
+                            <FontIcon FontSize="14" Glyph="&#xE71A;" />
+                        </Button>
+
+                        <!--  Status Text  -->
+                        <TextBlock
+                            Grid.Column="2"
+                            Margin="4,0,8,0"
+                            VerticalAlignment="Center"
+                            FontSize="10"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="{x:Bind ViewModel.MusicStatus, Mode=OneWay}" />
+
+                        <!--  Volume Control  -->
+                        <StackPanel
+                            Grid.Column="4"
+                            Orientation="Horizontal"
+                            Spacing="4">
+                            <FontIcon
+                                VerticalAlignment="Center"
+                                FontSize="12"
+                                Glyph="&#xE767;" />
+                            <Slider
+                                x:Name="VolumeSlider1"
+                                Width="60"
+                                Maximum="100"
+                                Minimum="0"
+                                ValueChanged="VolumeSlider_ValueChanged"
+                                Value="50" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!--  Current Lyric  -->
+                    <TextBlock
+                        FontFamily="Consolas"
+                        FontSize="9"
+                        Foreground="{ThemeResource SystemAccentColor}"
+                        MaxLines="1"
+                        Text="{x:Bind ViewModel.CurrentLyric, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="Wrap" />
                 </StackPanel>
 
-                <!-- System Status Info -->
+                <!--  System Status Info  -->
                 <StackPanel Grid.Column="1" Spacing="8">
                     <TextBlock
                         FontSize="12"
                         FontWeight="SemiBold"
                         Foreground="{ThemeResource SystemAccentColor}"
                         Text="📊 系统状态" />
-                    
+
                     <StackPanel Spacing="4">
                         <TextBlock
                             FontSize="11"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Text="{x:Bind ViewModel.SystemStatusText, Mode=OneWay}"
-                            TextWrapping="Wrap"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        
+                            TextWrapping="Wrap" />
+
                         <TextBlock
                             FontSize="11"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Text="{x:Bind ViewModel.IotStatusText, Mode=OneWay}"
-                            TextWrapping="Wrap"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            TextWrapping="Wrap" />
                     </StackPanel>
-                </StackPanel>                
-                <!-- Emotion & LLM Info -->
+                </StackPanel>
+                <!--  Emotion & LLM Info  -->
                 <StackPanel Grid.Column="2" Spacing="8">
                     <TextBlock
                         FontSize="12"
                         FontWeight="SemiBold"
                         Foreground="{ThemeResource SystemAccentColor}"
                         Text="😊 情感状态" />
-                    
+
                     <StackPanel Spacing="4">
                         <TextBlock
-                            FontSize="56"
-                            Visibility="Visible"
                             HorizontalAlignment="Center"
-                            Text="{x:Bind ViewModel.CurrentEmotion, Mode=OneWay}" />
+                            FontSize="56"
+                            Text="{x:Bind ViewModel.CurrentEmotion, Mode=OneWay}"
+                            Visibility="Visible" />
                     </StackPanel>
                 </StackPanel>
             </Grid>
-        </Border>        
-        
+        </Border>
+
         <!--  Main Content Grid  -->
         <Grid Grid.Row="3" Margin="20,0,20,20">
             <Grid.ColumnDefinitions>
@@ -302,7 +373,9 @@
                             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             CornerRadius="140">
                             <Grid>
-                                --><!--  Default Emotion  --><!--
+                    -->
+                    <!--  Default Emotion  -->
+                    <!--
                                 <TextBlock
                                     x:Name="DefaultEmotionText"
                                     HorizontalAlignment="Center"
@@ -311,7 +384,9 @@
                                     Visibility="Collapsed"
                                     Text="{x:Bind ViewModel.DefaultEmotionText, Mode=OneWay}" />
 
-                                --><!--  Animated Emotion  --><!--
+                    -->
+                    <!--  Animated Emotion  -->
+                    <!--
                                 <Image
                                     x:Name="EmotionImage"
                                     Stretch="Uniform"
@@ -489,6 +564,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
@@ -553,9 +629,36 @@
                         </Button>
                     </Grid>
 
+                    <!--  Music Search  -->
+                    <Grid Grid.Row="2" Margin="0,0,0,15">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox
+                            x:Name="MusicSearchTextBox"
+                            Grid.Column="0"
+                            Height="36"
+                            Margin="0,0,10,0"
+                            KeyDown="MusicSearchTextBox_KeyDown"
+                            PlaceholderText="搜索音乐..." />
+                        <Button
+                            x:Name="SearchMusicButton"
+                            Grid.Column="1"
+                            Height="36"
+                            MinWidth="60"
+                            Click="SearchMusicButton_Click"
+                            Style="{ThemeResource AccentButtonStyle}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontSize="14" Glyph="&#xE721;" />
+                                <TextBlock Text="搜索" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+
                     <!--  Messages Display  -->
                     <Border
-                        Grid.Row="2"
+                        Grid.Row="3"
                         Padding="12"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         CornerRadius="8">
