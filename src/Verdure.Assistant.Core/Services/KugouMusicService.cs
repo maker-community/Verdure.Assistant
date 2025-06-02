@@ -23,18 +23,10 @@ namespace Verdure.Assistant.Core.Services
         private readonly HttpClient _httpClient;
         private readonly IMusicAudioPlayer _audioPlayer;
         private readonly Timer _progressTimer;
-        private readonly SemaphoreSlim _operationSemaphore;
-
-        // 播放状态
+        private readonly SemaphoreSlim _operationSemaphore;        // 播放状态
         private MusicTrack? _currentTrack;
         private List<LyricLine> _currentLyrics = new();
         private int _currentLyricIndex = -1;
-        private bool _isPlaying;
-        private bool _isPaused;
-        private TimeSpan _totalDuration;
-        private TimeSpan _currentPosition;
-        private DateTime _playStartTime;
-        private TimeSpan _pausedDuration;
 
         // 缓存
         private readonly string _cacheDirectory;
