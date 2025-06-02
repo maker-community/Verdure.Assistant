@@ -99,9 +99,7 @@ class Program
                 services.AddSingleton<LampIoTDevice>();
                 services.AddSingleton<SpeakerIoTDevice>();
 
-            });
-
-    static VerdureConfig LoadConfiguration()
+            });    static VerdureConfig LoadConfiguration()
     {
         var configuration = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
@@ -113,6 +111,67 @@ class Program
         configuration.Bind(config);
         
         return config;
+    }
+
+    /// <summary>
+    /// Initialize IoT devices and setup integration (similar to py-xiaozhi's _initialize_iot_devices)
+    /// </summary>
+    static void InitializeIoTDevices(IServiceProvider services)
+    {
+        try
+        {
+            var logger = services.GetService<ILogger<Program>>();
+            logger?.LogInformation("开始初始化IoT设备...");
+
+            // Get required services
+            var iotDeviceManager = services.GetService<IoTDeviceManager>();
+            var voiceChatService = services.GetService<IVoiceChatService>();
+            var musicPlayerDevice = services.GetService<MusicPlayerIoTDevice>();
+            var lampDevice = services.GetService<LampIoTDevice>();
+            var speakerDevice = services.GetService<SpeakerIoTDevice>();
+
+            if (iotDeviceManager == null)
+            {
+                logger?.LogError("IoTDeviceManager service not found");
+                return;
+            }
+            if (voiceChatService == null)
+            {
+                logger?.LogError("VoiceChatService not found");
+                return;
+            }
+
+            // Add IoT devices to manager (similar to py-xiaozhi's thing_manager.add_thing)
+            if (musicPlayerDevice != null)
+            {
+                iotDeviceManager.AddDevice(musicPlayerDevice);
+                logger?.LogInformation("已添加音乐播放器IoT设备");
+            }
+            if (lampDevice != null)
+            {
+                iotDeviceManager.AddDevice(lampDevice);
+                logger?.LogInformation("已添加智能灯IoT设备");
+            }
+            if (speakerDevice != null)
+            {
+                iotDeviceManager.AddDevice(speakerDevice);
+                logger?.LogInformation("已添加智能音箱IoT设备");
+            }
+
+            // Set IoT device manager on VoiceChatService (similar to py-xiaozhi integration)
+            voiceChatService.SetIoTDeviceManager(iotDeviceManager);
+
+            logger?.LogInformation("IoT设备初始化完成，共注册了 {DeviceCount} 个设备", 
+                iotDeviceManager.GetDevices().Count);
+                
+            System.Console.WriteLine($"IoT设备初始化完成，注册了 {iotDeviceManager.GetDevices().Count} 个设备");
+        }
+        catch (Exception ex)
+        {
+            var logger = services.GetService<ILogger<Program>>();
+            logger?.LogError(ex, "IoT设备初始化失败");
+            System.Console.WriteLine($"IoT设备初始化失败: {ex.Message}");
+        }
     }
 
     static async Task ShowMenu()
