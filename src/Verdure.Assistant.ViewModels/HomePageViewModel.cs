@@ -157,11 +157,23 @@ public partial class HomePageViewModel : ViewModelBase
         ManualButtonText = "按住说话";
         AutoButtonText = "开始对话";
         SetEmotion("neutral");
-    }
-
-    public override async Task InitializeAsync()
+    }    public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
+
+        // 初始化EmotionManager
+        if (_emotionManager != null)
+        {
+            try
+            {
+                await _emotionManager.InitializeAsync();
+                _logger?.LogInformation("EmotionManager initialized successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to initialize EmotionManager");
+            }
+        }
 
         // 绑定服务事件
         await BindEventsAsync();
@@ -399,17 +411,17 @@ public partial class HomePageViewModel : ViewModelBase
             IotStatusText = iotInfo;
             AddMessage($"🏠 {iotInfo}", false);
         });
-    }
-
+    }    
+    
     private void OnLlmMessageReceived(object? sender, LlmMessage message)
     {
         // 使用UI调度器确保线程安全的事件处理
-        _ = _uiDispatcher.InvokeAsync(() =>
+        _ = _uiDispatcher.InvokeAsync(async () =>
         {
             if (!string.IsNullOrEmpty(message.Emotion))
             {
-                // 更新情感显示
-                CurrentEmotion = ConvertEmotionToEmoji(message.Emotion);
+                // 更新情感显示，优先使用GIF动画
+                await UpdateEmotionDisplayAsync(message.Emotion);
                 AddMessage($"😊 情感变化: {message.Emotion}", false);
             }
         });
@@ -854,8 +866,8 @@ public partial class HomePageViewModel : ViewModelBase
     private void UpdateVolumeText(double value)
     {
         VolumeText = $"{(int)value}%";
-    }
-
+    }    
+    
     private void SetEmotion(string emotionName)
     {
         try
@@ -869,6 +881,57 @@ public partial class HomePageViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to set emotion: {EmotionName}", emotionName);
+        }
+    }
+
+    /// <summary>
+    /// 更新表情显示，优先使用GIF动画，类似py-xiaozhi的表情切换
+    /// </summary>
+    private async Task UpdateEmotionDisplayAsync(string emotionName)
+    {
+        try
+        {
+            if (_emotionManager != null)
+            {
+                // 首先尝试获取GIF动画路径
+                var gifPath = await _emotionManager.GetEmotionImageAsync(emotionName);
+                
+                if (!string.IsNullOrEmpty(gifPath))
+                {
+                    // 有GIF动画可用，通知View切换到动画显示
+                    EmotionGifPathChanged?.Invoke(this, new EmotionGifPathEventArgs 
+                    { 
+                        GifPath = gifPath,
+                        EmotionName = emotionName
+                    });
+                    
+                    _logger?.LogDebug($"Updated emotion to GIF: {emotionName} -> {gifPath}");
+                }
+                else
+                {
+                    // 没有GIF动画，使用表情符号作为后备
+                    var emoji = _emotionManager.GetEmotionEmoji(emotionName);
+                    CurrentEmotion = emoji;
+                    DefaultEmotionText = emoji;
+                    
+                    // 通知View切换回文本显示
+                    EmotionGifPathChanged?.Invoke(this, new EmotionGifPathEventArgs 
+                    { 
+                        GifPath = null,
+                        EmotionName = emotionName
+                    });
+                    
+                    _logger?.LogDebug($"Updated emotion to emoji: {emotionName} -> {emoji}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to update emotion display: {EmotionName}", emotionName);
+            
+            // 出错时回退到简单表情符号
+            CurrentEmotion = ConvertEmotionToEmoji(emotionName);
+            DefaultEmotionText = CurrentEmotion;
         }
     }
 
@@ -896,7 +959,8 @@ public partial class HomePageViewModel : ViewModelBase
         ManualButtonText = "处理中...";
         ManualButtonStateChanged?.Invoke(this, new ManualButtonStateEventArgs
         {
-            State = ManualButtonState.Processing        });
+            State = ManualButtonState.Processing        
+        });
     }
 
     /// <summary>
@@ -1071,13 +1135,14 @@ public partial class HomePageViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsManualButtonEnabled));
     }
 
-    #endregion
-
+    #endregion    
+    
     #region 事件
 
     public event EventHandler<InterruptEventArgs>? InterruptTriggered;
     public event EventHandler? ScrollToBottomRequested;
     public event EventHandler<ManualButtonStateEventArgs>? ManualButtonStateChanged;
+    public event EventHandler<EmotionGifPathEventArgs>? EmotionGifPathChanged;
 
     #endregion
 
@@ -1150,4 +1215,13 @@ public enum ManualButtonState
 public class ManualButtonStateEventArgs : EventArgs
 {
     public ManualButtonState State { get; set; }
+}
+
+/// <summary>
+/// 表情GIF路径变化事件参数
+/// </summary>
+public class EmotionGifPathEventArgs : EventArgs
+{
+    public string? GifPath { get; set; }
+    public string? EmotionName { get; set; }
 }

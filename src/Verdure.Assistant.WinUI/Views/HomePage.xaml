@@ -12,7 +12,8 @@
         <converters:BoolNegationConverter x:Key="BoolNegationConverter" />
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
     </Page.Resources>    
-    <Grid>        <Grid.RowDefinitions>
+    <Grid>        
+        <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -246,8 +247,7 @@
                             TextWrapping="Wrap"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
-                </StackPanel>
-
+                </StackPanel>                
                 <!-- Emotion & LLM Info -->
                 <StackPanel Grid.Column="2" Spacing="8">
                     <TextBlock
@@ -259,15 +259,9 @@
                     <StackPanel Spacing="4">
                         <TextBlock
                             FontSize="24"
+                            Visibility="Collapsed"
                             HorizontalAlignment="Center"
                             Text="{x:Bind ViewModel.CurrentEmotion, Mode=OneWay}" />
-                        
-                        <TextBlock
-                            FontSize="11"
-                            HorizontalAlignment="Center"
-                            Text="{x:Bind ViewModel.TtsText, Mode=OneWay}"
-                            TextWrapping="Wrap"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                 </StackPanel>
             </Grid>
@@ -312,13 +306,14 @@
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
                                     FontSize="100"
+                                    Visibility="Collapsed"
                                     Text="{x:Bind ViewModel.DefaultEmotionText, Mode=OneWay}" />
 
                                 <!--  Animated Emotion  -->
                                 <Image
                                     x:Name="EmotionImage"
                                     Stretch="Uniform"
-                                    Visibility="Collapsed" />
+                                    Visibility="Visible" />
                             </Grid>
                         </Border>
                     </Viewbox>

@@ -2,6 +2,10 @@ using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media.Imaging;
+using System;
+using System.IO;
+using System.Threading.Tasks;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Services;
 using Verdure.Assistant.ViewModels;
@@ -50,13 +54,12 @@ public sealed partial class HomePage : Page
     {
         // 初始化连接指示器状态
         UpdateConnectionIndicator();
-    }
-
-    private void BindViewModelEvents()
+    }    private void BindViewModelEvents()
     {
         _viewModel.InterruptTriggered += OnInterruptTriggered;
         _viewModel.ScrollToBottomRequested += OnScrollToBottomRequested;
         _viewModel.ManualButtonStateChanged += OnManualButtonStateChanged;
+        _viewModel.EmotionGifPathChanged += OnEmotionGifPathChanged;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
     }
 
@@ -81,9 +84,7 @@ public sealed partial class HomePage : Page
         {
             MessagesScrollViewer.ChangeView(null, MessagesScrollViewer.ScrollableHeight, null);
         });      
-    }
-
-    private void OnManualButtonStateChanged(object? sender, ManualButtonStateEventArgs e)
+    }    private void OnManualButtonStateChanged(object? sender, ManualButtonStateEventArgs e)
     {
         switch (e.State)
         {
@@ -97,6 +98,18 @@ public sealed partial class HomePage : Page
                 SetManualButtonProcessingVisualState();
                 break;
         }    }
+
+    private async void OnEmotionGifPathChanged(object? sender, EmotionGifPathEventArgs e)
+    {
+        try
+        {
+            await UpdateEmotionDisplayAsync(e.GifPath, e.EmotionName);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to update emotion display: {EmotionName}", e.EmotionName);
+        }
+    }
 
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
@@ -216,8 +229,7 @@ public sealed partial class HomePage : Page
 
     #endregion
 
-    #region 页面生命周期
-
+    #region 页面生命周期    
     private void HomePage_Unloaded(object sender, RoutedEventArgs e)
     {
         // 清理ViewModel
@@ -225,7 +237,61 @@ public sealed partial class HomePage : Page
         _viewModel.InterruptTriggered -= OnInterruptTriggered;
         _viewModel.ScrollToBottomRequested -= OnScrollToBottomRequested;
         _viewModel.ManualButtonStateChanged -= OnManualButtonStateChanged;
+        _viewModel.EmotionGifPathChanged -= OnEmotionGifPathChanged;
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
     }    
+    
+    #endregion
+
+    #region 表情动画处理
+
+    /// <summary>
+    /// 更新表情显示，支持GIF动画切换，类似py-xiaozhi的表情切换效果
+    /// </summary>
+    private async Task UpdateEmotionDisplayAsync(string? gifPath, string? emotionName)
+    {
+        try
+        {
+            this.DispatcherQueue.TryEnqueue(async () =>
+            {
+                if (!string.IsNullOrEmpty(gifPath) && File.Exists(gifPath))
+                {
+                    // 显示GIF动画
+                    try
+                    {
+                        var bitmapImage = new BitmapImage();
+                        bitmapImage.UriSource = new Uri(gifPath);
+                        
+                        EmotionImage.Source = bitmapImage;
+                        EmotionImage.Visibility = Visibility.Visible;
+                        DefaultEmotionText.Visibility = Visibility.Collapsed;
+                        
+                        _logger?.LogDebug($"Switched to GIF emotion: {emotionName} -> {gifPath}");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Failed to load GIF emotion: {GifPath}", gifPath);
+                        
+                        // 回退到文本显示
+                        EmotionImage.Visibility = Visibility.Collapsed;
+                        DefaultEmotionText.Visibility = Visibility.Visible;
+                    }
+                }
+                else
+                {
+                    // 显示文本表情
+                    EmotionImage.Visibility = Visibility.Collapsed;
+                    DefaultEmotionText.Visibility = Visibility.Visible;
+                    
+                    _logger?.LogDebug($"Switched to text emotion: {emotionName}");
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error in UpdateEmotionDisplayAsync");
+        }
+    }
+
     #endregion
 }
