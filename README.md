@@ -1,26 +1,26 @@
-# XiaoZhi .NET
+# 绿荫助手（Verdure Assistant）
 
 <p align="center">
-  <img src="assets/logo.png" alt="XiaoZhi Logo" width="200" height="200">
+  <img src="assets/logo.png" alt="Verdure Assistant Logo" width="200" height="200">
 </p>
 
 <p align="center">
-  <a href="https://github.com/maker-community/xiaozhi-dotnet/releases/latest">
-    <img src="https://img.shields.io/github/v/release/maker-community/xiaozhi-dotnet?style=flat-square&logo=github&color=blue" alt="Release"/>
+  <a href="https://github.com/maker-community/Verdure.Assistant/releases/latest">
+    <img src="https://img.shields.io/github/v/release/maker-community/Verdure.Assistant?style=flat-square&logo=github&color=blue" alt="Release"/>
   </a>
-  <a href="https://github.com/maker-community/xiaozhi-dotnet/actions">
-    <img src="https://img.shields.io/github/actions/workflow/status/maker-community/xiaozhi-dotnet/build.yml?style=flat-square&logo=github" alt="Build Status"/>
+  <a href="https://github.com/maker-community/Verdure.Assistant/actions">
+    <img src="https://img.shields.io/github/actions/workflow/status/maker-community/Verdure.Assistant/build.yml?style=flat-square&logo=github" alt="Build Status"/>
   </a>
   <a href="https://opensource.org/licenses/MIT">
     <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License: MIT"/>
   </a>
-  <a href="https://github.com/maker-community/xiaozhi-dotnet/stargazers">
-    <img src="https://img.shields.io/github/stars/maker-community/xiaozhi-dotnet?style=flat-square&logo=github" alt="Stars"/>
+  <a href="https://github.com/maker-community/Verdure.Assistant/stargazers">
+    <img src="https://img.shields.io/github/stars/maker-community/Verdure.Assistant?style=flat-square&logo=github" alt="Stars"/>
   </a>
 </p>
 
 <p align="center">
-  🤖 基于 .NET 9.0 的智能语音助手 | 跨平台 AI 语音交互解决方案
+  🤖 基于 .NET 9.0 的多服务智能助手 | 跨平台 AI 语音交互解决方案
 </p>
 
 <p align="center">
@@ -35,7 +35,9 @@
 
 ## 📖 项目简介
 
-XiaoZhi .NET 是一个基于 .NET 9.0 开发的智能语音助手，提供了完整的AI语音交互解决方案。项目采用现代化的软件架构设计，支持多种部署方式，可在Windows、Linux、macOS等平台运行。
+绿荫助手（Verdure Assistant）是一个基于 .NET 9.0 开发的多服务智能助手，提供了完整的AI语音交互解决方案。项目采用现代化的软件架构设计，支持多种部署方式，可在Windows、Linux、macOS等平台运行。
+
+作为一个多服务集成平台，绿荫助手不仅支持原有的小智服务，还计划集成更多AI助手服务，为用户提供更丰富的智能交互体验。
 
 ### 🎯 设计目标
 
@@ -74,11 +76,11 @@ XiaoZhi .NET 是一个基于 .NET 9.0 开发的智能语音助手，提供了完
 ## 📂 项目结构
 
 ```
-xiaozhi-dotnet/
+verdure-assistant/
 ├── src/                          # 源代码
-│   ├── XiaoZhi.Core/             # 核心库
-│   ├── XiaoZhi.Console/          # 控制台应用
-│   └── XiaoZhi.WinUI/            # WinUI桌面应用
+│   ├── Verdure.Assistant.Core/   # 核心库
+│   ├── Verdure.Assistant.Console/# 控制台应用
+│   └── Verdure.Assistant.WinUI/  # WinUI桌面应用
 ├── tests/                        # 测试项目
 │   ├── ApiCheck/                 # API测试
 │   ├── CodecTest/                # 编解码测试
@@ -93,7 +95,7 @@ xiaozhi-dotnet/
 ├── scripts/                      # 构建和部署脚本
 ├── assets/                       # 资源文件
 ├── .github/                      # GitHub工作流和模板
-└── XiaoZhi.sln                   # 解决方案文件
+└── Verdure.Assistant.sln          # 解决方案文件
 ```
 
 ## 🏗️ 架构设计
@@ -131,9 +133,8 @@ xiaozhi-dotnet/
 ### 安装步骤
 
 1. **克隆仓库**
-   ```bash
-   git clone https://github.com/maker-community/xiaozhi-dotnet.git
-   cd xiaozhi-dotnet
+   ```bash   git clone https://github.com/maker-community/Verdure.Assistant.git
+   cd Verdure.Assistant
    ```
 
 2. **还原依赖**
@@ -150,17 +151,17 @@ xiaozhi-dotnet/
    
    **控制台版本：**
    ```bash
-   dotnet run --project src/XiaoZhi.Console
+   dotnet run --project src/Verdure.Assistant.Console
    ```
    
    **WinUI版本：**
    ```bash
-   dotnet run --project src/XiaoZhi.WinUI
+   dotnet run --project src/Verdure.Assistant.WinUI
    ```
 
 ### 配置说明
 
-在首次运行前，请配置 `src/XiaoZhi.Console/appsettings.json`：
+在首次运行前，请配置 `src/Verdure.Assistant.Console/appsettings.json`：
 
 ```json
 {
@@ -201,11 +202,11 @@ xiaozhi-dotnet/
 ### 项目结构
 
 ```
-xiaozhi-dotnet/
+verdure-assistant/
 ├── src/                    # 源代码
-│   ├── XiaoZhi.Core/      # 核心库
-│   ├── XiaoZhi.Console/   # 控制台应用
-│   └── XiaoZhi.WinUI/     # WinUI应用
+│   ├── Verdure.Assistant.Core/      # 核心库
+│   ├── Verdure.Assistant.Console/   # 控制台应用
+│   └── Verdure.Assistant.WinUI/     # WinUI应用
 ├── tests/                  # 测试项目
 ├── samples/               # 示例代码
 │   └── py-xiaozhi/        # Python参考实现
@@ -275,7 +276,7 @@ dotnet test
 
 运行特定测试项目：
 ```bash
-dotnet test tests/XiaoZhi.Core.Tests
+dotnet test tests/Verdure.Assistant.Core.Tests
 ```
 
 ## 📦 部署
@@ -284,17 +285,17 @@ dotnet test tests/XiaoZhi.Core.Tests
 
 **Windows:**
 ```bash
-dotnet publish src/XiaoZhi.Console -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+dotnet publish src/Verdure.Assistant.Console -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
 ```
 
 **Linux:**
 ```bash
-dotnet publish src/XiaoZhi.Console -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true
+dotnet publish src/Verdure.Assistant.Console -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true
 ```
 
 **macOS:**
 ```bash
-dotnet publish src/XiaoZhi.Console -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=true
+dotnet publish src/Verdure.Assistant.Console -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=true
 ```
 
 ### Docker部署
@@ -303,7 +304,7 @@ dotnet publish src/XiaoZhi.Console -c Release -r osx-x64 --self-contained true -
 FROM mcr.microsoft.com/dotnet/runtime:9.0
 COPY publish/ /app
 WORKDIR /app
-ENTRYPOINT ["./XiaoZhi.Console"]
+ENTRYPOINT ["./Verdure.Assistant.Console"]
 ```
 
 ## 👨‍💻 开发指南
@@ -347,8 +348,8 @@ ENTRYPOINT ["./XiaoZhi.Console"]
 ### IDE配置
 
 #### Visual Studio 2022
-1. 打开 `XiaoZhi.sln`
-2. 设置启动项目为 `XiaoZhi.Console` 或 `XiaoZhi.WinUI`
+1. 打开 `Verdure.Assistant.sln`
+2. 设置启动项目为 `Verdure.Assistant.Console` 或 `Verdure.Assistant.WinUI`
 3. 确保选择了正确的目标框架 (.NET 9.0)
 
 #### Visual Studio Code
@@ -440,8 +441,8 @@ ENTRYPOINT ["./XiaoZhi.Console"]
 
 ## 📞 联系我们
 
-- **GitHub Issues** - [提交问题或建议](https://github.com/maker-community/xiaozhi-dotnet/issues)
-- **GitHub Discussions** - [参与讨论](https://github.com/ymaker-community/xiaozhi-dotnet/discussions)
+- **GitHub Issues** - [提交问题或建议](https://github.com/maker-community/Verdure.Assistant/issues)
+- **GitHub Discussions** - [参与讨论](https://github.com/maker-community/Verdure.Assistant/discussions)
 
 ---
 

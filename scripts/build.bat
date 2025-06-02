@@ -1,8 +1,8 @@
 @echo off
-REM XiaoZhi .NET 构建脚本
+REM Verdure Assistant .NET 构建脚本
 REM 用于在Windows环境下构建项目
 
-echo 🚀 开始构建 XiaoZhi .NET 项目...
+echo 🚀 开始构建 Verdure Assistant .NET 项目...
 
 REM 检查.NET版本
 echo 📋 检查 .NET 版本...
@@ -40,16 +40,16 @@ if errorlevel 1 (
     echo ⚠️ 警告：测试失败，但继续构建
 )
 
-REM 发布控制台应用
+# 发布控制台应用
 echo 📱 发布控制台应用...
-dotnet publish src\XiaoZhi.Console\XiaoZhi.Console.csproj ^
+dotnet publish src\Verdure.Assistant.Console\Verdure.Assistant.Console.csproj ^
     --configuration Release ^
     --output build\console\win-x64 ^
     --runtime win-x64 ^
     --self-contained true ^
     -p:PublishSingleFile=true
 
-dotnet publish src\XiaoZhi.Console\XiaoZhi.Console.csproj ^
+dotnet publish src\Verdure.Assistant.Console\Verdure.Assistant.Console.csproj ^
     --configuration Release ^
     --output build\console\win-x86 ^
     --runtime win-x86 ^
@@ -58,7 +58,7 @@ dotnet publish src\XiaoZhi.Console\XiaoZhi.Console.csproj ^
 
 REM 发布WinUI应用
 echo 🖥️ 发布 WinUI 应用...
-dotnet publish src\XiaoZhi.WinUI\XiaoZhi.WinUI.csproj ^
+dotnet publish src\Verdure.Assistant.WinUI\Verdure.Assistant.WinUI.csproj ^
     --configuration Release ^
     --output build\winui\win-x64 ^
     --runtime win-x64 ^
@@ -66,7 +66,7 @@ dotnet publish src\XiaoZhi.WinUI\XiaoZhi.WinUI.csproj ^
 
 REM 创建NuGet包
 echo 📦 创建 NuGet 包...
-dotnet pack src\XiaoZhi.Core\XiaoZhi.Core.csproj ^
+dotnet pack src\Verdure.Assistant.Core\Verdure.Assistant.Core.csproj ^
     --configuration Release ^
     --output build\packages ^
     --no-build

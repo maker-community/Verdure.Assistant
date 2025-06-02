@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <ProjectReference Include="..\..\src\XiaoZhi.Core\XiaoZhi.Core.csproj" />
+    <ProjectReference Include="..\..\src\Verdure.Assistant.Core\Verdure.Assistant.Core.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

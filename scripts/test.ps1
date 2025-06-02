@@ -1,9 +1,9 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Test script for XiaoZhi .NET project
+    Test script for Verdure Assistant .NET project
 .DESCRIPTION
-    This script runs all tests in the XiaoZhi solution with comprehensive reporting
+    This script runs all tests in the Verdure Assistant solution with comprehensive reporting
 .PARAMETER Configuration
     Build configuration (Debug or Release). Default is Debug for testing.
 .PARAMETER Coverage
@@ -31,19 +31,18 @@ $ErrorActionPreference = 'Stop'
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Split-Path -Parent $ScriptDir
 
-Write-Host "Running XiaoZhi .NET Tests" -ForegroundColor Green
+Write-Host "Running Verdure Assistant .NET Tests" -ForegroundColor Green
 Write-Host "Configuration: $Configuration" -ForegroundColor Yellow
 Write-Host "Root Directory: $RootDir" -ForegroundColor Yellow
 
 Set-Location $RootDir
 
-try {
-    # Ensure solution is built
+try {    # Ensure solution is built
     Write-Host "`nBuilding solution for testing..." -ForegroundColor Cyan
-    dotnet build XiaoZhi.sln --configuration $Configuration
+    dotnet build Verdure.Assistant.sln --configuration $Configuration
 
     # Prepare test command
-    $testCommand = "dotnet test XiaoZhi.sln --no-build --configuration $Configuration --verbosity normal"
+    $testCommand = "dotnet test Verdure.Assistant.sln --no-build --configuration $Configuration --verbosity normal"
     
     if ($Filter) {
         $testCommand += " --filter `"$Filter`""

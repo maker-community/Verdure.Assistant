@@ -1,14 +1,14 @@
 # 测试项目
 
-本目录包含 XiaoZhi .NET 项目的所有测试代码。
+本目录包含绿荫助手（Verdure Assistant）项目的所有测试代码。
 
 ## 📁 目录结构
 
 ```
 tests/
-├── XiaoZhi.Core.Tests/        # 核心库单元测试
-├── XiaoZhi.Console.Tests/     # 控制台应用测试
-├── XiaoZhi.WinUI.Tests/       # WinUI应用测试
+├── Verdure.Assistant.Core.Tests/     # 核心库单元测试
+├── Verdure.Assistant.Console.Tests/  # 控制台应用测试
+├── Verdure.Assistant.WinUI.Tests/    # WinUI应用测试
 ├── Integration.Tests/         # 集成测试
 ├── Performance.Tests/         # 性能测试
 └── Test.Common/               # 测试通用库
@@ -17,9 +17,9 @@ tests/
 ## 🧪 测试类型
 
 ### 单元测试
-- **XiaoZhi.Core.Tests** - 核心业务逻辑测试
-- **XiaoZhi.Console.Tests** - 控制台应用逻辑测试
-- **XiaoZhi.WinUI.Tests** - WinUI界面逻辑测试
+- **Verdure.Assistant.Core.Tests** - 核心业务逻辑测试
+- **Verdure.Assistant.Console.Tests** - 控制台应用逻辑测试
+- **Verdure.Assistant.WinUI.Tests** - WinUI界面逻辑测试
 
 ### 集成测试
 - **Integration.Tests** - 组件间集成测试
@@ -51,7 +51,7 @@ dotnet test
 
 ### 运行特定测试项目
 ```bash
-dotnet test tests/XiaoZhi.Core.Tests
+dotnet test tests/Verdure.Assistant.Core.Tests
 ```
 
 ### 运行带覆盖率的测试

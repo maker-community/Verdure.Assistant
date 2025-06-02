@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Application
+    x:Class="Verdure.Assistant.WinUI.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:Verdure.Assistant.WinUI"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+                <!--  Other merged dictionaries here  -->
+            </ResourceDictionary.MergedDictionaries>
+
+            <!--  Light Theme Color Scheme  -->
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <!--  Primary Brand Colors  -->
+                    <Color x:Key="Primary">#0078D4</Color>
+                    <Color x:Key="PrimaryLight">#40A2E5</Color>
+                    <Color x:Key="PrimaryDark">#004B7C</Color>
+
+                    <!--  Accent Colors  -->
+                    <Color x:Key="Accent">#6B73FF</Color>
+                    <Color x:Key="AccentLight">#8A94FF</Color>
+                    <Color x:Key="AccentDark">#5151E5</Color>
+
+                    <!--  Surface Colors  -->
+                    <Color x:Key="Surface">#FFFFFF</Color>
+                    <Color x:Key="SurfaceVariant">#F8F9FA</Color>
+                    <Color x:Key="SurfaceContainer">#F1F3F4</Color>
+
+                    <!--  Text Colors  -->
+                    <Color x:Key="OnSurface">#1F1F1F</Color>
+                    <Color x:Key="OnSurfaceVariant">#5F6368</Color>
+                    <Color x:Key="OnPrimary">#FFFFFF</Color>
+
+                    <!--  Border Colors  -->
+                    <Color x:Key="OutlineVariant">#E8EAED</Color>
+                    <Color x:Key="Outline">#DADCE0</Color>
+
+                    <!--  Success, Warning, Error  -->
+                    <Color x:Key="Success">#0D7377</Color>
+                    <Color x:Key="Warning">#FF9500</Color>
+                    <Color x:Key="Error">#DC3545</Color>
+                </ResourceDictionary>
+
+                <ResourceDictionary x:Key="Dark">
+                    <!--  Primary Brand Colors  -->
+                    <Color x:Key="Primary">#60A5FA</Color>
+                    <Color x:Key="PrimaryLight">#93C5FD</Color>
+                    <Color x:Key="PrimaryDark">#3B82F6</Color>
+
+                    <!--  Accent Colors  -->
+                    <Color x:Key="Accent">#A855F7</Color>
+                    <Color x:Key="AccentLight">#C084FC</Color>
+                    <Color x:Key="AccentDark">#9333EA</Color>
+
+                    <!--  Surface Colors  -->
+                    <Color x:Key="Surface">#121212</Color>
+                    <Color x:Key="SurfaceVariant">#1E1E1E</Color>
+                    <Color x:Key="SurfaceContainer">#2A2A2A</Color>
+
+                    <!--  Text Colors  -->
+                    <Color x:Key="OnSurface">#E5E5E5</Color>
+                    <Color x:Key="OnSurfaceVariant">#A1A1AA</Color>
+                    <Color x:Key="OnPrimary">#0F172A</Color>
+
+                    <!--  Border Colors  -->
+                    <Color x:Key="OutlineVariant">#3F3F46</Color>
+                    <Color x:Key="Outline">#52525B</Color>
+
+                    <!--  Success, Warning, Error  -->
+                    <Color x:Key="Success">#10B981</Color>
+                    <Color x:Key="Warning">#F59E0B</Color>
+                    <Color x:Key="Error">#EF4444</Color>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+
+            <!--  App Resources  -->
+            <!--  Brushes using theme-aware colors  -->
+            <SolidColorBrush x:Key="PrimaryBrush" Color="{ThemeResource Primary}" />
+            <SolidColorBrush x:Key="PrimaryLightBrush" Color="{ThemeResource PrimaryLight}" />
+            <SolidColorBrush x:Key="PrimaryDarkBrush" Color="{ThemeResource PrimaryDark}" />
+
+            <SolidColorBrush x:Key="AccentBrush" Color="{ThemeResource Accent}" />
+            <SolidColorBrush x:Key="AccentLightBrush" Color="{ThemeResource AccentLight}" />
+            <SolidColorBrush x:Key="AccentDarkBrush" Color="{ThemeResource AccentDark}" />
+
+            <SolidColorBrush x:Key="SurfaceBrush" Color="{ThemeResource Surface}" />
+            <SolidColorBrush x:Key="SurfaceVariantBrush" Color="{ThemeResource SurfaceVariant}" />
+            <SolidColorBrush x:Key="SurfaceContainerBrush" Color="{ThemeResource SurfaceContainer}" />
+
+            <SolidColorBrush x:Key="OnSurfaceBrush" Color="{ThemeResource OnSurface}" />
+            <SolidColorBrush x:Key="OnSurfaceVariantBrush" Color="{ThemeResource OnSurfaceVariant}" />
+            <SolidColorBrush x:Key="OnPrimaryBrush" Color="{ThemeResource OnPrimary}" />
+
+            <SolidColorBrush x:Key="OutlineBrush" Color="{ThemeResource Outline}" />
+            <SolidColorBrush x:Key="OutlineVariantBrush" Color="{ThemeResource OutlineVariant}" />
+
+            <SolidColorBrush x:Key="SuccessBrush" Color="{ThemeResource Success}" />
+            <SolidColorBrush x:Key="WarningBrush" Color="{ThemeResource Warning}" />
+            <SolidColorBrush x:Key="ErrorBrush" Color="{ThemeResource Error}" />
+
+            <!--  Legacy brushes for backward compatibility  -->
+            <SolidColorBrush x:Key="WhiteBrush" Color="White" />
+            <SolidColorBrush x:Key="BlackBrush" Color="Black" />
+
+            <x:Double x:Key="AppFontSize">14</x:Double>
+
+            <Style x:Key="MyLabel" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{StaticResource OnSurfaceBrush}" />
+            </Style>
+
+            <Style x:Key="Action" TargetType="Button">
+                <Setter Property="FontSize" Value="{StaticResource AppFontSize}" />
+                <Setter Property="Padding" Value="14,10" />
+                <Setter Property="Background" Value="{StaticResource SurfaceVariantBrush}" />
+                <Setter Property="Foreground" Value="{StaticResource OnSurfaceBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource OutlineBrush}" />
+                <Setter Property="CornerRadius" Value="6" />
+            </Style>
+
+            <Style
+                x:Key="PrimaryAction"
+                BasedOn="{StaticResource Action}"
+                TargetType="Button">
+                <Setter Property="Background" Value="{StaticResource PrimaryBrush}" />
+                <Setter Property="Foreground" Value="{StaticResource OnPrimaryBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource PrimaryDarkBrush}" />
+                <Setter Property="CornerRadius" Value="8" />
+            </Style>
+
+            <Style
+                x:Key="AccentAction"
+                BasedOn="{StaticResource Action}"
+                TargetType="Button">
+                <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+                <Setter Property="Foreground" Value="{StaticResource OnPrimaryBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource AccentDarkBrush}" />
+                <Setter Property="CornerRadius" Value="8" />
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

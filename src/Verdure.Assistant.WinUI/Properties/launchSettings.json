@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Verdure.Assistant.WinUI (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "Verdure.Assistant.WinUI (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

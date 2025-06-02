@@ -28,34 +28,34 @@ jobs:
         echo "Version: $tag"
       
     - name: Restore dependencies
-      run: dotnet restore XiaoZhi.sln
+      run: dotnet restore Verdure.Assistant.sln
       
     - name: Build solution
-      run: dotnet build XiaoZhi.sln --no-restore --configuration Release
+      run: dotnet build Verdure.Assistant.sln --no-restore --configuration Release
       
     - name: Run tests
-      run: dotnet test XiaoZhi.sln --no-build --configuration Release --verbosity normal
+      run: dotnet test Verdure.Assistant.sln --no-build --configuration Release --verbosity normal
       
     - name: Create NuGet packages
       run: |
-        dotnet pack src/XiaoZhi.Core/XiaoZhi.Core.csproj --no-build --configuration Release --output ./packages /p:PackageVersion=${{ steps.version.outputs.VERSION }}
+        dotnet pack src/Verdure.Assistant.Core/Verdure.Assistant.Core.csproj --no-build --configuration Release --output ./packages /p:PackageVersion=${{ steps.version.outputs.VERSION }}
       
     - name: Publish Console App
       run: |
-        dotnet publish src/XiaoZhi.Console/XiaoZhi.Console.csproj -c Release -o publish/console-win-x64 --self-contained true -r win-x64 /p:PublishSingleFile=true
-        dotnet publish src/XiaoZhi.Console/XiaoZhi.Console.csproj -c Release -o publish/console-linux-x64 --self-contained true -r linux-x64 /p:PublishSingleFile=true
-        dotnet publish src/XiaoZhi.Console/XiaoZhi.Console.csproj -c Release -o publish/console-osx-x64 --self-contained true -r osx-x64 /p:PublishSingleFile=true
+        dotnet publish src/Verdure.Assistant.Console/Verdure.Assistant.Console.csproj -c Release -o publish/console-win-x64 --self-contained true -r win-x64 /p:PublishSingleFile=true
+        dotnet publish src/Verdure.Assistant.Console/Verdure.Assistant.Console.csproj -c Release -o publish/console-linux-x64 --self-contained true -r linux-x64 /p:PublishSingleFile=true
+        dotnet publish src/Verdure.Assistant.Console/Verdure.Assistant.Console.csproj -c Release -o publish/console-osx-x64 --self-contained true -r osx-x64 /p:PublishSingleFile=true
         
     - name: Publish WinUI App
       run: |
-        dotnet publish src/XiaoZhi.WinUI/XiaoZhi.WinUI.csproj -c Release -o publish/winui --self-contained true -r win-x64
+        dotnet publish src/Verdure.Assistant.WinUI/Verdure.Assistant.WinUI.csproj -c Release -o publish/winui --self-contained true -r win-x64
         
     - name: Create release archives
       run: |
-        Compress-Archive -Path "publish/console-win-x64/*" -DestinationPath "xiaozhi-console-win-x64-v${{ steps.version.outputs.VERSION }}.zip"
-        Compress-Archive -Path "publish/console-linux-x64/*" -DestinationPath "xiaozhi-console-linux-x64-v${{ steps.version.outputs.VERSION }}.zip"
-        Compress-Archive -Path "publish/console-osx-x64/*" -DestinationPath "xiaozhi-console-osx-x64-v${{ steps.version.outputs.VERSION }}.zip"
-        Compress-Archive -Path "publish/winui/*" -DestinationPath "xiaozhi-winui-win-x64-v${{ steps.version.outputs.VERSION }}.zip"
+        Compress-Archive -Path "publish/console-win-x64/*" -DestinationPath "verdure-assistant-console-win-x64-v${{ steps.version.outputs.VERSION }}.zip"
+        Compress-Archive -Path "publish/console-linux-x64/*" -DestinationPath "verdure-assistant-console-linux-x64-v${{ steps.version.outputs.VERSION }}.zip"
+        Compress-Archive -Path "publish/console-osx-x64/*" -DestinationPath "verdure-assistant-console-osx-x64-v${{ steps.version.outputs.VERSION }}.zip"
+        Compress-Archive -Path "publish/winui/*" -DestinationPath "verdure-assistant-winui-win-x64-v${{ steps.version.outputs.VERSION }}.zip"
         
     - name: Generate changelog
       id: changelog
@@ -68,7 +68,7 @@ jobs:
         ### Downloads
         - **Console Application**: Available for Windows, Linux, and macOS
         - **WinUI Application**: Available for Windows
-        - **NuGet Package**: XiaoZhi.Core v${{ steps.version.outputs.VERSION }}
+        - **NuGet Package**: Verdure.Assistant.Core v${{ steps.version.outputs.VERSION }}
         
         ### Installation
         1. Download the appropriate archive for your platform
@@ -76,9 +76,9 @@ jobs:
         3. Run the executable
         
         For developers, install the NuGet package:
-        ``````
-        dotnet add package XiaoZhi.Core --version ${{ steps.version.outputs.VERSION }}
-        ``````
+        ```
+        dotnet add package Verdure.Assistant.Core --version ${{ steps.version.outputs.VERSION }}
+        ```
         "@
         
         $changelog | Out-File -FilePath changelog.md -Encoding UTF8
@@ -87,13 +87,13 @@ jobs:
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
-        name: XiaoZhi v${{ steps.version.outputs.VERSION }}
+        name: Verdure Assistant v${{ steps.version.outputs.VERSION }}
         body_path: ${{ steps.changelog.outputs.CHANGELOG_FILE }}
         files: |
-          xiaozhi-console-win-x64-v${{ steps.version.outputs.VERSION }}.zip
-          xiaozhi-console-linux-x64-v${{ steps.version.outputs.VERSION }}.zip
-          xiaozhi-console-osx-x64-v${{ steps.version.outputs.VERSION }}.zip
-          xiaozhi-winui-win-x64-v${{ steps.version.outputs.VERSION }}.zip
+          verdure-assistant-console-win-x64-v${{ steps.version.outputs.VERSION }}.zip
+          verdure-assistant-console-linux-x64-v${{ steps.version.outputs.VERSION }}.zip
+          verdure-assistant-console-osx-x64-v${{ steps.version.outputs.VERSION }}.zip
+          verdure-assistant-winui-win-x64-v${{ steps.version.outputs.VERSION }}.zip
           packages/*.nupkg
         draft: false
         prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}

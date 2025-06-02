@@ -1,4 +1,4 @@
-# 更新日志
+# 绿荫助手（Verdure Assistant）更新日志
 
 本项目的所有重要更改都会记录在此文件中。
 
@@ -8,6 +8,7 @@
 ## [未发布]
 
 ### 新增
+- 🎯 **项目重新定位** - 从单一"小智"服务扩展为多服务智能助手平台
 - 🏗️ **项目重构** - 采用标准.NET开源项目目录结构
 - 🔄 **自动化CI/CD** - GitHub Actions工作流
 - 📝 **完整文档体系** - README、CONTRIBUTING、CHANGELOG
@@ -60,5 +61,5 @@
 - WSS加密传输
 - 安全的音频数据传输
 
-[未发布]: https://github.com/yourusername/xiaozhi-dotnet/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/yourusername/xiaozhi-dotnet/releases/tag/v1.0.0
+[未发布]: https://github.com/maker-community/Verdure.Assistant/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/maker-community/Verdure.Assistant/releases/tag/v1.0.0

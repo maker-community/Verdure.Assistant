@@ -1,6 +1,6 @@
 # 项目文档
 
-欢迎查看 XiaoZhi .NET 项目文档。
+欢迎查看 绿荫助手（Verdure Assistant） 项目文档。
 
 ## 📚 文档目录
 
@@ -20,6 +20,7 @@
 - [连接修复](CONNECTION_FIX_SUMMARY.md) - 网络连接问题解决
 - [语音中断](VOICE_INTERRUPTION_COMPLETE.md) - 语音中断处理机制
 - [唤醒词检测](WAKE_WORD_DETECTOR_COORDINATION_COMPLETE.md) - 唤醒词协调机制
+- [关键词识别错误处理](SPXERR_INVALID_HANDLE_ERROR_HANDLING_COMPLETE.md) - Microsoft Speech SDK 错误处理机制
 
 ### 变更记录
 - [更新日志](../CHANGELOG.md) - 版本更新记录

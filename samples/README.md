@@ -1,6 +1,6 @@
 # 示例代码
 
-本目录包含 XiaoZhi .NET 项目的示例代码和参考实现。
+本目录包含绿荫助手（Verdure Assistant）项目的示例代码和参考实现。
 
 ## 📁 目录结构
 
@@ -19,7 +19,7 @@ samples/
 ### 基础语音聊天
 ```csharp
 // 基础使用示例
-var config = new XiaoZhiConfig
+var config = new VerdureConfig
 {
     ServerUrl = "wss://your-server.com/ws",
     EnableVoice = true
@@ -116,13 +116,12 @@ python main.py
 2. **创建项目文件**
    ```bash
    dotnet new console
-   dotnet add reference ../../src/XiaoZhi.Core
+   dotnet add reference ../../src/Verdure.Assistant.Core
    ```
 
 3. **编写示例代码**
-   ```csharp
-   using XiaoZhi.Core.Services;
-   using XiaoZhi.Core.Models;
+   ```csharp   using Verdure.Assistant.Core.Services;
+   using Verdure.Assistant.Core.Models;
    
    // 你的示例代码
    ```
