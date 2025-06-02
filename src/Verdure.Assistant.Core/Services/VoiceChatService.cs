@@ -819,11 +819,14 @@ public class VoiceChatService : IVoiceChatService
                     _logger?.LogDebug("TTS句子结束");
                     break;
             }
+
+            TtsStateChanged?.Invoke(this, message);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "处理TTS状态变化失败");
-            ErrorOccurred?.Invoke(this, $"处理TTS状态变化失败: {ex.Message}");        }
+            ErrorOccurred?.Invoke(this, $"处理TTS状态变化失败: {ex.Message}");        
+        }
     }    
     
     /// <summary>
