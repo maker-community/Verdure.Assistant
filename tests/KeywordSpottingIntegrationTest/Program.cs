@@ -250,6 +250,13 @@ class Program
 /// </summary>
 public class MockVoiceChatService : IVoiceChatService
 {
+    // Protocol message events
+    public event EventHandler<MusicMessage>? MusicMessageReceived;
+    public event EventHandler<SystemStatusMessage>? SystemStatusMessageReceived;
+    public event EventHandler<IotMessage>? IotMessageReceived;
+    public event EventHandler<LlmMessage>? LlmMessageReceived;
+    public event EventHandler<TtsMessage>? TtsStateChanged;
+    
     public event EventHandler<bool>? VoiceChatStateChanged;
     public event EventHandler<ChatMessage>? MessageReceived;
     public event EventHandler<string>? ErrorOccurred;
