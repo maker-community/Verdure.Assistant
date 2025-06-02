@@ -173,7 +173,8 @@
                     </Button>
                 </Grid>
             </Grid>
-        </Border>        <!-- Protocol Information Panel -->
+        </Border>        
+        <!-- Protocol Information Panel -->
         <Border
             Grid.Row="2"
             Margin="20,0,20,10"
@@ -258,14 +259,16 @@
                     
                     <StackPanel Spacing="4">
                         <TextBlock
-                            FontSize="24"
-                            Visibility="Collapsed"
+                            FontSize="56"
+                            Visibility="Visible"
                             HorizontalAlignment="Center"
                             Text="{x:Bind ViewModel.CurrentEmotion, Mode=OneWay}" />
                     </StackPanel>
                 </StackPanel>
             </Grid>
-        </Border>        <!--  Main Content Grid  -->
+        </Border>        
+        
+        <!--  Main Content Grid  -->
         <Grid Grid.Row="3" Margin="20,0,20,20">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1*" MinWidth="350" />
@@ -281,14 +284,13 @@
                 CornerRadius="12">
                 <Grid>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <!--  Emotion Display  -->
-                    <Viewbox
+                    <!--<Viewbox
                         Grid.Row="0"
                         MaxWidth="280"
                         MaxHeight="280"
@@ -300,7 +302,7 @@
                             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             CornerRadius="140">
                             <Grid>
-                                <!--  Default Emotion  -->
+                                --><!--  Default Emotion  --><!--
                                 <TextBlock
                                     x:Name="DefaultEmotionText"
                                     HorizontalAlignment="Center"
@@ -309,18 +311,18 @@
                                     Visibility="Collapsed"
                                     Text="{x:Bind ViewModel.DefaultEmotionText, Mode=OneWay}" />
 
-                                <!--  Animated Emotion  -->
+                                --><!--  Animated Emotion  --><!--
                                 <Image
                                     x:Name="EmotionImage"
                                     Stretch="Uniform"
-                                    Visibility="Visible" />
+                                    Visibility="Collapsed" />
                             </Grid>
                         </Border>
-                    </Viewbox>
+                    </Viewbox>-->
 
                     <!--  TTS Text Display  -->
                     <Border
-                        Grid.Row="1"
+                        Grid.Row="0"
                         MinHeight="60"
                         Margin="0,15,0,0"
                         Padding="16"
@@ -338,7 +340,7 @@
                     </Border>
 
                     <!--  Audio Controls Stack  -->
-                    <Grid Grid.Row="2" Margin="0,15,0,0">
+                    <Grid Grid.Row="1" Margin="0,15,0,0">
                         <!--  Volume Control  -->
                         <StackPanel x:Name="VolumeControlPanel" Spacing="8">
                             <TextBlock
@@ -405,7 +407,7 @@
                     </Grid>
 
                     <!--  Control Buttons  -->
-                    <Grid Grid.Row="3" Margin="0,20,0,0">
+                    <Grid Grid.Row="2" Margin="0,20,0,0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />

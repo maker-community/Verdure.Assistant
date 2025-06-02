@@ -266,9 +266,9 @@ public sealed partial class HomePage : Page
                             var bitmapImage = new BitmapImage();
                             bitmapImage.UriSource = new Uri(gifPath);
                             
-                            EmotionImage.Source = bitmapImage;
-                            EmotionImage.Visibility = Visibility.Visible;
-                            DefaultEmotionText.Visibility = Visibility.Collapsed;
+                            //EmotionImage.Source = bitmapImage;
+                            //EmotionImage.Visibility = Visibility.Visible;
+                            //DefaultEmotionText.Visibility = Visibility.Collapsed;
                             
                             _logger?.LogDebug($"Switched to GIF emotion: {emotionName} -> {gifPath}");
                         }
@@ -277,15 +277,15 @@ public sealed partial class HomePage : Page
                             _logger?.LogWarning(ex, "Failed to load GIF emotion: {GifPath}", gifPath);
                             
                             // 回退到文本显示
-                            EmotionImage.Visibility = Visibility.Collapsed;
-                            DefaultEmotionText.Visibility = Visibility.Visible;
+                            //EmotionImage.Visibility = Visibility.Collapsed;
+                            //DefaultEmotionText.Visibility = Visibility.Visible;
                         }
                     }
                     else
                     {
                         // 显示文本表情
-                        EmotionImage.Visibility = Visibility.Collapsed;
-                        DefaultEmotionText.Visibility = Visibility.Visible;
+                        //EmotionImage.Visibility = Visibility.Collapsed;
+                        //DefaultEmotionText.Visibility = Visibility.Visible;
                         
                         _logger?.LogDebug($"Switched to text emotion: {emotionName}");
                     }

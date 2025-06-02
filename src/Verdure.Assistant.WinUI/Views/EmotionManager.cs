@@ -136,6 +136,9 @@ namespace Verdure.Assistant.WinUI.Views
 
         public async Task<string?> GetEmotionImageAsync(string emotion)
         {
+            //默认只走文本类型的表情 gif为空
+            return null;
+
             if (!_isInitialized)
             {
                 await InitializeAsync();
