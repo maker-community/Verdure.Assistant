@@ -41,6 +41,13 @@ public class VoiceChatService : IVoiceChatService
     public event EventHandler<DeviceState>? DeviceStateChanged;
     public event EventHandler<ListeningMode>? ListeningModeChanged;
 
+    // Protocol message events
+    public event EventHandler<MusicMessage>? MusicMessageReceived;
+    public event EventHandler<SystemStatusMessage>? SystemStatusMessageReceived;
+    public event EventHandler<IotMessage>? IotMessageReceived;
+    public event EventHandler<LlmMessage>? LlmMessageReceived;
+    public event EventHandler<TtsMessage>? TtsStateChanged;
+
     public bool IsVoiceChatActive => _isVoiceChatActive;
     public bool IsConnected => _communicationClient?.IsConnected ?? false;
 
@@ -362,15 +369,18 @@ public class VoiceChatService : IVoiceChatService
                     throw new InvalidOperationException("MQTT configuration not available");
                 }
             }            
-            
-            _communicationClient.MessageReceived += OnMessageReceived;
+              _communicationClient.MessageReceived += OnMessageReceived;
             _communicationClient.ConnectionStateChanged += OnConnectionStateChanged;            
             // 订阅WebSocket专有的TTS状态变化事件
             if (_communicationClient is WebSocketClient wsClient)
             {
                 wsClient.TtsStateChanged += OnTtsStateChanged;
                 wsClient.AudioDataReceived += OnWebSocketAudioDataReceived;
-            }            // 连接到服务器
+                wsClient.MusicMessageReceived += OnMusicMessageReceived;
+                wsClient.SystemStatusMessageReceived += OnSystemStatusMessageReceived;
+                wsClient.IotMessageReceived += OnIotMessageReceived;
+                wsClient.LlmMessageReceived += OnLlmMessageReceived;
+            }// 连接到服务器
             await _communicationClient.ConnectAsync();
             
             // 启动关键词唤醒检测（对应py-xiaozhi的_start_wake_word_detector调用）
@@ -845,7 +855,76 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogError(ex, "处理WebSocket音频数据失败");
             ErrorOccurred?.Invoke(this, $"处理WebSocket音频数据失败: {ex.Message}");
         }
-    }    
+    }
+
+    /// <summary>
+    /// 处理音乐播放器消息事件
+    /// </summary>
+    private void OnMusicMessageReceived(object? sender, MusicMessage message)
+    {
+        try
+        {
+            _logger?.LogDebug("收到音乐消息: {Action}, 歌曲: {Song}", message.Action, message.SongName);
+            MusicMessageReceived?.Invoke(this, message);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "处理音乐消息失败");
+            ErrorOccurred?.Invoke(this, $"处理音乐消息失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 处理系统状态消息事件
+    /// </summary>
+    private void OnSystemStatusMessageReceived(object? sender, SystemStatusMessage message)
+    {
+        try
+        {
+            _logger?.LogDebug("收到系统状态消息: {Component}, 状态: {Status}", message.Component, message.Status);
+            SystemStatusMessageReceived?.Invoke(this, message);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "处理系统状态消息失败");
+            ErrorOccurred?.Invoke(this, $"处理系统状态消息失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 处理IoT设备消息事件
+    /// </summary>
+    private void OnIotMessageReceived(object? sender, IotMessage message)
+    {
+        try
+        {
+            _logger?.LogDebug("收到IoT消息");
+            IotMessageReceived?.Invoke(this, message);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "处理IoT消息失败");
+            ErrorOccurred?.Invoke(this, $"处理IoT消息失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 处理LLM情感消息事件
+    /// </summary>
+    private void OnLlmMessageReceived(object? sender, LlmMessage message)
+    {
+        try
+        {
+            _logger?.LogDebug("收到LLM情感消息: {Emotion}", message.Emotion);
+            LlmMessageReceived?.Invoke(this, message);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "处理LLM情感消息失败");
+            ErrorOccurred?.Invoke(this, $"处理LLM情感消息失败: {ex.Message}");
+        }
+    }
+    
     public void Dispose()
     {
         try
@@ -873,13 +952,16 @@ public class VoiceChatService : IVoiceChatService
                 {
                     _communicationClient.MessageReceived -= OnMessageReceived;
                     _communicationClient.ConnectionStateChanged -= OnConnectionStateChanged;
-                    
-                    // 如果是WebSocket客户端，取消订阅更多事件
+                      // 如果是WebSocket客户端，取消订阅更多事件
                     if (_communicationClient is WebSocketClient webSocketClient)
                     {
                         //webSocketClient.ProtocolMessageReceived -= OnProtocolMessageReceived;
                         webSocketClient.AudioDataReceived -= OnWebSocketAudioDataReceived;
                         webSocketClient.TtsStateChanged -= OnTtsStateChanged;
+                        webSocketClient.MusicMessageReceived -= OnMusicMessageReceived;
+                        webSocketClient.SystemStatusMessageReceived -= OnSystemStatusMessageReceived;
+                        webSocketClient.IotMessageReceived -= OnIotMessageReceived;
+                        webSocketClient.LlmMessageReceived -= OnLlmMessageReceived;
                     }
                     
                     _communicationClient.Dispose();

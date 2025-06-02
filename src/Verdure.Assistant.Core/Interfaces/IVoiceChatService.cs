@@ -10,6 +10,12 @@ namespace Verdure.Assistant.Core.Interfaces;
 /// </summary>
 public interface IVoiceChatService : IDisposable
 {
+    // Protocol message events
+    event EventHandler<MusicMessage>? MusicMessageReceived;
+    event EventHandler<SystemStatusMessage>? SystemStatusMessageReceived;
+    event EventHandler<IotMessage>? IotMessageReceived;
+    event EventHandler<LlmMessage>? LlmMessageReceived;
+    event EventHandler<TtsMessage>? TtsStateChanged;
     /// <summary>
     /// 语音对话状态变化事件
     /// </summary>

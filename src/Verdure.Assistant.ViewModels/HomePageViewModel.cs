@@ -87,6 +87,35 @@ public partial class HomePageViewModel : ViewModelBase
     [ObservableProperty]
     private string _verificationCodeMessage = string.Empty;
 
+    // 音乐播放器相关属性
+    [ObservableProperty]
+    private string _currentSongName = string.Empty;
+
+    [ObservableProperty]
+    private string _currentArtist = string.Empty;
+
+    [ObservableProperty]
+    private string _currentLyric = string.Empty;
+
+    [ObservableProperty]
+    private double _musicPosition = 0.0;
+
+    [ObservableProperty]
+    private double _musicDuration = 0.0;
+
+    [ObservableProperty]
+    private string _musicStatus = "停止";
+
+    // 系统状态信息
+    [ObservableProperty]
+    private string _systemStatusText = string.Empty;
+
+    [ObservableProperty]
+    private string _iotStatusText = string.Empty;
+
+    [ObservableProperty]
+    private string _currentEmotion = "😊";
+
     // Manual按钮可用状态 - 基于连接状态、推送说话状态和等待响应状态
     public bool IsManualButtonEnabled => IsConnected && !IsPushToTalkActive && !IsWaitingForResponse;
 
@@ -139,15 +168,19 @@ public partial class HomePageViewModel : ViewModelBase
     }
 
     private async Task BindEventsAsync()
-    {
-        // 绑定语音服务事件
+    {        // 绑定语音服务事件
         if (_voiceChatService != null)
         {
             _voiceChatService.DeviceStateChanged += OnDeviceStateChanged;
             _voiceChatService.VoiceChatStateChanged += OnVoiceChatStateChanged;
             _voiceChatService.MessageReceived += OnMessageReceived;
             _voiceChatService.ErrorOccurred += OnErrorOccurred;
-        }        // 初始化和绑定InterruptManager事件
+            _voiceChatService.MusicMessageReceived += OnMusicMessageReceived;
+            _voiceChatService.SystemStatusMessageReceived += OnSystemStatusMessageReceived;
+            _voiceChatService.IotMessageReceived += OnIotMessageReceived;
+            _voiceChatService.LlmMessageReceived += OnLlmMessageReceived;
+            _voiceChatService.TtsStateChanged += OnTtsStateChanged;
+        }// 初始化和绑定InterruptManager事件
         if (_interruptManager != null)
         {
             try
@@ -290,6 +323,120 @@ public partial class HomePageViewModel : ViewModelBase
         }
     }
 
+
+    private void OnMusicMessageReceived(object? sender, MusicMessage message)
+    {
+        // 使用UI调度器确保线程安全的事件处理
+        _ = _uiDispatcher.InvokeAsync(() =>
+        {
+            switch (message.Action?.ToLowerInvariant())
+            {
+                case "play":
+                    CurrentSongName = message.SongName ?? string.Empty;
+                    CurrentArtist = message.Artist ?? string.Empty;
+                    MusicDuration = message.Duration;
+                    MusicStatus = "播放中";
+                    AddMessage($"🎵 开始播放: {message.SongName} - {message.Artist}", false);
+                    break;
+
+                case "pause":
+                    MusicStatus = "暂停";
+                    AddMessage("⏸️ 音乐已暂停", false);
+                    break;
+
+                case "stop":
+                    MusicStatus = "停止";
+                    CurrentLyric = string.Empty;
+                    AddMessage("⏹️ 音乐已停止", false);
+                    break;
+
+                case "lyric_update":
+                    if (!string.IsNullOrEmpty(message.LyricText))
+                    {
+                        MusicPosition = message.Position;
+                        // 格式化歌词显示，参考py-xiaozhi的实现
+                        var positionStr = FormatTime(message.Position);
+                        var durationStr = FormatTime(message.Duration);
+                        CurrentLyric = $"[{positionStr}/{durationStr}] {message.LyricText}";
+                        AddMessage($"🎤 {CurrentLyric}", false);
+                    }
+                    break;
+
+                case "seek":
+                    MusicPosition = message.Position;
+                    break;
+            }
+        });
+    }
+
+    private void OnSystemStatusMessageReceived(object? sender, SystemStatusMessage message)
+    {
+        // 使用UI调度器确保线程安全的事件处理
+        _ = _uiDispatcher.InvokeAsync(() =>
+        {
+            var statusText = $"{message.Component}: {message.Status}";
+            if (!string.IsNullOrEmpty(message.Message))
+            {
+                statusText += $" - {message.Message}";
+            }
+            
+            SystemStatusText = statusText;
+            AddMessage($"📊 {statusText}", false);
+        });
+    }
+
+    private void OnIotMessageReceived(object? sender, IotMessage message)
+    {
+        // 使用UI调度器确保线程安全的事件处理
+        _ = _uiDispatcher.InvokeAsync(() =>
+        {
+            var iotInfo = "IoT设备状态更新";
+            if (message.States != null)
+            {
+                iotInfo += $": {message.States}";
+            }
+            
+            IotStatusText = iotInfo;
+            AddMessage($"🏠 {iotInfo}", false);
+        });
+    }
+
+    private void OnLlmMessageReceived(object? sender, LlmMessage message)
+    {
+        // 使用UI调度器确保线程安全的事件处理
+        _ = _uiDispatcher.InvokeAsync(() =>
+        {
+            if (!string.IsNullOrEmpty(message.Emotion))
+            {
+                // 更新情感显示
+                CurrentEmotion = ConvertEmotionToEmoji(message.Emotion);
+                AddMessage($"😊 情感变化: {message.Emotion}", false);
+            }
+        });
+    }
+
+    private void OnTtsStateChanged(object? sender, TtsMessage message)
+    {
+        // 使用UI调度器确保线程安全的事件处理
+        _ = _uiDispatcher.InvokeAsync(() =>
+        {
+            switch (message.State?.ToLowerInvariant())
+            {
+                case "start":
+                    TtsText = "正在说话...";
+                    break;
+                case "stop":
+                    TtsText = "待命";
+                    break;
+                case "sentence_start":
+                    if (!string.IsNullOrEmpty(message.Text))
+                    {
+                        TtsText = message.Text;
+                    }
+                    break;
+            }
+        });
+    }
     #endregion
 
     #region 命令
@@ -806,9 +953,7 @@ public partial class HomePageViewModel : ViewModelBase
             _logger?.LogError(ex, "处理验证码时发生错误");
             AddMessage("❌ 处理验证码时发生错误", true);
         }
-    }
-
-    private void CleanupEventSubscriptions()
+    }    private void CleanupEventSubscriptions()
     {
         if (_voiceChatService != null)
         {
@@ -816,6 +961,11 @@ public partial class HomePageViewModel : ViewModelBase
             _voiceChatService.VoiceChatStateChanged -= OnVoiceChatStateChanged;
             _voiceChatService.ErrorOccurred -= OnErrorOccurred;
             _voiceChatService.DeviceStateChanged -= OnDeviceStateChanged;
+            _voiceChatService.MusicMessageReceived -= OnMusicMessageReceived;
+            _voiceChatService.SystemStatusMessageReceived -= OnSystemStatusMessageReceived;
+            _voiceChatService.IotMessageReceived -= OnIotMessageReceived;
+            _voiceChatService.LlmMessageReceived -= OnLlmMessageReceived;
+            _voiceChatService.TtsStateChanged -= OnTtsStateChanged;
         }
 
         if (_interruptManager != null)
@@ -930,6 +1080,42 @@ public partial class HomePageViewModel : ViewModelBase
     public event EventHandler<ManualButtonStateEventArgs>? ManualButtonStateChanged;
 
     #endregion
+
+
+    /// <summary>
+    /// 格式化时间显示（参考py-xiaozhi的_format_time方法）
+    /// </summary>
+    private string FormatTime(double seconds)
+    {
+        var timeSpan = TimeSpan.FromSeconds(seconds);
+        if (timeSpan.TotalHours >= 1)
+        {
+            return timeSpan.ToString(@"h\:mm\:ss");
+        }
+        else
+        {
+            return timeSpan.ToString(@"m\:ss");
+        }
+    }
+
+    /// <summary>
+    /// 将情感文本转换为对应的表情符号
+    /// </summary>
+    private string ConvertEmotionToEmoji(string emotion)
+    {
+        return emotion.ToLowerInvariant() switch
+        {
+            "happy" or "joy" => "😊",
+            "sad" => "😢",
+            "angry" => "😠",
+            "surprise" => "😲",
+            "fear" => "😨",
+            "disgust" => "😒",
+            "thinking" => "🤔",
+            "neutral" => "😐",
+            _ => "😊"
+        };
+    }
 
     public override void Cleanup()
     {

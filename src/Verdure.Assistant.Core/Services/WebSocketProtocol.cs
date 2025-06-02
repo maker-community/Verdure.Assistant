@@ -323,9 +323,7 @@ public static class WebSocketProtocol
 
             string? messageType = typeElement.GetString()?.ToLowerInvariant();
             if (string.IsNullOrEmpty(messageType))
-                return null;
-
-            // 根据类型直接反序列化为具体消息
+                return null;            // 根据类型直接反序列化为具体消息
             return messageType switch
             {
                 "hello" => JsonSerializer.Deserialize<HelloMessage>(json, JsonOptions),
@@ -336,6 +334,8 @@ public static class WebSocketProtocol
                 "iot" => JsonSerializer.Deserialize<IotMessage>(json, JsonOptions),
                 "llm" => JsonSerializer.Deserialize<LlmMessage>(json, JsonOptions),
                 "goodbye" => JsonSerializer.Deserialize<GoodbyeMessage>(json, JsonOptions),
+                "music" => JsonSerializer.Deserialize<MusicMessage>(json, JsonOptions),
+                "system_status" => JsonSerializer.Deserialize<SystemStatusMessage>(json, JsonOptions),
                 _ => null
             };
         }

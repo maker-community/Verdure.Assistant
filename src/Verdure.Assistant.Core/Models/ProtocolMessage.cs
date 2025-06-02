@@ -91,7 +91,6 @@ public class SttMessage : ProtocolMessage
     public string? Text { get; set; }
 }
 
-
 /// <summary>
 /// 中止消息
 /// </summary>
@@ -153,4 +152,56 @@ public class GenericProtocolMessage : ProtocolMessage
 
     [JsonExtensionData]
     public Dictionary<string, object>? ExtensionData { get; set; }
+}
+
+/// <summary>
+/// 音乐播放器消息
+/// </summary>
+public class MusicMessage : ProtocolMessage
+{
+    public override string Type => "music";
+
+    [JsonPropertyName("action")]
+    public string? Action { get; set; } // play, pause, stop, seek, lyric_update
+
+    [JsonPropertyName("song_name")]
+    public string? SongName { get; set; }
+
+    [JsonPropertyName("artist")]
+    public string? Artist { get; set; }
+
+    [JsonPropertyName("duration")]
+    public double Duration { get; set; }
+
+    [JsonPropertyName("position")]
+    public double Position { get; set; }
+
+    [JsonPropertyName("lyric_text")]
+    public string? LyricText { get; set; }
+
+    [JsonPropertyName("lyric_time")]
+    public double LyricTime { get; set; }
+
+    [JsonPropertyName("status")]
+    public string? Status { get; set; } // playing, paused, stopped
+}
+
+/// <summary>
+/// 系统状态消息 - 用于展示各种系统状态信息
+/// </summary>
+public class SystemStatusMessage : ProtocolMessage
+{
+    public override string Type => "system_status";
+
+    [JsonPropertyName("component")]
+    public string? Component { get; set; } // music_player, tts, stt, iot, etc.
+
+    [JsonPropertyName("status")]
+    public string? Status { get; set; }
+
+    [JsonPropertyName("message")]
+    public string? Message { get; set; }
+
+    [JsonPropertyName("data")]
+    public Dictionary<string, object>? Data { get; set; }
 }

@@ -26,6 +26,10 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     public event EventHandler<ProtocolMessage>? ProtocolMessageReceived;
     public event EventHandler<byte[]>? AudioDataReceived;
     public event EventHandler<TtsMessage>? TtsStateChanged;
+    public event EventHandler<MusicMessage>? MusicMessageReceived;
+    public event EventHandler<SystemStatusMessage>? SystemStatusMessageReceived;
+    public event EventHandler<IotMessage>? IotMessageReceived;
+    public event EventHandler<LlmMessage>? LlmMessageReceived;
 
     public bool IsConnected => _isConnected;
     public string? SessionId => _sessionId;
@@ -383,6 +387,18 @@ public class WebSocketClient : ICommunicationClient, IDisposable
             case "llm":
                 await HandleLlmMessageAsync((LlmMessage)message);
                 break;
+
+            case "music":
+                await HandleMusicMessageAsync((MusicMessage)message);
+                break;
+
+            case "system_status":
+                await HandleSystemStatusMessageAsync((SystemStatusMessage)message);
+                break;
+
+            case "iot":
+                await HandleIotMessageAsync((IotMessage)message);
+                break;
                 
             default:
                 _logger?.LogDebug("收到未知类型的协议消息: {Type}", message.Type);
@@ -462,14 +478,60 @@ public class WebSocketClient : ICommunicationClient, IDisposable
         _logger?.LogDebug("收到Listen消息，状态: {State}，模式: {Mode}，文本: {Text}", 
             message.State, message.Mode, message.Text);
         await Task.CompletedTask;
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// 处理LLM消息
     /// </summary>
     private async Task HandleLlmMessageAsync(LlmMessage message)
     {
         _logger?.LogDebug("收到LLM消息，情感: {Emotion}", message.Emotion);
+        LlmMessageReceived?.Invoke(this, message);
+        await Task.CompletedTask;
+    }    /// <summary>
+    /// 处理音乐播放器消息
+    /// </summary>
+    private async Task HandleMusicMessageAsync(MusicMessage message)
+    {
+        _logger?.LogDebug("收到音乐消息，动作: {Action}，歌曲: {Song}", message.Action, message.SongName);
+        
+        // 根据不同的音乐动作进行处理
+        switch (message.Action?.ToLowerInvariant())
+        {
+            case "play":
+                _logger?.LogInformation("开始播放音乐: {Song} - {Artist}", message.SongName, message.Artist);
+                break;
+            case "pause":
+                _logger?.LogInformation("音乐暂停");
+                break;
+            case "stop":
+                _logger?.LogInformation("音乐停止");
+                break;
+            case "lyric_update":
+                _logger?.LogDebug("歌词更新: {Lyric}", message.LyricText);
+                break;
+            case "seek":
+                _logger?.LogDebug("音乐跳转到: {Position}/{Duration}", message.Position, message.Duration);
+                break;
+        }
+        
+        MusicMessageReceived?.Invoke(this, message);
+        await Task.CompletedTask;
+    }    /// <summary>
+    /// 处理系统状态消息
+    /// </summary>
+    private async Task HandleSystemStatusMessageAsync(SystemStatusMessage message)
+    {
+        _logger?.LogDebug("收到系统状态消息，组件: {Component}，状态: {Status}，消息: {Message}", 
+            message.Component, message.Status, message.Message);
+        SystemStatusMessageReceived?.Invoke(this, message);
+        await Task.CompletedTask;
+    }    /// <summary>
+    /// 处理IoT设备消息
+    /// </summary>
+    private async Task HandleIotMessageAsync(IotMessage message)
+    {
+        _logger?.LogDebug("收到IoT消息，描述符: {Descriptors}，状态: {States}", 
+            message.Descriptors, message.States);
+        IotMessageReceived?.Invoke(this, message);
         await Task.CompletedTask;
     }
 

@@ -12,8 +12,8 @@
         <converters:BoolNegationConverter x:Key="BoolNegationConverter" />
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
     </Page.Resources>    
-    <Grid>
-        <Grid.RowDefinitions>
+    <Grid>        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -172,8 +172,107 @@
                     </Button>
                 </Grid>
             </Grid>
+        </Border>        <!-- Protocol Information Panel -->
+        <Border
+            Grid.Row="2"
+            Margin="20,0,20,10"
+            Padding="16"
+            Background="{ThemeResource LayerFillColorDefaultBrush}"
+            CornerRadius="8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Music Player Info -->
+                <StackPanel Grid.Column="0" Spacing="8">
+                    <TextBlock
+                        FontSize="12"
+                        FontWeight="SemiBold"
+                        Foreground="{ThemeResource SystemAccentColor}"
+                        Text="🎵 音乐播放器" />
+                    
+                    <StackPanel Spacing="4">
+                        <TextBlock
+                            FontSize="11"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                            <Run Text="歌曲: " />
+                            <Run Text="{x:Bind ViewModel.CurrentSongName, Mode=OneWay}" />
+                        </TextBlock>
+                        
+                        <TextBlock
+                            FontSize="11"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                            <Run Text="艺术家: " />
+                            <Run Text="{x:Bind ViewModel.CurrentArtist, Mode=OneWay}" />
+                        </TextBlock>
+                        
+                        <TextBlock
+                            FontSize="11"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                            <Run Text="状态: " />
+                            <Run Text="{x:Bind ViewModel.MusicStatus, Mode=OneWay}" />
+                        </TextBlock>
+                        
+                        <TextBlock
+                            FontSize="10"
+                            FontFamily="Consolas"
+                            Text="{x:Bind ViewModel.CurrentLyric, Mode=OneWay}"
+                            TextWrapping="Wrap"
+                            MaxLines="2" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- System Status Info -->
+                <StackPanel Grid.Column="1" Spacing="8">
+                    <TextBlock
+                        FontSize="12"
+                        FontWeight="SemiBold"
+                        Foreground="{ThemeResource SystemAccentColor}"
+                        Text="📊 系统状态" />
+                    
+                    <StackPanel Spacing="4">
+                        <TextBlock
+                            FontSize="11"
+                            Text="{x:Bind ViewModel.SystemStatusText, Mode=OneWay}"
+                            TextWrapping="Wrap"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        
+                        <TextBlock
+                            FontSize="11"
+                            Text="{x:Bind ViewModel.IotStatusText, Mode=OneWay}"
+                            TextWrapping="Wrap"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Emotion & LLM Info -->
+                <StackPanel Grid.Column="2" Spacing="8">
+                    <TextBlock
+                        FontSize="12"
+                        FontWeight="SemiBold"
+                        Foreground="{ThemeResource SystemAccentColor}"
+                        Text="😊 情感状态" />
+                    
+                    <StackPanel Spacing="4">
+                        <TextBlock
+                            FontSize="24"
+                            HorizontalAlignment="Center"
+                            Text="{x:Bind ViewModel.CurrentEmotion, Mode=OneWay}" />
+                        
+                        <TextBlock
+                            FontSize="11"
+                            HorizontalAlignment="Center"
+                            Text="{x:Bind ViewModel.TtsText, Mode=OneWay}"
+                            TextWrapping="Wrap"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
         </Border>        <!--  Main Content Grid  -->
-        <Grid Grid.Row="2" Margin="20,0,20,20">
+        <Grid Grid.Row="3" Margin="20,0,20,20">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1*" MinWidth="350" />
                 <ColumnDefinition Width="15" />
