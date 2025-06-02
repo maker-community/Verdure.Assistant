@@ -45,15 +45,16 @@ public partial class App : Application
         await _host.StartAsync();
 
         MainWindow = new MainWindow();
-        MainWindow.Activate();
-
-        // Initialize theme service after window is created
+        MainWindow.Activate();        // Initialize theme service after window is created
         var themeService = GetService<ThemeService>();
         if (themeService != null)
         {
             await themeService.InitializeAsync();
             themeService.StartSystemThemeListener();
         }
+
+        // Initialize IoT device management (similar to py-xiaozhi's _initialize_iot_devices)
+        await InitializeIoTDevicesAsync();
     }
     private void ConfigureServices(IServiceCollection services)
     {
@@ -102,10 +103,17 @@ public partial class App : Application
         
         // Voice chat service
         services.AddSingleton<IVoiceChatService, VoiceChatService>();        
-        
-        // Music player service
+          // Music player service
         services.AddSingleton<IMusicAudioPlayer, WinUIMusicAudioPlayer>();
         services.AddSingleton<IMusicPlayerService, KugouMusicService>();
+
+        // IoT Device Management (similar to py-xiaozhi ThingManager)
+        services.AddSingleton<IoTDeviceManager>();
+        
+        // Register IoT devices
+        services.AddSingleton<MusicPlayerIoTDevice>();
+        services.AddSingleton<LampIoTDevice>();
+        services.AddSingleton<SpeakerIoTDevice>();
 
         // Interrupt manager and related services
         services.AddSingleton<InterruptManager>();
@@ -124,8 +132,65 @@ public partial class App : Application
         // Views
         services.AddTransient<HomePage>();
         services.AddTransient<SettingsPage>();
-        services.AddTransient<MainWindow>();
-    }    
+        services.AddTransient<MainWindow>();    }    
+    
+    /// <summary>
+    /// Initialize IoT devices and setup integration (similar to py-xiaozhi's _initialize_iot_devices)
+    /// </summary>
+    private async Task InitializeIoTDevicesAsync()
+    {
+        try
+        {
+            var logger = GetService<ILogger<App>>();
+            logger?.LogInformation("开始初始化IoT设备...");
+
+            // Get required services
+            var iotDeviceManager = GetService<IoTDeviceManager>();
+            var voiceChatService = GetService<IVoiceChatService>();
+            var musicPlayerDevice = GetService<MusicPlayerIoTDevice>();
+            var lampDevice = GetService<LampIoTDevice>();
+            var speakerDevice = GetService<SpeakerIoTDevice>();
+
+            if (iotDeviceManager == null)
+            {
+                logger?.LogError("IoTDeviceManager service not found");
+                return;
+            }
+            if (voiceChatService == null)
+            {
+                logger?.LogError("VoiceChatService not found");
+                return;
+            }
+
+            // Add IoT devices to manager (similar to py-xiaozhi's thing_manager.add_thing)
+            if (musicPlayerDevice != null)
+            {
+                iotDeviceManager.AddDevice(musicPlayerDevice);
+                logger?.LogInformation("已添加音乐播放器IoT设备");
+            }
+            if (lampDevice != null)
+            {
+                iotDeviceManager.AddDevice(lampDevice);
+                logger?.LogInformation("已添加智能灯IoT设备");
+            }
+            if (speakerDevice != null)
+            {
+                iotDeviceManager.AddDevice(speakerDevice);
+                logger?.LogInformation("已添加智能音箱IoT设备");
+            }
+
+            // Set IoT device manager on VoiceChatService (similar to py-xiaozhi integration)
+            voiceChatService.SetIoTDeviceManager(iotDeviceManager);
+
+            logger?.LogInformation("IoT设备初始化完成，共注册了 {DeviceCount} 个设备", 
+                iotDeviceManager.GetDevices().Count);
+        }
+        catch (Exception ex)
+        {
+            var logger = GetService<ILogger<App>>();
+            logger?.LogError(ex, "IoT设备初始化失败");
+        }
+    }
     
     /// <summary>
     /// Gets a service of the specified type from the dependency injection container

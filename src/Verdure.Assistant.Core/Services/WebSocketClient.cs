@@ -22,13 +22,14 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     private string? _sessionId;
     private readonly TaskCompletionSource<bool> _helloReceived = new();    
     public event EventHandler<ChatMessage>? MessageReceived;
-    public event EventHandler<bool>? ConnectionStateChanged;
-    public event EventHandler<ProtocolMessage>? ProtocolMessageReceived;
+    public event EventHandler<bool>? ConnectionStateChanged;    public event EventHandler<ProtocolMessage>? ProtocolMessageReceived;
     public event EventHandler<byte[]>? AudioDataReceived;
     public event EventHandler<TtsMessage>? TtsStateChanged;
     public event EventHandler<MusicMessage>? MusicMessageReceived;
     public event EventHandler<SystemStatusMessage>? SystemStatusMessageReceived;
     public event EventHandler<IotMessage>? IotMessageReceived;
+    public event EventHandler<IotCommandMessage>? IotCommandMessageReceived;
+    public event EventHandler<IotCommandResultMessage>? IotCommandResultMessageReceived;
     public event EventHandler<LlmMessage>? LlmMessageReceived;
 
     public bool IsConnected => _isConnected;
@@ -394,10 +395,16 @@ public class WebSocketClient : ICommunicationClient, IDisposable
 
             case "system_status":
                 await HandleSystemStatusMessageAsync((SystemStatusMessage)message);
+                break;            case "iot":
+                await HandleIotMessageAsync((IotMessage)message);
                 break;
 
-            case "iot":
-                await HandleIotMessageAsync((IotMessage)message);
+            case "iot_command":
+                await HandleIotCommandMessageAsync((IotCommandMessage)message);
+                break;
+
+            case "iot_command_result":
+                await HandleIotCommandResultMessageAsync((IotCommandResultMessage)message);
                 break;
                 
             default:
@@ -532,6 +539,28 @@ public class WebSocketClient : ICommunicationClient, IDisposable
         _logger?.LogDebug("收到IoT消息，描述符: {Descriptors}，状态: {States}", 
             message.Descriptors, message.States);
         IotMessageReceived?.Invoke(this, message);
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 处理IoT命令消息
+    /// </summary>
+    private async Task HandleIotCommandMessageAsync(IotCommandMessage message)
+    {
+        _logger?.LogDebug("收到IoT命令消息，设备ID: {DeviceId}，方法: {Method}", 
+            message.DeviceId, message.Method);
+        IotCommandMessageReceived?.Invoke(this, message);
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 处理IoT命令结果消息
+    /// </summary>
+    private async Task HandleIotCommandResultMessageAsync(IotCommandResultMessage message)
+    {
+        _logger?.LogDebug("收到IoT命令结果消息，设备ID: {DeviceId}，成功: {Success}", 
+            message.DeviceId, message.Success);
+        IotCommandResultMessageReceived?.Invoke(this, message);
         await Task.CompletedTask;
     }
 

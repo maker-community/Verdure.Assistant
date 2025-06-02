@@ -332,6 +332,8 @@ public static class WebSocketProtocol
                 "stt" => JsonSerializer.Deserialize<SttMessage>(json, JsonOptions),
                 "abort" => JsonSerializer.Deserialize<AbortMessage>(json, JsonOptions),
                 "iot" => JsonSerializer.Deserialize<IotMessage>(json, JsonOptions),
+                "iot_command" => JsonSerializer.Deserialize<IotCommandMessage>(json, JsonOptions),
+                "iot_command_result" => JsonSerializer.Deserialize<IotCommandResultMessage>(json, JsonOptions),
                 "llm" => JsonSerializer.Deserialize<LlmMessage>(json, JsonOptions),
                 "goodbye" => JsonSerializer.Deserialize<GoodbyeMessage>(json, JsonOptions),
                 "music" => JsonSerializer.Deserialize<MusicMessage>(json, JsonOptions),

@@ -32,6 +32,9 @@ public class VoiceChatService : IVoiceChatService
     private IKeywordSpottingService? _keywordSpottingService;
     private bool _keywordDetectionEnabled = false;
 
+    // IoT device management (similar to py-xiaozhi ThingManager)
+    private IoTDeviceManager? _iotDeviceManager;
+
 
     public event EventHandler<bool>? VoiceChatStateChanged;
     public event EventHandler<ChatMessage>? MessageReceived;
@@ -195,8 +198,132 @@ public class VoiceChatService : IVoiceChatService
         _keywordSpottingService.ErrorOccurred += OnKeywordDetectionError;
         
         _logger?.LogInformation("关键词唤醒服务已设置");
-    }    
-    
+    }
+
+    /// <summary>
+    /// 设置IoT设备管理器（对应py-xiaozhi的ThingManager集成）
+    /// </summary>
+    public void SetIoTDeviceManager(IoTDeviceManager iotDeviceManager)
+    {
+        _iotDeviceManager = iotDeviceManager;
+        
+        // 订阅IoT设备状态变化事件
+        _iotDeviceManager.DeviceStateChanged += OnIoTDeviceStateChanged;
+        
+        _logger?.LogInformation("IoT设备管理器已设置，当前设备数量: {DeviceCount}", 
+            _iotDeviceManager.GetDevices().Count);
+    }    /// <summary>
+    /// 处理IoT设备状态变化事件（对应py-xiaozhi的ThingManager事件处理）
+    /// </summary>
+    private void OnIoTDeviceStateChanged(object? sender, IoTDeviceStateChangedEventArgs e)
+    {
+        try
+        {
+            _logger?.LogInformation("IoT设备状态变化: 设备={DeviceName}, 状态={StateJson}", 
+                e.DeviceName, e.StateJson);
+
+            // 通过WebSocket通知服务器IoT设备状态变化（类似py-xiaozhi的_send_iot_states）
+            if (_communicationClient is WebSocketClient webSocketClient && IsConnected)
+            {
+                var deviceStatesJson = _iotDeviceManager?.GetStatesJson();
+                if (!string.IsNullOrEmpty(deviceStatesJson))
+                {
+                    Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var statesData = System.Text.Json.JsonSerializer.Deserialize<object>(deviceStatesJson);
+                            await webSocketClient.SendIotStatesAsync(statesData);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogError(ex, "发送IoT设备状态失败");
+                        }
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "处理IoT设备状态变化失败");
+            ErrorOccurred?.Invoke(this, $"处理IoT设备状态变化失败: {ex.Message}");
+        }
+    }    /// <summary>
+    /// 处理IoT命令执行（对应py-xiaozhi的_handle_iot_message方法）
+    /// </summary>
+    private async Task HandleIoTCommandAsync(IotCommandMessage command)
+    {
+        try
+        {
+            _logger?.LogInformation("执行IoT命令: 设备ID={DeviceId}, 方法={Method}", 
+                command.DeviceId, command.Method);
+
+            if (_iotDeviceManager == null)
+            {
+                _logger?.LogWarning("IoT设备管理器未设置，无法执行命令");
+                return;
+            }
+
+            // 构建IoT命令对象
+            var iotCommand = new IoTCommand
+            {
+                Name = command.DeviceId ?? string.Empty,
+                Method = command.Method ?? string.Empty,
+                Parameters = command.Parameters ?? new Dictionary<string, object>()
+            };
+
+            // 执行IoT设备命令
+            var result = await _iotDeviceManager.ExecuteCommandAsync(iotCommand);
+
+            // 发送命令执行结果（类似py-xiaozhi的命令响应机制）
+            if (_communicationClient is WebSocketClient webSocketClient && IsConnected)
+            {
+                var resultMessage = new IotCommandResultMessage
+                {
+                    RequestId = command.RequestId,
+                    DeviceId = command.DeviceId,
+                    Method = command.Method,
+                    Success = result.Success,
+                    Result = result.Data,
+                    Error = result.Success ? null : result.Message
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(resultMessage);
+                await webSocketClient.SendTextAsync(json);
+                
+                _logger?.LogInformation("IoT命令执行完成: 成功={Success}, 结果={Result}", 
+                    result.Success, result.Data);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "执行IoT命令失败: {DeviceId}.{Method}", 
+                command.DeviceId, command.Method);
+            
+            // 发送错误结果
+            if (_communicationClient is WebSocketClient webSocketClient && IsConnected)
+            {
+                var errorResult = new IotCommandResultMessage
+                {
+                    RequestId = command.RequestId,
+                    DeviceId = command.DeviceId,
+                    Method = command.Method,
+                    Success = false,
+                    Error = ex.Message
+                };
+
+                try
+                {
+                    var json = System.Text.Json.JsonSerializer.Serialize(errorResult);
+                    await webSocketClient.SendTextAsync(json);
+                }
+                catch (Exception sendEx)
+                {
+                    _logger?.LogError(sendEx, "发送IoT命令错误结果失败");
+                }
+            }
+        }
+    }
     
     /// <summary>
     /// 启动关键词唤醒检测（对应py-xiaozhi的_start_wake_word_detector方法）
@@ -370,8 +497,7 @@ public class VoiceChatService : IVoiceChatService
                 }
             }            
               _communicationClient.MessageReceived += OnMessageReceived;
-            _communicationClient.ConnectionStateChanged += OnConnectionStateChanged;            
-            // 订阅WebSocket专有的TTS状态变化事件
+            _communicationClient.ConnectionStateChanged += OnConnectionStateChanged;              // 订阅WebSocket专有的TTS状态变化事件
             if (_communicationClient is WebSocketClient wsClient)
             {
                 wsClient.TtsStateChanged += OnTtsStateChanged;
@@ -379,6 +505,8 @@ public class VoiceChatService : IVoiceChatService
                 wsClient.MusicMessageReceived += OnMusicMessageReceived;
                 wsClient.SystemStatusMessageReceived += OnSystemStatusMessageReceived;
                 wsClient.IotMessageReceived += OnIotMessageReceived;
+                wsClient.IotCommandMessageReceived += OnIotCommandMessageReceived;
+                wsClient.IotCommandResultMessageReceived += OnIotCommandResultMessageReceived;
                 wsClient.LlmMessageReceived += OnLlmMessageReceived;
             }// 连接到服务器
             await _communicationClient.ConnectAsync();
@@ -892,9 +1020,7 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogError(ex, "处理系统状态消息失败");
             ErrorOccurred?.Invoke(this, $"处理系统状态消息失败: {ex.Message}");
         }
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// 处理IoT设备消息事件
     /// </summary>
     private void OnIotMessageReceived(object? sender, IotMessage message)
@@ -908,6 +1034,53 @@ public class VoiceChatService : IVoiceChatService
         {
             _logger?.LogError(ex, "处理IoT消息失败");
             ErrorOccurred?.Invoke(this, $"处理IoT消息失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 处理IoT命令消息事件（对应py-xiaozhi的_handle_iot_message）
+    /// </summary>
+    private void OnIotCommandMessageReceived(object? sender, IotCommandMessage message)
+    {
+        try
+        {
+            _logger?.LogDebug("收到IoT命令消息: 设备={DeviceId}, 方法={Method}", 
+                message.DeviceId, message.Method);
+            
+            // 异步处理IoT命令，避免阻塞事件处理
+            Task.Run(async () =>
+            {
+                try
+                {
+                    await HandleIoTCommandAsync(message);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "异步处理IoT命令失败");
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "处理IoT命令消息失败");
+            ErrorOccurred?.Invoke(this, $"处理IoT命令消息失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 处理IoT命令结果消息事件
+    /// </summary>
+    private void OnIotCommandResultMessageReceived(object? sender, IotCommandResultMessage message)
+    {
+        try
+        {
+            _logger?.LogDebug("收到IoT命令结果: 设备={DeviceId}, 成功={Success}, 结果={Result}", 
+                message.DeviceId, message.Success, message.Result);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "处理IoT命令结果消息失败");
+            ErrorOccurred?.Invoke(this, $"处理IoT命令结果消息失败: {ex.Message}");
         }
     }
 
@@ -954,8 +1127,7 @@ public class VoiceChatService : IVoiceChatService
                 try
                 {
                     _communicationClient.MessageReceived -= OnMessageReceived;
-                    _communicationClient.ConnectionStateChanged -= OnConnectionStateChanged;
-                      // 如果是WebSocket客户端，取消订阅更多事件
+                    _communicationClient.ConnectionStateChanged -= OnConnectionStateChanged;                    // 如果是WebSocket客户端，取消订阅更多事件
                     if (_communicationClient is WebSocketClient webSocketClient)
                     {
                         //webSocketClient.ProtocolMessageReceived -= OnProtocolMessageReceived;
@@ -964,6 +1136,8 @@ public class VoiceChatService : IVoiceChatService
                         webSocketClient.MusicMessageReceived -= OnMusicMessageReceived;
                         webSocketClient.SystemStatusMessageReceived -= OnSystemStatusMessageReceived;
                         webSocketClient.IotMessageReceived -= OnIotMessageReceived;
+                        webSocketClient.IotCommandMessageReceived -= OnIotCommandMessageReceived;
+                        webSocketClient.IotCommandResultMessageReceived -= OnIotCommandResultMessageReceived;
                         webSocketClient.LlmMessageReceived -= OnLlmMessageReceived;
                     }
                     
