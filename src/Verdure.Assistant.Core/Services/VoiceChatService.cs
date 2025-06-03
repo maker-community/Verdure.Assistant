@@ -908,38 +908,38 @@ public class VoiceChatService : IVoiceChatService
             CurrentState = DeviceState.Idle;
               // Send IoT device descriptors and initial states when connection is established
             // This matches the py-xiaozhi behavior in _on_audio_channel_opened
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    if (_iotDeviceManager != null && _communicationClient is WebSocketClient webSocketClient)
-                    {
-                        _logger?.LogInformation("发送IoT设备描述符和初始状态");
+            //_ = Task.Run(async () =>
+            //{
+            //    try
+            //    {
+            //        if (_iotDeviceManager != null && _communicationClient is WebSocketClient webSocketClient)
+            //        {
+            //            _logger?.LogInformation("发送IoT设备描述符和初始状态");
                         
-                        // Send IoT device descriptors (similar to py-xiaozhi's send_iot_descriptors)
-                        var descriptorsJson = _iotDeviceManager.GetDescriptorsJson();
-                        var descriptors = JsonSerializer.Deserialize<object>(descriptorsJson);
-                        if (descriptors != null)
-                        {
-                            await webSocketClient.SendIotDescriptorsAsync(descriptors);
-                        }
+            //            // Send IoT device descriptors (similar to py-xiaozhi's send_iot_descriptors)
+            //            var descriptorsJson = _iotDeviceManager.GetDescriptorsJson();
+            //            var descriptors = JsonSerializer.Deserialize<object>(descriptorsJson);
+            //            if (descriptors != null)
+            //            {
+            //                await webSocketClient.SendIotDescriptorsAsync(descriptors);
+            //            }
                         
-                        // Send initial IoT device states (similar to py-xiaozhi's _update_iot_states(False))
-                        var statesJson = _iotDeviceManager.GetStatesJson();
-                        var states = JsonSerializer.Deserialize<object>(statesJson);
-                        if (states != null)
-                        {
-                            await webSocketClient.SendIotStatesAsync(states);
-                        }
+            //            // Send initial IoT device states (similar to py-xiaozhi's _update_iot_states(False))
+            //            var statesJson = _iotDeviceManager.GetStatesJson();
+            //            var states = JsonSerializer.Deserialize<object>(statesJson);
+            //            if (states != null)
+            //            {
+            //                await webSocketClient.SendIotStatesAsync(states);
+            //            }
                         
-                        _logger?.LogInformation("IoT设备描述符和状态发送完成");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "发送IoT设备信息失败");
-                }
-            });
+            //            _logger?.LogInformation("IoT设备描述符和状态发送完成");
+            //        }
+            //    }
+            //    catch (Exception ex)
+            //    {
+            //        _logger?.LogError(ex, "发送IoT设备信息失败");
+            //    }
+            //});
         }
         else
         {
