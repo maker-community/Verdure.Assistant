@@ -307,9 +307,12 @@ public class MockVoiceChatService : IVoiceChatService
     public void SetInterruptManager(InterruptManager interruptManager)
     {
         // 模拟实现
+    }    public void SetKeywordSpottingService(IKeywordSpottingService keywordSpottingService)
+    {
+        // 模拟实现
     }
 
-    public void SetKeywordSpottingService(IKeywordSpottingService keywordSpottingService)
+    public void SetIoTDeviceManager(IoTDeviceManager iotDeviceManager)
     {
         // 模拟实现
     }
@@ -317,7 +320,7 @@ public class MockVoiceChatService : IVoiceChatService
     public Task<bool> StartKeywordDetectionAsync()
     {
         return Task.FromResult(true);
-    }    public Task StopKeywordDetectionAsync()
+    }public Task StopKeywordDetectionAsync()
     {
         // 模拟实现
         return Task.CompletedTask;

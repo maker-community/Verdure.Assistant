@@ -63,7 +63,7 @@ public partial class App : Application
         {
             builder.AddConsole();
             builder.AddDebug();
-            builder.SetMinimumLevel(LogLevel.Information);
+            builder.SetMinimumLevel(LogLevel.Debug);
         });        // Settings services
         services.AddSingleton<ISettingsService<AppSettings>, WindowsSettingsService<AppSettings>>();
 

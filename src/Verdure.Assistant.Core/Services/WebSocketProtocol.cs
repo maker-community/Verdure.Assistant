@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using Verdure.Assistant.Core.Constants;
 using Verdure.Assistant.Core.Models;
@@ -12,8 +13,11 @@ public static class WebSocketProtocol
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
+        WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = false
+        AllowTrailingCommas = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
     #region Hello Messages

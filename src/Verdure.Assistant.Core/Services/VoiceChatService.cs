@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 using Verdure.Assistant.Core.Constants;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
@@ -212,7 +213,9 @@ public class VoiceChatService : IVoiceChatService
         
         _logger?.LogInformation("IoT设备管理器已设置，当前设备数量: {DeviceCount}", 
             _iotDeviceManager.GetDevices().Count);
-    }    /// <summary>
+    }    
+    
+    /// <summary>
     /// 处理IoT设备状态变化事件（对应py-xiaozhi的ThingManager事件处理）
     /// </summary>
     private void OnIoTDeviceStateChanged(object? sender, IoTDeviceStateChangedEventArgs e)
@@ -227,13 +230,15 @@ public class VoiceChatService : IVoiceChatService
             {
                 var deviceStatesJson = _iotDeviceManager?.GetStatesJson();
                 if (!string.IsNullOrEmpty(deviceStatesJson))
-                {
-                    Task.Run(async () =>
+                {                    Task.Run(async () =>
                     {
                         try
                         {
                             var statesData = System.Text.Json.JsonSerializer.Deserialize<object>(deviceStatesJson);
-                            await webSocketClient.SendIotStatesAsync(statesData);
+                            if (statesData != null)
+                            {
+                                await webSocketClient.SendIotStatesAsync(statesData);
+                            }
                         }
                         catch (Exception ex)
                         {
@@ -497,7 +502,9 @@ public class VoiceChatService : IVoiceChatService
                 }
             }            
               _communicationClient.MessageReceived += OnMessageReceived;
-            _communicationClient.ConnectionStateChanged += OnConnectionStateChanged;              // 订阅WebSocket专有的TTS状态变化事件
+            _communicationClient.ConnectionStateChanged += OnConnectionStateChanged;              
+            
+            // 订阅WebSocket专有的TTS状态变化事件
             if (_communicationClient is WebSocketClient wsClient)
             {
                 wsClient.TtsStateChanged += OnTtsStateChanged;
@@ -890,8 +897,8 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogError(ex, "处理接收消息失败");
             ErrorOccurred?.Invoke(this, $"处理接收消息失败: {ex.Message}");
         }
-    }
-
+    }    
+    
     private void OnConnectionStateChanged(object? sender, bool isConnected)
     {
         _logger?.LogInformation("连接状态变化: {IsConnected}", isConnected);
@@ -899,6 +906,40 @@ public class VoiceChatService : IVoiceChatService
         if (isConnected)
         {
             CurrentState = DeviceState.Idle;
+              // Send IoT device descriptors and initial states when connection is established
+            // This matches the py-xiaozhi behavior in _on_audio_channel_opened
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    if (_iotDeviceManager != null && _communicationClient is WebSocketClient webSocketClient)
+                    {
+                        _logger?.LogInformation("发送IoT设备描述符和初始状态");
+                        
+                        // Send IoT device descriptors (similar to py-xiaozhi's send_iot_descriptors)
+                        var descriptorsJson = _iotDeviceManager.GetDescriptorsJson();
+                        var descriptors = JsonSerializer.Deserialize<object>(descriptorsJson);
+                        if (descriptors != null)
+                        {
+                            await webSocketClient.SendIotDescriptorsAsync(descriptors);
+                        }
+                        
+                        // Send initial IoT device states (similar to py-xiaozhi's _update_iot_states(False))
+                        var statesJson = _iotDeviceManager.GetStatesJson();
+                        var states = JsonSerializer.Deserialize<object>(statesJson);
+                        if (states != null)
+                        {
+                            await webSocketClient.SendIotStatesAsync(states);
+                        }
+                        
+                        _logger?.LogInformation("IoT设备描述符和状态发送完成");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "发送IoT设备信息失败");
+                }
+            });
         }
         else
         {

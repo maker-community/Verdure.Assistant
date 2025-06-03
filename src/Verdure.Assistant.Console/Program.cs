@@ -40,9 +40,6 @@ class Program
             _voiceChatService.DeviceStateChanged += OnDeviceStateChanged;
             _voiceChatService.ListeningModeChanged += OnListeningModeChanged;
 
-            // 初始化服务
-            await _voiceChatService.InitializeAsync(_config);
-            
             // Set up wake word detector coordination (matches py-xiaozhi behavior)
             _voiceChatService.SetInterruptManager(interruptManager);
             await interruptManager.InitializeAsync();
@@ -50,8 +47,11 @@ class Program
             _voiceChatService.SetKeywordSpottingService(keywordSpottingService);
             System.Console.WriteLine("关键词唤醒功能已启用（基于Microsoft认知服务）");
             
-            // Initialize IoT devices (similar to py-xiaozhi's _initialize_iot_devices)
+            // Initialize IoT devices BEFORE initializing VoiceChatService (similar to py-xiaozhi's _initialize_iot_devices)
             InitializeIoTDevices(host.Services);
+
+            // 初始化服务 (this will establish WebSocket connection and trigger IoT initialization)
+            await _voiceChatService.InitializeAsync(_config);
             
             System.Console.WriteLine($"已连接到服务器: {(_config.UseWebSocket ? _config.ServerUrl : $"{_config.MqttBroker}:{_config.MqttPort}")}");
             System.Console.WriteLine();
@@ -91,7 +91,9 @@ class Program
                 {
                     var logger = provider.GetService<ILogger<AudioStreamManager>>();
                     return AudioStreamManager.GetInstance(logger);
-                });
+                });                // Music player service (required for MusicPlayerIoTDevice)
+                services.AddSingleton<IMusicPlayerService, KugouMusicService>();
+                services.AddSingleton<IMusicAudioPlayer, ConsoleMusicAudioPlayer>();
 
                 // Register IoT Device Manager and devices (similar to py-xiaozhi's _initialize_iot_devices)
                 services.AddSingleton<IoTDeviceManager>();
@@ -99,7 +101,7 @@ class Program
                 services.AddSingleton<LampIoTDevice>();
                 services.AddSingleton<SpeakerIoTDevice>();
 
-            });    static VerdureConfig LoadConfiguration()
+            });static VerdureConfig LoadConfiguration()
     {
         var configuration = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
