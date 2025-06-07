@@ -106,66 +106,6 @@ public class AbortMessage : ProtocolMessage
 }
 
 /// <summary>
-/// IoT设备消息
-/// </summary>
-public class IotMessage : ProtocolMessage
-{
-    public override string Type => "iot";
-
-    [JsonPropertyName("descriptors")]
-    public object? Descriptors { get; set; }
-
-    [JsonPropertyName("states")]
-    public object? States { get; set; }
-}
-
-/// <summary>
-/// IoT命令消息 - 用于执行IoT设备命令
-/// </summary>
-public class IotCommandMessage : ProtocolMessage
-{
-    public override string Type => "iot_command";
-
-    [JsonPropertyName("device_id")]
-    public string? DeviceId { get; set; }
-
-    [JsonPropertyName("method")]
-    public string? Method { get; set; }
-
-    [JsonPropertyName("parameters")]
-    public Dictionary<string, object>? Parameters { get; set; }
-
-    [JsonPropertyName("request_id")]
-    public string? RequestId { get; set; }
-}
-
-/// <summary>
-/// IoT命令结果消息 - 返回IoT设备命令执行结果
-/// </summary>
-public class IotCommandResultMessage : ProtocolMessage
-{
-    public override string Type => "iot_command_result";
-
-    [JsonPropertyName("request_id")]
-    public string? RequestId { get; set; }
-
-    [JsonPropertyName("device_id")]
-    public string? DeviceId { get; set; }
-
-    [JsonPropertyName("method")]
-    public string? Method { get; set; }
-
-    [JsonPropertyName("success")]
-    public bool Success { get; set; }
-
-    [JsonPropertyName("result")]
-    public object? Result { get; set; }
-
-    [JsonPropertyName("error")]
-    public string? Error { get; set; }
-}
-
-/// <summary>
 /// LLM情感状态消息
 /// </summary>
 public class LlmMessage : ProtocolMessage

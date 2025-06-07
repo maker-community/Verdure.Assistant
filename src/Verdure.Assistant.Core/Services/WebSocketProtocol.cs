@@ -242,44 +242,6 @@ public static class WebSocketProtocol
 
     #endregion
 
-    #region IoT Messages
-
-    /// <summary>
-    /// 创建IoT设备描述消息
-    /// </summary>
-    /// <param name="descriptors">设备描述JSON对象</param>
-    /// <param name="sessionId">会话ID</param>
-    /// <returns>IoT设备描述消息JSON字符串</returns>
-    public static string CreateIotDescriptorsMessage(object descriptors, string? sessionId)
-    {
-        var message = new IotMessage
-        {
-            SessionId = sessionId,
-            Descriptors = descriptors
-        };
-
-        return JsonSerializer.Serialize(message, JsonOptions);
-    }
-
-    /// <summary>
-    /// 创建IoT设备状态消息
-    /// </summary>
-    /// <param name="states">状态JSON对象</param>
-    /// <param name="sessionId">会话ID</param>
-    /// <returns>IoT设备状态消息JSON字符串</returns>
-    public static string CreateIotStatesMessage(object states, string? sessionId)
-    {
-        var message = new IotMessage
-        {
-            SessionId = sessionId,
-            States = states
-        };
-
-        return JsonSerializer.Serialize(message, JsonOptions);
-    }
-
-    #endregion
-
     #region LLM Messages
 
     /// <summary>
@@ -343,9 +305,6 @@ public static class WebSocketProtocol
                 "tts" => JsonSerializer.Deserialize<TtsMessage>(json, JsonOptions),
                 "stt" => JsonSerializer.Deserialize<SttMessage>(json, JsonOptions),
                 "abort" => JsonSerializer.Deserialize<AbortMessage>(json, JsonOptions),
-                "iot" => JsonSerializer.Deserialize<IotMessage>(json, JsonOptions),
-                "iot_command" => JsonSerializer.Deserialize<IotCommandMessage>(json, JsonOptions),
-                "iot_command_result" => JsonSerializer.Deserialize<IotCommandResultMessage>(json, JsonOptions),
                 "llm" => JsonSerializer.Deserialize<LlmMessage>(json, JsonOptions),
                 "goodbye" => JsonSerializer.Deserialize<GoodbyeMessage>(json, JsonOptions),
                 "music" => JsonSerializer.Deserialize<MusicMessage>(json, JsonOptions),

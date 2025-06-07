@@ -481,22 +481,6 @@ public partial class HomePageViewModel : ViewModelBase
             AddMessage($"📊 {statusText}", false);
         });
     }
-
-    private void OnIotMessageReceived(object? sender, IotMessage message)
-    {
-        // 使用UI调度器确保线程安全的事件处理
-        _ = _uiDispatcher.InvokeAsync(() =>
-        {
-            var iotInfo = "IoT设备状态更新";
-            if (message.States != null)
-            {
-                iotInfo += $": {message.States}";
-            }
-            
-            IotStatusText = iotInfo;
-            AddMessage($"🏠 {iotInfo}", false);
-        });
-    }    
     
     private void OnLlmMessageReceived(object? sender, LlmMessage message)
     {
