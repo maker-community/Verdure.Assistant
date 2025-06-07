@@ -5,6 +5,7 @@ using Verdure.Assistant.Core.Services;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Constants;
+using Verdure.Assistant.Core.Services.MCP;
 
 namespace KeywordSpottingIntegrationTest;
 
@@ -310,9 +311,12 @@ public class MockVoiceChatService : IVoiceChatService
     }    public void SetKeywordSpottingService(IKeywordSpottingService keywordSpottingService)
     {
         // 模拟实现
+    }    public void SetIoTDeviceManager(IoTDeviceManager iotDeviceManager)
+    {
+        // 模拟实现
     }
 
-    public void SetIoTDeviceManager(IoTDeviceManager iotDeviceManager)
+    public void SetMcpIntegrationService(McpIntegrationService mcpIntegrationService)
     {
         // 模拟实现
     }
