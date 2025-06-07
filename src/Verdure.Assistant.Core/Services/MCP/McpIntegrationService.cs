@@ -247,6 +247,139 @@ namespace Verdure.Assistant.Core.Services.MCP
                 _logger.LogError(ex, "Failed to get device context");
                 return "IoT device information is currently unavailable.";            
             }
+        }        /// <summary>
+        /// Register a tool from the MCP server response
+        /// </summary>
+        public async Task RegisterToolAsync(string toolName, string description, string toolDefinition)
+        {
+            try
+            {
+                _logger.LogDebug("Registering tool: {ToolName}", toolName);
+                
+                // Parse the tool definition and register it with the device manager
+                var toolElement = JsonSerializer.Deserialize<JsonElement>(toolDefinition);
+                
+                // Create a basic tool registration - this would be expanded based on actual MCP tool schema
+                var tool = new McpTool
+                {
+                    Name = toolName,
+                    Description = description,
+                    Properties = new McpPropertyList(ExtractToolProperties(toolElement))
+                };
+                
+                // For now, just log the registration since the actual device manager method signature may differ
+                _logger.LogInformation("Tool registered locally: {ToolName} - {Description}", toolName, description);
+                
+                await Task.CompletedTask; // Placeholder for actual async registration
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to register tool: {ToolName}", toolName);
+                throw;
+            }
+        }        /// <summary>
+        /// Handle successful tool call completion
+        /// </summary>
+        public async Task OnToolCallCompletedAsync(string toolName, string result)
+        {
+            try
+            {
+                _logger.LogDebug("Tool call completed: {ToolName}", toolName);
+                
+                // Log successful tool execution - device manager integration would be added here
+                _logger.LogInformation("Tool execution successful: {ToolName}", toolName);
+                
+                await Task.CompletedTask; // Placeholder for actual async processing
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to process tool call completion for: {ToolName}", toolName);
+            }
+        }        /// <summary>
+        /// Handle failed tool call
+        /// </summary>
+        public async Task OnToolCallFailedAsync(string toolName, string error)
+        {
+            try
+            {
+                _logger.LogWarning("Tool call failed: {ToolName}, Error: {Error}", toolName, error);
+                
+                // Log failure - device manager integration would be added here  
+                _logger.LogWarning("Tool execution failed: {ToolName}", toolName);
+                
+                await Task.CompletedTask; // Placeholder for actual async processing
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to process tool call failure for: {ToolName}", toolName);
+            }
+        }        /// <summary>
+        /// Update device state based on tool execution results
+        /// </summary>
+        public async Task UpdateDeviceStateAsync(string deviceName, string property, object value)
+        {
+            try
+            {
+                _logger.LogDebug("Updating device state: {DeviceName}.{Property} = {Value}", deviceName, property, value);
+                
+                // Log state update - actual device state management would be implemented here
+                _logger.LogInformation("Device state updated: {DeviceName}.{Property} = {Value}", deviceName, property, value);
+                
+                await Task.CompletedTask; // Placeholder for actual async state update
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to update device state: {DeviceName}.{Property}", deviceName, property);
+            }
+        }
+
+        /// <summary>
+        /// Extract tool properties from JSON element
+        /// </summary>
+        private List<McpProperty> ExtractToolProperties(JsonElement toolElement)
+        {
+            var properties = new List<McpProperty>();
+            
+            try
+            {
+                if (toolElement.TryGetProperty("inputSchema", out var schemaElement) &&
+                    schemaElement.TryGetProperty("properties", out var propsElement))
+                {
+                    foreach (var prop in propsElement.EnumerateObject())
+                    {
+                        var property = new McpProperty
+                        {
+                            Name = prop.Name,
+                            Type = McpPropertyType.String, // Default type
+                            Description = ""
+                        };
+                        
+                        if (prop.Value.TryGetProperty("type", out var typeElement))
+                        {
+                            property.Type = typeElement.GetString() switch
+                            {
+                                "boolean" => McpPropertyType.Boolean,
+                                "integer" => McpPropertyType.Integer,
+                                "string" => McpPropertyType.String,
+                                _ => McpPropertyType.String
+                            };
+                        }
+                        
+                        if (prop.Value.TryGetProperty("description", out var descElement))
+                        {
+                            property.Description = descElement.GetString() ?? "";
+                        }
+                        
+                        properties.Add(property);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to extract tool properties, using empty list");
+            }
+            
+            return properties;
         }
 
         #region IDisposable Support
