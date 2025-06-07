@@ -18,20 +18,20 @@ public enum McpPropertyType
 public class McpReturnValue
 {
     public object? Value { get; set; }
-    
+
     public static implicit operator McpReturnValue(bool value) => new() { Value = value };
     public static implicit operator McpReturnValue(int value) => new() { Value = value };
     public static implicit operator McpReturnValue(string value) => new() { Value = value };
-    
+
     public T? GetValue<T>()
     {
         if (Value == null) return default(T);
-        
+
         try
         {
             if (Value is T directValue)
                 return directValue;
-                
+
             return (T)Convert.ChangeType(Value, typeof(T));
         }
         catch
@@ -48,30 +48,30 @@ public class McpProperty
 {
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
-    
+
     [JsonPropertyName("type")]
     public McpPropertyType Type { get; set; }
-    
+
     [JsonPropertyName("description")]
     public string Description { get; set; } = string.Empty;
-    
+
     [JsonPropertyName("required")]
     public bool Required { get; set; } = true;
-    
+
     [JsonPropertyName("default")]
     public object? DefaultValue { get; set; }
-      // 整数类型的范围限制
+    // 整数类型的范围限制
     [JsonPropertyName("minimum")]
     public int? MinValue { get; set; }
-    
+
     [JsonPropertyName("maximum")]
     public int? MaxValue { get; set; }
-    
+
     // Backward compatibility properties for McpIntegrationService
     public double? Minimum => MinValue;
     public double? Maximum => MaxValue;
     public IEnumerable<string>? EnumValues { get; set; }
-    
+
     public object? Value { get; set; }
 
     public McpProperty() { }
@@ -107,7 +107,7 @@ public class McpProperty
         Value = defaultValue;
         MinValue = minValue;
         MaxValue = maxValue;
-        
+
         if (defaultValue < minValue || defaultValue > maxValue)
         {
             throw new ArgumentException("Default value must be within the specified range");
@@ -124,7 +124,7 @@ public class McpProperty
         MinValue = minValue;
         MaxValue = maxValue;
     }
-    
+
     public void SetValue(object? value)
     {
         // 范围检查（针对整数类型）
@@ -139,19 +139,19 @@ public class McpProperty
                 throw new ArgumentException($"Value {intValue} exceeds maximum allowed: {MaxValue.Value}");
             }
         }
-        
+
         Value = value;
     }
-    
+
     public T? GetValue<T>()
     {
         if (Value == null) return default(T);
-        
+
         try
         {
             if (Value is T directValue)
                 return directValue;
-                
+
             return (T)Convert.ChangeType(Value, typeof(T));
         }
         catch
@@ -167,9 +167,9 @@ public class McpProperty
 public class McpPropertyList : List<McpProperty>
 {
     public McpPropertyList() { }
-    
+
     public McpPropertyList(IEnumerable<McpProperty> properties) : base(properties) { }
-    
+
     public McpProperty this[string name]
     {
         get
@@ -182,20 +182,37 @@ public class McpPropertyList : List<McpProperty>
             return property;
         }
     }
-    
+
     public List<string> GetRequired()
     {
         return this.Where(p => p.Required && p.DefaultValue == null)
                   .Select(p => p.Name)
                   .ToList();
     }
-    
+
     public bool TryGetProperty(string name, out McpProperty? property)
     {
         property = this.FirstOrDefault(p => p.Name == name);
         return property != null;
     }
 }
+
+
+/// <summary>
+/// MCP工具 - 对应xiaozhi-esp32的McpTool
+/// </summary>
+public class SimpleMcpTool
+{
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("description")]
+    public string Description { get; set; } = string.Empty;
+
+    [JsonPropertyName("inputSchema")]
+    public object InputSchema { get; set; } = new();
+}
+
 
 /// <summary>
 /// MCP工具 - 对应xiaozhi-esp32的McpTool
@@ -204,15 +221,15 @@ public class McpTool
 {
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
-    
+
     [JsonPropertyName("description")]
     public string Description { get; set; } = string.Empty;
-    
+
     [JsonPropertyName("inputSchema")]
     public object InputSchema { get; set; } = new();
-    
+
     public McpPropertyList Properties { get; set; } = new();
-    
+
     public Func<McpPropertyList, Task<McpReturnValue>>? Handler { get; set; }
 
     public McpTool() { }
@@ -223,16 +240,16 @@ public class McpTool
         Description = description;
         Properties = properties;
         Handler = handler;
-        
+
         // 构建输入架构
         BuildInputSchema();
     }
-    
+
     private void BuildInputSchema()
     {
         var required = Properties.GetRequired();
         var propertiesObj = new Dictionary<string, object>();
-        
+
         foreach (var prop in Properties)
         {
             var propSchema = new Dictionary<string, object>
@@ -245,17 +262,17 @@ public class McpTool
                     _ => "string"
                 }
             };
-            
+
             if (!string.IsNullOrEmpty(prop.Description))
             {
                 propSchema["description"] = prop.Description;
             }
-            
+
             if (prop.DefaultValue != null)
             {
                 propSchema["default"] = prop.DefaultValue;
             }
-            
+
             if (prop.Type == McpPropertyType.Integer)
             {
                 if (prop.MinValue.HasValue)
@@ -263,21 +280,21 @@ public class McpTool
                 if (prop.MaxValue.HasValue)
                     propSchema["maximum"] = prop.MaxValue.Value;
             }
-            
+
             propertiesObj[prop.Name] = propSchema;
         }
-        
+
         var schema = new Dictionary<string, object>
         {
             ["type"] = "object",
             ["properties"] = propertiesObj
         };
-        
+
         if (required.Count > 0)
         {
             schema["required"] = required;
         }
-        
+
         InputSchema = schema;
     }
 
@@ -287,12 +304,12 @@ public class McpTool
         {
             return McpToolCallResult.CreateError($"Tool {Name} has no handler");
         }
-        
+
         try
         {
             // 准备属性值
             var propertyList = new McpPropertyList();
-            
+
             foreach (var prop in Properties)
             {
                 var newProp = new McpProperty(prop.Name, prop.Type, prop.Description)
@@ -302,7 +319,7 @@ public class McpTool
                     MinValue = prop.MinValue,
                     MaxValue = prop.MaxValue
                 };
-                
+
                 if (arguments.TryGetValue(prop.Name, out var value))
                 {
                     newProp.SetValue(value);
@@ -315,13 +332,13 @@ public class McpTool
                 {
                     return McpToolCallResult.CreateError($"Missing required parameter: {prop.Name}");
                 }
-                
+
                 propertyList.Add(newProp);
             }
-            
+
             // 调用处理器
             var result = await Handler(propertyList);
-            
+
             return McpToolCallResult.CreateSuccess(result.Value?.ToString() ?? "Success", result.Value);
         }
         catch (Exception ex)
@@ -329,7 +346,7 @@ public class McpTool
             return McpToolCallResult.CreateError($"Tool execution failed: {ex.Message}");
         }
     }
-    
+
     /// <summary>
     /// 执行工具 - ExecuteAsync alias for CallAsync
     /// </summary>
@@ -346,10 +363,10 @@ public class McpToolCallResult
 {
     [JsonPropertyName("content")]
     public List<McpContent> Content { get; set; } = new();
-    
+
     [JsonPropertyName("isError")]
     public bool IsError { get; set; }
-    
+
     public static McpToolCallResult CreateSuccess(string message, object? data = null)
     {
         return new McpToolCallResult
@@ -365,7 +382,7 @@ public class McpToolCallResult
             IsError = false
         };
     }
-    
+
     public static McpToolCallResult CreateError(string message)
     {
         return new McpToolCallResult
@@ -390,7 +407,7 @@ public class McpContent
 {
     [JsonPropertyName("type")]
     public string Type { get; set; } = "text";
-    
+
     [JsonPropertyName("text")]
     public string Text { get; set; } = string.Empty;
 }
@@ -402,13 +419,13 @@ public class JsonRpcRequest
 {
     [JsonPropertyName("jsonrpc")]
     public string JsonRpc { get; set; } = "2.0";
-    
+
     [JsonPropertyName("method")]
     public string Method { get; set; } = string.Empty;
-    
+
     [JsonPropertyName("params")]
     public object? Params { get; set; }
-    
+
     [JsonPropertyName("id")]
     public int Id { get; set; }
 }
@@ -420,13 +437,13 @@ public class JsonRpcResponse
 {
     [JsonPropertyName("jsonrpc")]
     public string JsonRpc { get; set; } = "2.0";
-    
+
     [JsonPropertyName("result")]
     public object? Result { get; set; }
-    
+
     [JsonPropertyName("error")]
     public JsonRpcError? Error { get; set; }
-    
+
     [JsonPropertyName("id")]
     public int Id { get; set; }
 }
@@ -438,10 +455,10 @@ public class JsonRpcError
 {
     [JsonPropertyName("code")]
     public int Code { get; set; }
-    
+
     [JsonPropertyName("message")]
     public string Message { get; set; } = string.Empty;
-    
+
     [JsonPropertyName("data")]
     public object? Data { get; set; }
 }

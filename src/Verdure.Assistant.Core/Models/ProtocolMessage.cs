@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Verdure.Assistant.Core.Models;
@@ -204,5 +205,5 @@ public class McpMessage : ProtocolMessage
     public override string Type => "mcp";
     
     [JsonPropertyName("payload")]
-    public object Payload { get; set; } = new();
+    public JsonDocument? Payload { get; set; }
 }

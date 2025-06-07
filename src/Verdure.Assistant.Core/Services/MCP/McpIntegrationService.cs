@@ -1,12 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text.Json;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 
 namespace Verdure.Assistant.Core.Services.MCP
-{    
+{
     /// <summary>
     /// Integration service that bridges MCP IoT devices with the voice chat system
     /// Provides backward compatibility and seamless integration
@@ -36,7 +32,7 @@ namespace Verdure.Assistant.Core.Services.MCP
             {
                 // Initialize MCP server
                 await _mcpServer.InitializeAsync();
-                
+
                 // Initialize device manager
                 await _deviceManager.InitializeAsync();
 
@@ -46,6 +42,33 @@ namespace Verdure.Assistant.Core.Services.MCP
             {
                 _logger.LogError(ex, "Failed to initialize MCP Integration Service");
                 throw;
+            }
+        }
+
+        public List<SimpleMcpTool> GetAllSimpleMcpTools()
+        {
+            try
+            {
+                var tools = new List<SimpleMcpTool>();
+                var toolList = _deviceManager.GetAllTools();
+
+                foreach (var tool in toolList)
+                {
+                    tools.Add(new SimpleMcpTool
+                    {
+                        Name = tool.Name,
+                        Description = tool.Description,
+                        InputSchema = tool.InputSchema,
+                    });
+                }
+
+                _logger.LogDebug($"Converted {tools.Count} MCP tools to {tools.Count} tools");
+                return tools;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get available functions");
+                return new List<SimpleMcpTool>();
             }
         }
 
@@ -101,7 +124,7 @@ namespace Verdure.Assistant.Core.Services.MCP
                 // Convert MCP result to simple string response for voice chat
                 var response = ConvertMcpResultToResponse(result);
                 _logger.LogDebug($"Function '{functionName}' executed successfully: {response}");
-                
+
                 return response;
             }
             catch (Exception ex)
@@ -168,7 +191,8 @@ namespace Verdure.Assistant.Core.Services.MCP
             var required = (List<string>)parameters["required"];
 
             foreach (var prop in mcpProperties)
-            {                var propertyDef = new Dictionary<string, object>
+            {
+                var propertyDef = new Dictionary<string, object>
                 {
                     ["type"] = prop.Value.Type switch
                     {
@@ -246,10 +270,10 @@ namespace Verdure.Assistant.Core.Services.MCP
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to get device context");
-                return "IoT device information is currently unavailable.";            
+                return "IoT device information is currently unavailable.";
             }
-        }        
-        
+        }
+
         /// <summary>
         /// Register a tool from the MCP server response
         /// </summary>
@@ -258,10 +282,10 @@ namespace Verdure.Assistant.Core.Services.MCP
             try
             {
                 _logger.LogDebug("Registering tool: {ToolName}", toolName);
-                
+
                 // Parse the tool definition and register it with the device manager
                 var toolElement = JsonSerializer.Deserialize<JsonElement>(toolDefinition);
-                
+
                 // Create a basic tool registration - this would be expanded based on actual MCP tool schema
                 var tool = new McpTool
                 {
@@ -269,10 +293,10 @@ namespace Verdure.Assistant.Core.Services.MCP
                     Description = description,
                     Properties = new McpPropertyList(ExtractToolProperties(toolElement))
                 };
-                
+
                 // For now, just log the registration since the actual device manager method signature may differ
                 _logger.LogInformation("Tool registered locally: {ToolName} - {Description}", toolName, description);
-                
+
                 await Task.CompletedTask; // Placeholder for actual async registration
             }
             catch (Exception ex)
@@ -281,25 +305,25 @@ namespace Verdure.Assistant.Core.Services.MCP
                 throw;
             }
         }        /// <summary>
-        /// Handle successful tool call completion
-        /// </summary>
+                 /// Handle successful tool call completion
+                 /// </summary>
         public async Task OnToolCallCompletedAsync(string toolName, string result)
         {
             try
             {
                 _logger.LogDebug("Tool call completed: {ToolName}", toolName);
-                
+
                 // Log successful tool execution - device manager integration would be added here
                 _logger.LogInformation("Tool execution successful: {ToolName}", toolName);
-                
+
                 await Task.CompletedTask; // Placeholder for actual async processing
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to process tool call completion for: {ToolName}", toolName);
             }
-        }        
-        
+        }
+
         /// <summary>
         /// Handle failed tool call
         /// </summary>
@@ -308,18 +332,18 @@ namespace Verdure.Assistant.Core.Services.MCP
             try
             {
                 _logger.LogWarning("Tool call failed: {ToolName}, Error: {Error}", toolName, error);
-                
+
                 // Log failure - device manager integration would be added here  
                 _logger.LogWarning("Tool execution failed: {ToolName}", toolName);
-                
+
                 await Task.CompletedTask; // Placeholder for actual async processing
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to process tool call failure for: {ToolName}", toolName);
             }
-        }        
-        
+        }
+
         /// <summary>
         /// Update device state based on tool execution results
         /// </summary>
@@ -328,10 +352,10 @@ namespace Verdure.Assistant.Core.Services.MCP
             try
             {
                 _logger.LogDebug("Updating device state: {DeviceName}.{Property} = {Value}", deviceName, property, value);
-                
+
                 // Log state update - actual device state management would be implemented here
                 _logger.LogInformation("Device state updated: {DeviceName}.{Property} = {Value}", deviceName, property, value);
-                
+
                 await Task.CompletedTask; // Placeholder for actual async state update
             }
             catch (Exception ex)
@@ -346,7 +370,7 @@ namespace Verdure.Assistant.Core.Services.MCP
         private List<McpProperty> ExtractToolProperties(JsonElement toolElement)
         {
             var properties = new List<McpProperty>();
-            
+
             try
             {
                 if (toolElement.TryGetProperty("inputSchema", out var schemaElement) &&
@@ -360,7 +384,7 @@ namespace Verdure.Assistant.Core.Services.MCP
                             Type = McpPropertyType.String, // Default type
                             Description = ""
                         };
-                        
+
                         if (prop.Value.TryGetProperty("type", out var typeElement))
                         {
                             property.Type = typeElement.GetString() switch
@@ -371,12 +395,12 @@ namespace Verdure.Assistant.Core.Services.MCP
                                 _ => McpPropertyType.String
                             };
                         }
-                        
+
                         if (prop.Value.TryGetProperty("description", out var descElement))
                         {
                             property.Description = descElement.GetString() ?? "";
                         }
-                        
+
                         properties.Add(property);
                     }
                 }
@@ -385,12 +409,12 @@ namespace Verdure.Assistant.Core.Services.MCP
             {
                 _logger.LogWarning(ex, "Failed to extract tool properties, using empty list");
             }
-            
+
             return properties;
         }
 
         #region IDisposable Support
-        
+
         private bool _disposed = false;
 
         protected virtual void Dispose(bool disposing)

@@ -462,7 +462,7 @@ public class KeywordSpottingService : IKeywordSpottingService
             try
             {
                 // 增加延迟时间以确保SDK完全释放资源
-                await Task.Delay(150);
+                await Task.Delay(300);
                 
                 // 再次检查状态，防止在延迟期间服务被停止
                 if (!_isRunning || _isPaused || _keywordRecognizer == null || _keywordModel == null)
@@ -496,7 +496,7 @@ public class KeywordSpottingService : IKeywordSpottingService
                     _logger?.LogWarning(ex, "检测到Microsoft Speech SDK句柄错误 (SPXERR_INVALID_HANDLE)，这是SDK在快速重启时的已知问题，不影响功能");
                     
                     // 对于句柄错误，尝试延迟后再次重启
-                    await Task.Delay(300);
+                    await Task.Delay(1000);
                     if (_isRunning && !_isPaused && _keywordRecognizer != null && _keywordModel != null)
                     {
                         try

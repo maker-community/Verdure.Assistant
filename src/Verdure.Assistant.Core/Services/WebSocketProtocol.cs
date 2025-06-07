@@ -2,6 +2,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using Verdure.Assistant.Core.Constants;
 using Verdure.Assistant.Core.Models;
+using Verdure.Assistant.Core.Services.MCP;
 
 namespace Verdure.Assistant.Core.Services;
 
@@ -21,7 +22,7 @@ public static class WebSocketProtocol
     };
 
     #region Hello Messages    
-    
+
     /// <summary>
     /// 创建客户端Hello消息
     /// </summary>
@@ -329,8 +330,8 @@ public static class WebSocketProtocol
         try
         {
             using var document = JsonDocument.Parse(json);
-            return document.RootElement.TryGetProperty("type", out var typeElement) 
-                ? typeElement.GetString() 
+            return document.RootElement.TryGetProperty("type", out var typeElement)
+                ? typeElement.GetString()
                 : null;
         }
         catch
@@ -350,7 +351,7 @@ public static class WebSocketProtocol
     /// <param name="sessionId">会话ID</param>
     /// <param name="payload">MCP JSON-RPC负载</param>
     /// <returns>MCP消息JSON字符串</returns>
-    public static string CreateMcpMessage(string? sessionId, object payload)
+    public static string CreateMcpMessage(string? sessionId, JsonDocument payload)
     {
         var message = new McpMessage
         {
@@ -387,7 +388,33 @@ public static class WebSocketProtocol
             id = id
         };
 
-        return CreateMcpMessage(sessionId, payload);
+        var jsonString = JsonSerializer.Serialize(payload, JsonOptions);
+
+        return CreateMcpMessage(sessionId, JsonDocument.Parse(jsonString));
+    }
+
+    /// <summary>
+    /// 创建MCP工具列表响应消息
+    /// </summary>
+    /// <param name="sessionId">会话ID</param>
+    /// <param name="id">请求ID</param>
+    /// <param name="cursor">分页游标</param>
+    /// <returns>MCP工具列表请求消息JSON字符串</returns>
+    public static string CreateMcpToolsListResponseMessage(string? sessionId, int id, List<SimpleMcpTool> mcpTools, string? nextCursor = null)
+    {
+        var payload = new
+        {
+            jsonrpc = "2.0",
+            result = new
+            {
+                tools = mcpTools,
+                nextCursor = nextCursor
+            },
+            id = id
+        };
+
+        var jsonString = JsonSerializer.Serialize(payload, JsonOptions);
+        return CreateMcpMessage(sessionId, JsonDocument.Parse(jsonString));
     }
 
     /// <summary>
@@ -410,7 +437,8 @@ public static class WebSocketProtocol
             id = id
         };
 
-        return CreateMcpMessage(sessionId, payload);
+        var jsonString = JsonSerializer.Serialize(payload, JsonOptions);
+        return CreateMcpMessage(sessionId, JsonDocument.Parse(jsonString));
     }
 
     /// <summary>
@@ -435,7 +463,9 @@ public static class WebSocketProtocol
             id = id
         };
 
-        return CreateMcpMessage(sessionId, payload);
+        var jsonString = JsonSerializer.Serialize(payload, JsonOptions);
+
+        return CreateMcpMessage(sessionId, JsonDocument.Parse(jsonString));
     }
 
     #endregion
