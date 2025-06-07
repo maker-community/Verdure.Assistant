@@ -207,110 +207,7 @@ public class VoiceChatService : IVoiceChatService
         _mcpIntegrationService = mcpIntegrationService;
         
         _logger?.LogInformation("MCP集成服务已设置");
-    }    /// <summary>
-    /// 处理IoT命令执行（基于xiaozhi-esp32的MCP架构）
-    /// </summary>
-    private async Task HandleIoTCommandAsync(IotCommandMessage command)
-    {
-        try
-        {
-            _logger?.LogInformation("执行MCP IoT命令: 设备ID={DeviceId}, 方法={Method}", 
-                command.DeviceId, command.Method);
-
-            // 使用MCP架构处理IoT命令（基于xiaozhi-esp32设计）
-            if (_mcpIntegrationService != null)
-            {
-                await HandleMcpIoTCommandAsync(command);
-                return;
-            }
-
-            _logger?.LogWarning("MCP集成服务未设置，无法执行命令");
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "执行MCP IoT命令失败: {DeviceId}.{Method}", 
-                command.DeviceId, command.Method);
-            
-            // 发送错误结果
-            await SendIoTCommandErrorResult(command, ex.Message);
-        }
-    }
-
-    /// <summary>
-    /// 使用MCP架构处理IoT命令（基于xiaozhi-esp32实现）
-    /// </summary>
-    private async Task HandleMcpIoTCommandAsync(IotCommandMessage command)
-    {
-        try
-        {
-            // 构建MCP工具名称（遵循MCP命名约定）
-            var toolName = $"self.{command.DeviceId?.ToLowerInvariant()}.{command.Method?.ToLowerInvariant()}";
-            
-            // 执行MCP工具
-            var result = await _mcpIntegrationService!.ExecuteFunctionAsync(toolName, command.Parameters);
-            
-            // 发送命令执行结果
-            await SendIoTCommandSuccessResult(command, result);
-            
-            _logger?.LogInformation("MCP IoT命令执行完成: {ToolName}", toolName);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "MCP IoT命令执行失败: {DeviceId}.{Method}", 
-                command.DeviceId, command.Method);
-            await SendIoTCommandErrorResult(command, ex.Message);
-        }
-    }
-
-    /// <summary>
-    /// 发送IoT命令成功结果
-    /// </summary>
-    private async Task SendIoTCommandSuccessResult(IotCommandMessage command, object? result)
-    {
-        if (_communicationClient is WebSocketClient webSocketClient && IsConnected)
-        {
-            var resultMessage = new IotCommandResultMessage
-            {
-                RequestId = command.RequestId,
-                DeviceId = command.DeviceId,
-                Method = command.Method,
-                Success = true,
-                Result = result,
-                Error = null
-            };
-
-            var json = System.Text.Json.JsonSerializer.Serialize(resultMessage);
-            await webSocketClient.SendTextAsync(json);
-        }
-    }
-
-    /// <summary>
-    /// 发送IoT命令错误结果
-    /// </summary>
-    private async Task SendIoTCommandErrorResult(IotCommandMessage command, string error)
-    {
-        if (_communicationClient is WebSocketClient webSocketClient && IsConnected)
-        {
-            var errorResult = new IotCommandResultMessage
-            {
-                RequestId = command.RequestId,
-                DeviceId = command.DeviceId,
-                Method = command.Method,
-                Success = false,
-                Error = error
-            };
-
-            try
-            {
-                var json = System.Text.Json.JsonSerializer.Serialize(errorResult);
-                await webSocketClient.SendTextAsync(json);
-            }
-            catch (Exception sendEx)
-            {
-                _logger?.LogError(sendEx, "发送IoT命令错误结果失败");
-            }
-        }
-    }
+    }    
     
     /// <summary>
     /// 启动关键词唤醒检测（对应py-xiaozhi的_start_wake_word_detector方法）
@@ -341,7 +238,9 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogError(ex, "启动关键词唤醒检测时发生错误");
             return false;
         }
-    }    /// <summary>
+    }    
+    
+    /// <summary>
     /// 停止关键词唤醒检测
     /// </summary>
     public async Task StopKeywordDetectionAsync()
@@ -352,7 +251,9 @@ public class VoiceChatService : IVoiceChatService
             _keywordDetectionEnabled = false;
             _logger?.LogInformation("关键词唤醒检测已停止");
         }
-    }/// <summary>
+    }
+    
+    /// <summary>
     /// 关键词检测事件处理（对应py-xiaozhi的_on_wake_word_detected回调）
     /// </summary>
     private void OnKeywordDetected(object? sender, KeywordDetectedEventArgs e)
@@ -361,7 +262,9 @@ public class VoiceChatService : IVoiceChatService
 
         // 在后台线程处理关键词检测事件（对应py-xiaozhi的_handle_wake_word_detected）
         Task.Run(async () => await HandleKeywordDetectedAsync(e.Keyword));
-    }    /// <summary>
+    }    
+    
+    /// <summary>
     /// 处理关键词检测事件（对应py-xiaozhi的_handle_wake_word_detected方法）
     /// </summary>
     private async Task HandleKeywordDetectedAsync(string keyword)

@@ -27,30 +27,28 @@ class Program
         
         // Add MCP services
         services.AddSingleton<McpServer>();
-        services.AddSingleton<McpDeviceManager>();
-        services.AddSingleton<McpIntegrationService>();
+        services.AddSingleton<McpDeviceManager>();        services.AddSingleton<McpIntegrationService>();
         
         // Add WebSocket services
         services.AddSingleton<WebSocketClient>();
-        services.AddSingleton<McpWebSocketClient>();
 
         var provider = services.BuildServiceProvider();
 
         try
         {
             // Test 1: Initialize services
-            Console.WriteLine("1. Initializing services...");
-            var mcpServer = provider.GetRequiredService<McpServer>();
+            Console.WriteLine("1. Initializing services...");            var mcpServer = provider.GetRequiredService<McpServer>();
             var mcpDeviceManager = provider.GetRequiredService<McpDeviceManager>();
             var mcpIntegration = provider.GetRequiredService<McpIntegrationService>();
-            var webSocketClient = provider.GetRequiredService<WebSocketClient>();
-            var mcpWebSocketClient = provider.GetRequiredService<McpWebSocketClient>();
-
-            await mcpServer.InitializeAsync();
+            var webSocketClient = provider.GetRequiredService<WebSocketClient>();            await mcpServer.InitializeAsync();
             await mcpDeviceManager.InitializeAsync();
             await mcpIntegration.InitializeAsync();
+            
+            // Configure WebSocketClient with MCP integration
+            webSocketClient.SetMcpIntegrationService(mcpIntegration);
 
             Console.WriteLine("✓ All services initialized successfully");
+            Console.WriteLine("✓ WebSocketClient configured with MCP integration");
             Console.WriteLine();
 
             // Test 2: Verify MCP architecture
@@ -139,34 +137,19 @@ class Program
             {
                 Console.WriteLine($"  - {state.Key}: {JsonSerializer.Serialize(state.Value)}");
             }
-            Console.WriteLine();
-
-            // Test 7: Verify MCP-WebSocket integration completeness
+            Console.WriteLine();            // Test 7: Verify MCP-WebSocket integration completeness
             Console.WriteLine("7. Verifying MCP-WebSocket integration completeness...");
             
             // Check that WebSocketClient has MCP methods
             var webSocketClientType = typeof(WebSocketClient);
-            var mcpMethods = webSocketClientType.GetMethods()
-                .Where(m => m.Name.Contains("Mcp"))
-                .Select(m => m.Name)
-                .ToList();
-
-            Console.WriteLine($"✓ WebSocketClient has {mcpMethods.Count} MCP methods:");
-            foreach (var method in mcpMethods)
-            {
-                Console.WriteLine($"  - {method}");
-            }
-
-            // Check that McpWebSocketClient exists and has required functionality
-            var mcpWebSocketClientType = typeof(McpWebSocketClient);
-            var mcpWebSocketMethods = mcpWebSocketClientType.GetMethods()
-                .Where(m => m.IsPublic && !m.Name.StartsWith("get_") && !m.Name.StartsWith("set_"))
+            var webSocketMcpMethods = webSocketClientType.GetMethods()
+                .Where(m => m.IsPublic && (m.Name.Contains("Mcp") || m.Name.Contains("MCP")) && !m.Name.StartsWith("get_") && !m.Name.StartsWith("set_"))
                 .Select(m => m.Name)
                 .Distinct()
                 .ToList();
 
-            Console.WriteLine($"✓ McpWebSocketClient has {mcpWebSocketMethods.Count} public methods:");
-            foreach (var method in mcpWebSocketMethods)
+            Console.WriteLine($"✓ WebSocketClient has {webSocketMcpMethods.Count} public MCP methods:");
+            foreach (var method in webSocketMcpMethods)
             {
                 Console.WriteLine($"  - {method}");
             }

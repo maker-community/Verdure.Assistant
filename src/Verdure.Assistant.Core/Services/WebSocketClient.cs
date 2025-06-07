@@ -1,16 +1,20 @@
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Verdure.Assistant.Core.Constants;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
+using Verdure.Assistant.Core.Services.MCP;
 
 namespace Verdure.Assistant.Core.Services;
 
 /// <summary>
 /// WebSocket通信客户端实现
-/// 支持完整的WebSocket协议消息处理
+/// 支持完整的WebSocket协议消息处理和MCP协议集成
+/// 基于xiaozhi-esp32的MCP协议实现，提供统一的WebSocket+MCP通信能力
 /// </summary>
 public class WebSocketClient : ICommunicationClient, IDisposable
 {
@@ -20,7 +24,14 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     private readonly ILogger? _logger;
     private bool _isConnected;
     private string? _sessionId;
-    private readonly TaskCompletionSource<bool> _helloReceived = new();      
+    private readonly TaskCompletionSource<bool> _helloReceived = new();
+
+    // MCP相关字段
+    private readonly ConcurrentDictionary<int, TaskCompletionSource<string>> _mcpPendingRequests = new();
+    private int _mcpNextRequestId = 1;
+    private bool _mcpInitialized = false;
+    private McpIntegrationService? _mcpIntegrationService;
+      
     public event EventHandler<ChatMessage>? MessageReceived;
     public event EventHandler<bool>? ConnectionStateChanged;    
     public event EventHandler<ProtocolMessage>? ProtocolMessageReceived;
@@ -32,13 +43,27 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     public event EventHandler<McpMessage>? McpMessageReceived;
     public event EventHandler<EventArgs>? McpReadyForInitialization;
 
+    // MCP事件
+    public event EventHandler<string>? McpResponseReceived;
+    public event EventHandler<Exception>? McpErrorOccurred;    
     public bool IsConnected => _isConnected;
     public string? SessionId => _sessionId;
+
+    // MCP属性
+    public bool IsMcpInitialized => _mcpInitialized;
 
     public WebSocketClient(IConfigurationService configurationService, ILogger? logger = null)
     {
         _configurationService = configurationService;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// 设置MCP集成服务（可选，用于高级MCP功能）
+    /// </summary>
+    public void SetMcpIntegrationService(McpIntegrationService mcpIntegrationService)
+    {
+        _mcpIntegrationService = mcpIntegrationService;
     }
 
     public async Task ConnectAsync()
@@ -296,6 +321,345 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     }
 
     #endregion
+
+    #region MCP Methods
+
+    /// <summary>
+    /// 初始化MCP客户端
+    /// 对应xiaozhi-esp32的MCP初始化流程
+    /// </summary>
+    public async Task InitializeMcpAsync()
+    {
+        if (_mcpInitialized)
+            return;
+
+        try
+        {
+            _logger?.LogInformation("Initializing MCP client");
+
+            // 确保WebSocket已连接
+            if (!_isConnected)
+            {
+                throw new InvalidOperationException("WebSocket must be connected before initializing MCP client");
+            }
+
+            // 初始化MCP集成服务（如果有）
+            if (_mcpIntegrationService != null)
+            {
+                await _mcpIntegrationService.InitializeAsync();
+            }
+
+            // 发送MCP初始化请求并等待响应
+            var initRequestId = GetNextMcpRequestId();
+            var tcs = new TaskCompletionSource<string>();
+            _mcpPendingRequests[initRequestId] = tcs;
+
+            var capabilities = new
+            {
+                tools = new { },
+                logging = new { }
+            };
+
+            try
+            {
+                await SendMcpInitializeAsync(initRequestId, capabilities);
+                _logger?.LogDebug("Sent MCP initialize request with ID: {RequestId}", initRequestId);
+
+                // 等待服务端初始化响应（设置超时）
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                cts.Token.Register(() => tcs.TrySetCanceled());
+
+                var initResponse = await tcs.Task;
+                _logger?.LogDebug("Received MCP initialize response: {Response}", initResponse);
+
+                // 验证初始化响应
+                var responseElement = JsonSerializer.Deserialize<JsonElement>(initResponse);
+                if (responseElement.TryGetProperty("result", out var resultElement))
+                {
+                    _logger?.LogInformation("MCP initialization confirmed by server");
+
+                    // 初始化成功后，自动获取工具列表
+                    await LoadMcpToolsFromServerAsync();
+                    
+                    _mcpInitialized = true;
+                    _logger?.LogInformation("MCP WebSocket client initialized successfully");
+                }
+                else
+                {
+                    throw new InvalidOperationException("Server did not confirm MCP initialization");
+                }            
+            }
+            catch (Exception)
+            {
+                _mcpPendingRequests.TryRemove(initRequestId, out _);
+                throw;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to initialize MCP WebSocket client");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 从服务端加载工具列表并注册到本地管理器
+    /// </summary>
+    private async Task LoadMcpToolsFromServerAsync()
+    {
+        try
+        {
+            _logger?.LogDebug("Loading tools from server");
+            
+            var toolsResponse = await GetMcpToolsListAsync();
+            var responseElement = JsonSerializer.Deserialize<JsonElement>(toolsResponse);
+            
+            if (responseElement.TryGetProperty("result", out var resultElement) &&
+                resultElement.TryGetProperty("tools", out var toolsElement))
+            {
+                var toolsArray = toolsElement.EnumerateArray();
+                var registeredCount = 0;
+
+                foreach (var toolElement in toolsArray)
+                {
+                    try
+                    {
+                        if (toolElement.TryGetProperty("name", out var nameElement) &&
+                            toolElement.TryGetProperty("description", out var descElement))
+                        {
+                            var toolName = nameElement.GetString();
+                            var toolDescription = descElement.GetString();
+                            
+                            if (!string.IsNullOrEmpty(toolName) && !string.IsNullOrEmpty(toolDescription))
+                            {
+                                // 将工具注册到MCP集成服务中
+                                if (_mcpIntegrationService != null)
+                                {
+                                    await _mcpIntegrationService.RegisterToolAsync(toolName, toolDescription, toolElement.ToString());
+                                    registeredCount++;
+                                    _logger?.LogDebug("Registered tool: {ToolName}", toolName);
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Failed to register tool from server response");
+                    }
+                }
+
+                _logger?.LogInformation("Successfully registered {Count} tools from server", registeredCount);
+            }
+            else
+            {
+                _logger?.LogWarning("Server tools list response missing tools array");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to load tools from server");
+            // 不抛出异常，允许初始化继续，因为工具列表可能为空
+        }
+    }
+
+    /// <summary>
+    /// 获取设备工具列表
+    /// </summary>
+    /// <param name="cursor">分页游标</param>
+    /// <returns>工具列表JSON响应</returns>
+    public async Task<string> GetMcpToolsListAsync(string cursor = "")
+    {
+        if (!_mcpInitialized)
+            throw new InvalidOperationException("MCP client not initialized");
+
+        var requestId = GetNextMcpRequestId();
+        var tcs = new TaskCompletionSource<string>();
+        _mcpPendingRequests[requestId] = tcs;
+
+        try
+        {
+            await SendMcpToolsListAsync(requestId, cursor);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            cts.Token.Register(() => tcs.TrySetCanceled());
+
+            return await tcs.Task;
+        }
+        catch (Exception)
+        {
+            _mcpPendingRequests.TryRemove(requestId, out _);
+            throw;
+        }
+    }    
+    
+    /// <summary>
+    /// 调用设备工具
+    /// </summary>
+    /// <param name="toolName">工具名称</param>
+    /// <param name="arguments">工具参数</param>
+    /// <returns>工具调用结果JSON响应</returns>
+    public async Task<string> CallMcpToolAsync(string toolName, Dictionary<string, object>? arguments = null)
+    {
+        if (!_mcpInitialized)
+            throw new InvalidOperationException("MCP client not initialized");
+
+        var requestId = GetNextMcpRequestId();
+        var tcs = new TaskCompletionSource<string>();
+        _mcpPendingRequests[requestId] = tcs;
+
+        try
+        {
+            await SendMcpToolCallAsync(requestId, toolName, arguments);
+            _logger?.LogDebug("Sent MCP tool call request: {ToolName}", toolName);
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            cts.Token.Register(() => tcs.TrySetCanceled());
+
+            var response = await tcs.Task;
+            
+            // 处理工具调用响应并更新设备状态
+            await ProcessMcpToolCallResponseAsync(toolName, response);
+            
+            return response;
+        }
+        catch (Exception)
+        {
+            _mcpPendingRequests.TryRemove(requestId, out _);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 处理工具调用响应并更新设备状态
+    /// </summary>
+    /// <param name="toolName">工具名称</param>
+    /// <param name="response">服务端响应</param>
+    private async Task ProcessMcpToolCallResponseAsync(string toolName, string response)
+    {
+        try
+        {
+            var responseElement = JsonSerializer.Deserialize<JsonElement>(response);
+            
+            if (responseElement.TryGetProperty("result", out var resultElement) &&
+                resultElement.TryGetProperty("content", out var contentElement))
+            {
+                var contentArray = contentElement.EnumerateArray();
+                foreach (var contentItem in contentArray)
+                {
+                    if (contentItem.TryGetProperty("text", out var textElement))
+                    {
+                        var resultText = textElement.GetString();
+                        if (!string.IsNullOrEmpty(resultText))
+                        {
+                            await UpdateDeviceStateFromMcpResultAsync(toolName, resultText);
+                        }
+                    }
+                }
+            }        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to process tool call response for {ToolName}", toolName);
+        }
+    }
+
+    /// <summary>
+    /// 根据工具调用结果更新设备状态
+    /// </summary>
+    /// <param name="toolName">工具名称</param>
+    /// <param name="resultText">结果文本</param>
+    private async Task UpdateDeviceStateFromMcpResultAsync(string toolName, string? resultText)
+    {
+        if (_mcpIntegrationService == null || string.IsNullOrEmpty(resultText))
+            return;
+
+        try
+        {
+            var deviceName = ExtractDeviceNameFromTool(toolName);
+            if (string.IsNullOrEmpty(deviceName))
+                return;            // 根据工具名称和结果更新状态
+            if (toolName.Contains("turn_on"))
+            {
+                await _mcpIntegrationService.UpdateDeviceStateAsync(deviceName, "power", "on");
+            }
+            else if (toolName.Contains("turn_off"))
+            {
+                await _mcpIntegrationService.UpdateDeviceStateAsync(deviceName, "power", "off");
+            }
+            else if (toolName.Contains("set_brightness") || toolName.Contains("brightness"))
+            {
+                var brightness = ExtractBrightnessFromResult(resultText);
+                if (brightness.HasValue)
+                {
+                    await _mcpIntegrationService.UpdateDeviceStateAsync(deviceName, "brightness", brightness.Value);
+                }
+            }
+
+            _logger?.LogDebug("Updated device state for {DeviceName} based on tool {ToolName}", deviceName, toolName);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to update device state from tool result");
+        }
+
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 从工具名称中提取设备名称
+    /// </summary>
+    private string? ExtractDeviceNameFromTool(string toolName)
+    {
+        // 例如：self.lamp.turn_on -> lamp
+        var parts = toolName.Split('.');
+        return parts.Length >= 2 ? parts[1] : null;
+    }
+
+    /// <summary>
+    /// 从结果文本中提取亮度值
+    /// </summary>
+    private int? ExtractBrightnessFromResult(string resultText)
+    {
+        // 简单的亮度值提取逻辑
+        var match = System.Text.RegularExpressions.Regex.Match(resultText, @"brightness.*?(\d+)", 
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        
+        if (match.Success && int.TryParse(match.Groups[1].Value, out var brightness))
+        {
+            return brightness;
+        }
+        
+        return null;
+    }
+
+    /// <summary>
+    /// 通过语音聊天系统执行设备功能（向后兼容）
+    /// </summary>
+    /// <param name="functionName">功能名称</param>
+    /// <param name="parameters">功能参数</param>
+    /// <returns>执行结果</returns>
+    public async Task<string> ExecuteMcpFunctionAsync(string functionName, Dictionary<string, object>? parameters = null)
+    {
+        if (_mcpIntegrationService == null)
+            throw new InvalidOperationException("MCP integration service not configured");
+
+        return await _mcpIntegrationService.ExecuteFunctionAsync(functionName, parameters);
+    }
+
+    /// <summary>
+    /// 获取设备状态信息
+    /// </summary>
+    /// <returns>设备状态字典</returns>
+    public Dictionary<string, object> GetMcpDeviceStates()
+    {
+        return _mcpIntegrationService?.GetDeviceStates() ?? new Dictionary<string, object>();
+    }
+
+    /// <summary>
+    /// 获取下一个MCP请求ID
+    /// </summary>
+    private int GetNextMcpRequestId()
+    {
+        return Interlocked.Increment(ref _mcpNextRequestId);
+    }
 
     private async Task ReceiveMessagesAsync()
     {
@@ -568,17 +932,73 @@ public class WebSocketClient : ICommunicationClient, IDisposable
             message.Component, message.Status, message.Message);
         SystemStatusMessageReceived?.Invoke(this, message);
         await Task.CompletedTask;
-    }
-
+    }    
     /// <summary>
     /// 处理MCP消息
     /// </summary>
     private async Task HandleMcpMessageAsync(McpMessage message)
     {
         _logger?.LogDebug("收到MCP消息，会话ID: {SessionId}", message.SessionId);
+        
+        try
+        {
+            // 尝试解析为JSON-RPC响应
+            if (message.Payload is JsonElement payloadElement)
+            {
+                if (payloadElement.TryGetProperty("id", out var idElement) && idElement.TryGetInt32(out var requestId))
+                {
+                    // 这是一个响应消息，检查是否有等待的请求
+                    if (_mcpPendingRequests.TryRemove(requestId, out var tcs))
+                    {
+                        // 检查是否是错误响应
+                        if (payloadElement.TryGetProperty("error", out var errorElement))
+                        {
+                            var errorMessage = "MCP Error";
+                            if (errorElement.TryGetProperty("message", out var errorMessageElement))
+                            {
+                                errorMessage = errorMessageElement.GetString() ?? errorMessage;
+                            }
+                            
+                            var exception = new Exception($"MCP JSON-RPC Error: {errorMessage}");
+                            tcs.SetException(exception);
+                            _logger?.LogError("MCP request {RequestId} failed with error: {Error}", requestId, errorMessage);
+                            
+                            // 触发错误事件
+                            McpErrorOccurred?.Invoke(this, exception);
+                        }
+                        else
+                        {
+                            // 成功响应
+                            var responseJson = JsonSerializer.Serialize(message.Payload);
+                            tcs.SetResult(responseJson);
+                            _logger?.LogDebug("Resolved pending MCP request {RequestId}", requestId);
+                            
+                            // 触发响应事件
+                            McpResponseReceived?.Invoke(this, responseJson);
+                        }
+                    }
+                }
+                else
+                {
+                    // 这是一个通知消息
+                    var notificationJson = JsonSerializer.Serialize(message.Payload);
+                    McpResponseReceived?.Invoke(this, notificationJson);
+                    _logger?.LogDebug("Received MCP notification");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error processing MCP message");
+            McpErrorOccurred?.Invoke(this, ex);
+        }
+        
+        // 也触发原始MCP消息事件以保持向后兼容
         McpMessageReceived?.Invoke(this, message);
         await Task.CompletedTask;
     }
+
+    #endregion
 
     public void Dispose()
     {
