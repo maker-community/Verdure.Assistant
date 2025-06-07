@@ -197,7 +197,10 @@ public class VoiceChatService : IVoiceChatService
         _keywordSpottingService.KeywordDetected += OnKeywordDetected;
         _keywordSpottingService.ErrorOccurred += OnKeywordDetectionError;
         
-        _logger?.LogInformation("关键词唤醒服务已设置");    }    /// <summary>
+        _logger?.LogInformation("关键词唤醒服务已设置");    
+    }    
+    
+    /// <summary>
     /// 设置MCP集成服务（新架构，基于xiaozhi-esp32的MCP实现）
     /// </summary>
     public void SetMcpIntegrationService(McpIntegrationService mcpIntegrationService)
