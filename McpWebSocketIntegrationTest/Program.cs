@@ -87,7 +87,7 @@ class Program
             // Test specific MCP message types
             var initMessage = WebSocketProtocol.CreateMcpInitializeMessage("test-session", 1);
             var toolsListMessage = WebSocketProtocol.CreateMcpToolsListMessage("test-session", 2);
-            var toolCallMessage = WebSocketProtocol.CreateMcpToolCallMessage("test-session", 3, "lamp_turn_on", 
+            var toolCallMessage = WebSocketProtocol.CreateMcpToolCallMessage("test-session", 3, "self.lamp.turn_on", 
                 new Dictionary<string, object> { ["brightness"] = 80 });
 
             Console.WriteLine("✓ Created MCP initialize message");
@@ -121,8 +121,7 @@ class Program
 
             // Test function execution through integration service
             try
-            {
-                var result = await mcpIntegration.ExecuteFunctionAsync("lamp_turn_on", 
+            {                var result = await mcpIntegration.ExecuteFunctionAsync("self.lamp.turn_on", 
                     new Dictionary<string, object> { ["brightness"] = 75 });
                 Console.WriteLine($"✓ Function execution result: {result}");
             }
