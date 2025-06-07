@@ -1,9 +1,10 @@
+using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading;
-using System.Collections.Concurrent;
-using Microsoft.Extensions.Logging;
 using Verdure.Assistant.Core.Constants;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
@@ -18,6 +19,15 @@ namespace Verdure.Assistant.Core.Services;
 /// </summary>
 public class WebSocketClient : ICommunicationClient, IDisposable
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        AllowTrailingCommas = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
     private ClientWebSocket? _webSocket;
     private CancellationTokenSource? _cancellationTokenSource;
     private readonly IConfigurationService _configurationService;
@@ -815,7 +825,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
         _sessionId = message.SessionId;
         
         // 检查设备是否支持MCP协议
-        bool deviceSupportsMcp = false;
+        bool deviceSupportsMcp = true;
         if (message.Features != null && message.Features.TryGetValue("mcp", out var mcpValue))
         {
             deviceSupportsMcp = mcpValue is bool mcpBool && mcpBool;
@@ -945,6 +955,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
             // 尝试解析为JSON-RPC响应
             if (message.Payload is JsonElement payloadElement)
             {
+                // 成功响应
                 if (payloadElement.TryGetProperty("id", out var idElement) && idElement.TryGetInt32(out var requestId))
                 {
                     // 这是一个响应消息，检查是否有等待的请求
@@ -981,7 +992,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
                 else
                 {
                     // 这是一个通知消息
-                    var notificationJson = JsonSerializer.Serialize(message.Payload);
+                    var notificationJson = JsonSerializer.Serialize(message.Payload, JsonOptions);
                     McpResponseReceived?.Invoke(this, notificationJson);
                     _logger?.LogDebug("Received MCP notification");
                 }

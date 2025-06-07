@@ -198,8 +198,7 @@ public class VoiceChatService : IVoiceChatService
         
         _logger?.LogInformation("关键词唤醒服务已设置");    
     }    
-    
-    /// <summary>
+      /// <summary>
     /// 设置MCP集成服务（新架构，基于xiaozhi-esp32的MCP实现）
     /// </summary>
     public void SetMcpIntegrationService(McpIntegrationService mcpIntegrationService)
@@ -207,7 +206,14 @@ public class VoiceChatService : IVoiceChatService
         _mcpIntegrationService = mcpIntegrationService;
         
         _logger?.LogInformation("MCP集成服务已设置");
-    }    
+        
+        // 如果WebSocketClient已经存在，立即配置MCP集成服务
+        if (_communicationClient is WebSocketClient wsClient)
+        {
+            wsClient.SetMcpIntegrationService(mcpIntegrationService);
+            _logger?.LogInformation("MCP集成服务已配置到现有WebSocketClient");
+        }
+    }
     
     /// <summary>
     /// 启动关键词唤醒检测（对应py-xiaozhi的_start_wake_word_detector方法）
@@ -388,8 +394,7 @@ public class VoiceChatService : IVoiceChatService
             }            
               _communicationClient.MessageReceived += OnMessageReceived;
             _communicationClient.ConnectionStateChanged += OnConnectionStateChanged;              
-            
-            // 订阅WebSocket专有的TTS状态变化事件
+              // 订阅WebSocket专有的TTS状态变化事件
             if (_communicationClient is WebSocketClient wsClient)
             {
                 wsClient.TtsStateChanged += OnTtsStateChanged;
@@ -397,6 +402,18 @@ public class VoiceChatService : IVoiceChatService
                 wsClient.MusicMessageReceived += OnMusicMessageReceived;
                 wsClient.SystemStatusMessageReceived += OnSystemStatusMessageReceived;
                 wsClient.LlmMessageReceived += OnLlmMessageReceived;
+                
+                // 订阅MCP事件
+                wsClient.McpReadyForInitialization += OnMcpReadyForInitialization;
+                wsClient.McpResponseReceived += OnMcpResponseReceived;
+                wsClient.McpErrorOccurred += OnMcpErrorOccurred;
+                
+                // 如果已有MCP集成服务，立即配置到WebSocketClient
+                if (_mcpIntegrationService != null)
+                {
+                    wsClient.SetMcpIntegrationService(_mcpIntegrationService);
+                    _logger?.LogInformation("MCP集成服务已配置到WebSocketClient");
+                }
             }// 连接到服务器
             await _communicationClient.ConnectAsync();
             
@@ -962,6 +979,67 @@ public class VoiceChatService : IVoiceChatService
         }
     }
    
+    /// <summary>
+    /// 处理MCP准备就绪事件 - 设备声明支持MCP时自动初始化
+    /// </summary>
+    private async void OnMcpReadyForInitialization(object? sender, EventArgs e)
+    {
+        try
+        {
+            _logger?.LogInformation("设备已准备好MCP初始化，开始自动初始化MCP协议");
+            
+            if (_communicationClient is WebSocketClient wsClient && _mcpIntegrationService != null)
+            {
+                // 自动初始化MCP协议
+                //await wsClient.InitializeMcpAsync();
+                _logger?.LogInformation("MCP协议自动初始化完成");
+            }
+            else
+            {
+                _logger?.LogWarning("无法自动初始化MCP：WebSocketClient或MCP集成服务未设置");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "MCP自动初始化失败");
+            ErrorOccurred?.Invoke(this, $"MCP初始化失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 处理MCP响应接收事件
+    /// </summary>
+    private void OnMcpResponseReceived(object? sender, string response)
+    {
+        try
+        {
+            _logger?.LogDebug("收到MCP响应: {Response}", response);
+            
+            // 可以在这里处理特定的MCP响应，比如工具调用结果等
+            // 目前只记录日志，具体处理逻辑可以根据需要扩展
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "处理MCP响应时发生错误");
+        }
+    }
+
+    /// <summary>
+    /// 处理MCP错误事件
+    /// </summary>
+    private void OnMcpErrorOccurred(object? sender, Exception error)
+    {
+        try
+        {
+            _logger?.LogError(error, "MCP协议发生错误");
+            ErrorOccurred?.Invoke(this, $"MCP错误: {error.Message}");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "处理MCP错误事件时发生异常");
+        }
+    }
+
     public void Dispose()
     {
         try
@@ -988,8 +1066,7 @@ public class VoiceChatService : IVoiceChatService
                 try
                 {
                     _communicationClient.MessageReceived -= OnMessageReceived;
-                    _communicationClient.ConnectionStateChanged -= OnConnectionStateChanged;                    
-                    // 如果是WebSocket客户端，取消订阅更多事件
+                    _communicationClient.ConnectionStateChanged -= OnConnectionStateChanged;                      // 如果是WebSocket客户端，取消订阅更多事件
                     if (_communicationClient is WebSocketClient webSocketClient)
                     {
                         //webSocketClient.ProtocolMessageReceived -= OnProtocolMessageReceived;
@@ -998,6 +1075,11 @@ public class VoiceChatService : IVoiceChatService
                         webSocketClient.MusicMessageReceived -= OnMusicMessageReceived;
                         webSocketClient.SystemStatusMessageReceived -= OnSystemStatusMessageReceived;
                         webSocketClient.LlmMessageReceived -= OnLlmMessageReceived;
+                        
+                        // 取消订阅MCP事件
+                        webSocketClient.McpReadyForInitialization -= OnMcpReadyForInitialization;
+                        webSocketClient.McpResponseReceived -= OnMcpResponseReceived;
+                        webSocketClient.McpErrorOccurred -= OnMcpErrorOccurred;
                     }
                     
                     _communicationClient.Dispose();
