@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Services;
+using Verdure.Assistant.Core.Services.MCP;
 
 namespace Verdure.Assistant.Console;
 
@@ -46,9 +47,11 @@ class Program
               // Set up Microsoft Cognitive Services keyword spotting (matches py-xiaozhi wake word detector)
             _voiceChatService.SetKeywordSpottingService(keywordSpottingService);
             System.Console.WriteLine("关键词唤醒功能已启用（基于Microsoft认知服务）");
-            
-            // Initialize IoT devices BEFORE initializing VoiceChatService (similar to py-xiaozhi's _initialize_iot_devices)
+              // Initialize IoT devices BEFORE initializing VoiceChatService (similar to py-xiaozhi's _initialize_iot_devices)
             InitializeIoTDevices(host.Services);
+
+            // Initialize MCP services (new architecture based on xiaozhi-esp32)
+            await InitializeMcpServicesAsync(host.Services);
 
             // 初始化服务 (this will establish WebSocket connection and trigger IoT initialization)
             await _voiceChatService.InitializeAsync(_config);
@@ -93,13 +96,16 @@ class Program
                     return AudioStreamManager.GetInstance(logger);
                 });                // Music player service (required for MusicPlayerIoTDevice)
                 services.AddSingleton<IMusicPlayerService, KugouMusicService>();
-                services.AddSingleton<IMusicAudioPlayer, ConsoleMusicAudioPlayer>();
-
-                // Register IoT Device Manager and devices (similar to py-xiaozhi's _initialize_iot_devices)
+                services.AddSingleton<IMusicAudioPlayer, ConsoleMusicAudioPlayer>();                // Register IoT Device Manager and devices (similar to py-xiaozhi's _initialize_iot_devices)
                 services.AddSingleton<IoTDeviceManager>();
                 services.AddSingleton<MusicPlayerIoTDevice>();
                 services.AddSingleton<LampIoTDevice>();
                 services.AddSingleton<SpeakerIoTDevice>();
+
+                // Register MCP services (new architecture based on xiaozhi-esp32)
+                services.AddSingleton<McpServer>();
+                services.AddSingleton<McpDeviceManager>();
+                services.AddSingleton<McpIntegrationService>();
 
             });static VerdureConfig LoadConfiguration()
     {
@@ -113,9 +119,7 @@ class Program
         configuration.Bind(config);
         
         return config;
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Initialize IoT devices and setup integration (similar to py-xiaozhi's _initialize_iot_devices)
     /// </summary>
     static void InitializeIoTDevices(IServiceProvider services)
@@ -173,6 +177,46 @@ class Program
             var logger = services.GetService<ILogger<Program>>();
             logger?.LogError(ex, "IoT设备初始化失败");
             System.Console.WriteLine($"IoT设备初始化失败: {ex.Message}");
+        }
+    }    /// <summary>
+    /// Initialize MCP services (new architecture based on xiaozhi-esp32)
+    /// </summary>
+    static async Task InitializeMcpServicesAsync(IServiceProvider services)
+    {
+        try
+        {
+            var logger = services.GetService<ILogger<Program>>();
+            logger?.LogInformation("开始初始化MCP服务...");
+
+            // Get MCP services
+            var mcpServer = services.GetService<McpServer>();
+            var mcpDeviceManager = services.GetService<McpDeviceManager>();
+            var mcpIntegrationService = services.GetService<McpIntegrationService>();
+
+            if (mcpServer == null || mcpDeviceManager == null || mcpIntegrationService == null)
+            {
+                logger?.LogWarning("MCP services not found, skipping MCP initialization");
+                return;
+            }
+
+            // Initialize MCP integration
+            await mcpIntegrationService.InitializeAsync();
+
+            // Wire MCP integration service to VoiceChatService
+            if (_voiceChatService != null)
+            {
+                _voiceChatService.SetMcpIntegrationService(mcpIntegrationService);
+                logger?.LogInformation("MCP集成服务已连接到VoiceChatService");
+            }
+
+            logger?.LogInformation("MCP服务初始化完成");
+            System.Console.WriteLine("MCP设备管理器已启用 (基于xiaozhi-esp32架构)");
+        }
+        catch (Exception ex)
+        {
+            var logger = services.GetService<ILogger<Program>>();
+            logger?.LogError(ex, "MCP服务初始化失败");
+            System.Console.WriteLine($"MCP服务初始化失败: {ex.Message}");
         }
     }
 

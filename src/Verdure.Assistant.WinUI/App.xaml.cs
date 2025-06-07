@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Services;
+using Verdure.Assistant.Core.Services.MCP;
 using Verdure.Assistant.ViewModels;
 using Verdure.Assistant.WinUI.Services;
 using Windows.Storage;
@@ -105,8 +106,8 @@ public partial class App : Application
         services.AddSingleton<IVoiceChatService, VoiceChatService>();        
           // Music player service
         services.AddSingleton<IMusicAudioPlayer, WinUIMusicAudioPlayer>();
-        services.AddSingleton<IMusicPlayerService, KugouMusicService>();
-
+        services.AddSingleton<IMusicPlayerService, KugouMusicService>();        
+        
         // IoT Device Management (similar to py-xiaozhi ThingManager)
         services.AddSingleton<IoTDeviceManager>();
         
@@ -114,6 +115,11 @@ public partial class App : Application
         services.AddSingleton<MusicPlayerIoTDevice>();
         services.AddSingleton<LampIoTDevice>();
         services.AddSingleton<SpeakerIoTDevice>();
+
+        // Register MCP services (new architecture based on xiaozhi-esp32)
+        services.AddSingleton<McpServer>();
+        services.AddSingleton<McpDeviceManager>();
+        services.AddSingleton<McpIntegrationService>();
 
         // Interrupt manager and related services
         services.AddSingleton<InterruptManager>();

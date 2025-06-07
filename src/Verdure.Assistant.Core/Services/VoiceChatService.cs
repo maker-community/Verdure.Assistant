@@ -3,6 +3,7 @@ using System.Text.Json;
 using Verdure.Assistant.Core.Constants;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
+using Verdure.Assistant.Core.Services.MCP;
 
 namespace Verdure.Assistant.Core.Services;
 
@@ -35,6 +36,9 @@ public class VoiceChatService : IVoiceChatService
 
     // IoT device management (similar to py-xiaozhi ThingManager)
     private IoTDeviceManager? _iotDeviceManager;
+
+    // MCP integration service (new architecture based on xiaozhi-esp32)
+    private McpIntegrationService? _mcpIntegrationService;
 
 
     public event EventHandler<bool>? VoiceChatStateChanged;
@@ -199,9 +203,7 @@ public class VoiceChatService : IVoiceChatService
         _keywordSpottingService.ErrorOccurred += OnKeywordDetectionError;
         
         _logger?.LogInformation("关键词唤醒服务已设置");
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// 设置IoT设备管理器（对应py-xiaozhi的ThingManager集成）
     /// </summary>
     public void SetIoTDeviceManager(IoTDeviceManager iotDeviceManager)
@@ -213,8 +215,16 @@ public class VoiceChatService : IVoiceChatService
         
         _logger?.LogInformation("IoT设备管理器已设置，当前设备数量: {DeviceCount}", 
             _iotDeviceManager.GetDevices().Count);
-    }    
-    
+    }    /// <summary>
+    /// 设置MCP集成服务（新架构，基于xiaozhi-esp32的MCP实现）
+    /// </summary>
+    public void SetMcpIntegrationService(McpIntegrationService mcpIntegrationService)
+    {
+        _mcpIntegrationService = mcpIntegrationService;
+        
+        _logger?.LogInformation("MCP集成服务已设置");
+    }
+
     /// <summary>
     /// 处理IoT设备状态变化事件（对应py-xiaozhi的ThingManager事件处理）
     /// </summary>
@@ -255,6 +265,7 @@ public class VoiceChatService : IVoiceChatService
         }
     }    /// <summary>
     /// 处理IoT命令执行（对应py-xiaozhi的_handle_iot_message方法）
+    /// 支持传统IoT和新MCP架构
     /// </summary>
     private async Task HandleIoTCommandAsync(IotCommandMessage command)
     {
@@ -263,12 +274,65 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogInformation("执行IoT命令: 设备ID={DeviceId}, 方法={Method}", 
                 command.DeviceId, command.Method);
 
-            if (_iotDeviceManager == null)
+            // 优先使用MCP架构（新架构，基于xiaozhi-esp32设计）
+            if (_mcpIntegrationService != null)
             {
-                _logger?.LogWarning("IoT设备管理器未设置，无法执行命令");
+                await HandleMcpIoTCommandAsync(command);
                 return;
             }
 
+            // 回退到传统IoT架构（向后兼容）
+            if (_iotDeviceManager != null)
+            {
+                await HandleTraditionalIoTCommandAsync(command);
+                return;
+            }
+
+            _logger?.LogWarning("IoT设备管理器未设置，无法执行命令");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "执行IoT命令失败: {DeviceId}.{Method}", 
+                command.DeviceId, command.Method);
+            
+            // 发送错误结果
+            await SendIoTCommandErrorResult(command, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// 使用MCP架构处理IoT命令
+    /// </summary>
+    private async Task HandleMcpIoTCommandAsync(IotCommandMessage command)
+    {
+        try
+        {
+            // 构建MCP工具名称（遵循MCP命名约定）
+            var toolName = $"self.{command.DeviceId?.ToLowerInvariant()}.{command.Method?.ToLowerInvariant()}";
+            
+            // 执行MCP工具
+            var result = await _mcpIntegrationService!.ExecuteFunctionAsync(toolName, command.Parameters);
+            
+            // 发送命令执行结果
+            await SendIoTCommandSuccessResult(command, result);
+            
+            _logger?.LogInformation("MCP IoT命令执行完成: {ToolName}", toolName);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "MCP IoT命令执行失败: {DeviceId}.{Method}", 
+                command.DeviceId, command.Method);
+            await SendIoTCommandErrorResult(command, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// 使用传统架构处理IoT命令（向后兼容）
+    /// </summary>
+    private async Task HandleTraditionalIoTCommandAsync(IotCommandMessage command)
+    {
+        try
+        {
             // 构建IoT命令对象
             var iotCommand = new IoTCommand
             {
@@ -278,54 +342,75 @@ public class VoiceChatService : IVoiceChatService
             };
 
             // 执行IoT设备命令
-            var result = await _iotDeviceManager.ExecuteCommandAsync(iotCommand);
+            var result = await _iotDeviceManager!.ExecuteCommandAsync(iotCommand);
 
-            // 发送命令执行结果（类似py-xiaozhi的命令响应机制）
-            if (_communicationClient is WebSocketClient webSocketClient && IsConnected)
+            // 发送命令执行结果
+            if (result.Success)
             {
-                var resultMessage = new IotCommandResultMessage
-                {
-                    RequestId = command.RequestId,
-                    DeviceId = command.DeviceId,
-                    Method = command.Method,
-                    Success = result.Success,
-                    Result = result.Data,
-                    Error = result.Success ? null : result.Message
-                };
-
-                var json = System.Text.Json.JsonSerializer.Serialize(resultMessage);
-                await webSocketClient.SendTextAsync(json);
-                
-                _logger?.LogInformation("IoT命令执行完成: 成功={Success}, 结果={Result}", 
-                    result.Success, result.Data);
+                await SendIoTCommandSuccessResult(command, result.Data);
             }
+            else
+            {
+                await SendIoTCommandErrorResult(command, result.Message);
+            }
+                
+            _logger?.LogInformation("传统IoT命令执行完成: 成功={Success}, 结果={Result}", 
+                result.Success, result.Data);
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "执行IoT命令失败: {DeviceId}.{Method}", 
+            _logger?.LogError(ex, "传统IoT命令执行失败: {DeviceId}.{Method}", 
                 command.DeviceId, command.Method);
-            
-            // 发送错误结果
-            if (_communicationClient is WebSocketClient webSocketClient && IsConnected)
-            {
-                var errorResult = new IotCommandResultMessage
-                {
-                    RequestId = command.RequestId,
-                    DeviceId = command.DeviceId,
-                    Method = command.Method,
-                    Success = false,
-                    Error = ex.Message
-                };
+            await SendIoTCommandErrorResult(command, ex.Message);
+        }
+    }
 
-                try
-                {
-                    var json = System.Text.Json.JsonSerializer.Serialize(errorResult);
-                    await webSocketClient.SendTextAsync(json);
-                }
-                catch (Exception sendEx)
-                {
-                    _logger?.LogError(sendEx, "发送IoT命令错误结果失败");
-                }
+    /// <summary>
+    /// 发送IoT命令成功结果
+    /// </summary>
+    private async Task SendIoTCommandSuccessResult(IotCommandMessage command, object? result)
+    {
+        if (_communicationClient is WebSocketClient webSocketClient && IsConnected)
+        {
+            var resultMessage = new IotCommandResultMessage
+            {
+                RequestId = command.RequestId,
+                DeviceId = command.DeviceId,
+                Method = command.Method,
+                Success = true,
+                Result = result,
+                Error = null
+            };
+
+            var json = System.Text.Json.JsonSerializer.Serialize(resultMessage);
+            await webSocketClient.SendTextAsync(json);
+        }
+    }
+
+    /// <summary>
+    /// 发送IoT命令错误结果
+    /// </summary>
+    private async Task SendIoTCommandErrorResult(IotCommandMessage command, string error)
+    {
+        if (_communicationClient is WebSocketClient webSocketClient && IsConnected)
+        {
+            var errorResult = new IotCommandResultMessage
+            {
+                RequestId = command.RequestId,
+                DeviceId = command.DeviceId,
+                Method = command.Method,
+                Success = false,
+                Error = error
+            };
+
+            try
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(errorResult);
+                await webSocketClient.SendTextAsync(json);
+            }
+            catch (Exception sendEx)
+            {
+                _logger?.LogError(sendEx, "发送IoT命令错误结果失败");
             }
         }
     }
@@ -1263,7 +1348,21 @@ public class VoiceChatService : IVoiceChatService
                 }
             }
             
-            // 7. 重置状态
+            // 7. 释放MCP集成服务
+            if (_mcpIntegrationService != null)
+            {
+                try
+                {
+                    _mcpIntegrationService.Dispose();
+                    _mcpIntegrationService = null;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "释放MCP集成服务时出错");
+                }
+            }
+            
+            // 8. 重置状态
             _isVoiceChatActive = false;
             CurrentState = DeviceState.Idle;
             _lastAbortReason = AbortReason.None;
