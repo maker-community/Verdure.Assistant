@@ -72,8 +72,8 @@ namespace Verdure.Assistant.Core.Services.MCP
             var musicPlayer = new McpMusicPlayerDevice(_mcpServer, _musicPlayerService, null);
 
             // Add devices
-            await AddDeviceAsync(lamp);
-            await AddDeviceAsync(speaker);
+            //await AddDeviceAsync(lamp);
+            //await AddDeviceAsync(speaker);
             await AddDeviceAsync(musicPlayer);
 
             _logger.LogInformation("Default MCP devices initialized - Music service available: {HasMusicService}", 

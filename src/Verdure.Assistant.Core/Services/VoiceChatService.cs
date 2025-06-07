@@ -1059,7 +1059,7 @@ public class VoiceChatService : IVoiceChatService
 
                         case "tools/call":
                             // 处理工具调用响应
-                            HandleMcpToolCallResponse(resultElement);
+                            HandleMcpToolCallResponse(response);
                             break;
                         default:
                             _logger?.LogDebug("收到未知类型的协议消息: {Type}", method);
@@ -1190,51 +1190,21 @@ public class VoiceChatService : IVoiceChatService
     /// <summary>
     /// 处理MCP工具调用响应
     /// </summary>
-    private void HandleMcpToolCallResponse(JsonElement resultElement)
+    private async Task HandleMcpToolCallResponse(string resultJson)
     {
         try
         {
-            // 检查是否有错误标志
-            var isError = false;
-            if (resultElement.TryGetProperty("isError", out var isErrorElement))
+            if (_communicationClient is WebSocketClient wsClient && _mcpIntegrationService != null)
             {
-                isError = isErrorElement.GetBoolean();
+                // 如果有MCP集成服务，注册工具调用结果
+                _logger?.LogInformation("响应mcp 工具调用结果");
+                var content = await _mcpIntegrationService.HandleMcpRequestAsync(resultJson);
+                await wsClient.SendMcpMessageAsync(JsonDocument.Parse(content));
             }
-
-            if (isError)
+            else
             {
-                _logger?.LogWarning("MCP工具调用返回错误");
-                return;
-            }
+                _logger?.LogWarning("没有配置MCP集成服务，无法处理工具调用结果");
 
-            // 提取工具调用结果内容
-            if (resultElement.TryGetProperty("content", out var contentElement))
-            {
-                var resultTexts = new List<string>();
-
-                foreach (var contentItem in contentElement.EnumerateArray())
-                {
-                    if (contentItem.TryGetProperty("type", out var typeElement) &&
-                        typeElement.GetString() == "text" &&
-                        contentItem.TryGetProperty("text", out var textElement))
-                    {
-                        var resultText = textElement.GetString();
-                        if (!string.IsNullOrEmpty(resultText))
-                        {
-                            resultTexts.Add(resultText);
-                        }
-                    }
-                }
-
-                var combinedResult = string.Join(". ", resultTexts);
-                _logger?.LogInformation("MCP工具调用成功，结果: {Result}", combinedResult);
-
-                // 通知MCP集成服务工具调用完成
-                if (_mcpIntegrationService != null)
-                {
-                    _ = Task.Run(async () =>
-                        await _mcpIntegrationService.OnToolCallCompletedAsync("unknown", combinedResult));
-                }
             }
         }
         catch (Exception ex)

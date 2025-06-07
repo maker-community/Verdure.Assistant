@@ -10,7 +10,7 @@ public abstract class McpIoTDevice : IDisposable
 {
     protected readonly ILogger? _logger;
     protected readonly McpServer _mcpServer;
-      public string Name { get; protected set; } = string.Empty;
+    public string Name { get; protected set; } = string.Empty;
     public string Description { get; protected set; } = string.Empty;
     public string Type { get; protected set; } = string.Empty;
     public string DeviceId { get; protected set; } = string.Empty;

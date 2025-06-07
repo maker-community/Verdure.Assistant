@@ -46,7 +46,8 @@ public partial class App : Application
         await _host.StartAsync();
 
         MainWindow = new MainWindow();
-        MainWindow.Activate();        // Initialize theme service after window is created
+        MainWindow.Activate();        
+        // Initialize theme service after window is created
         var themeService = GetService<ThemeService>();
         if (themeService != null)
         {
@@ -71,7 +72,8 @@ public partial class App : Application
 
         // Core services
         services.AddSingleton<IVerificationService, VerificationService>();
-        services.AddSingleton<IConfigurationService, ConfigurationService>();          // Audio services
+        services.AddSingleton<IConfigurationService, ConfigurationService>();          
+        // Audio services
         services.AddSingleton<AudioStreamManager>(provider =>
         {
             var logger = provider.GetService<ILogger<AudioStreamManager>>();
@@ -88,7 +90,9 @@ public partial class App : Application
         {
             var logger = provider.GetService<ILogger<MqttNetClient>>();
             return new MqttNetClient("localhost", 1883, "winui-client", "verdure/chat", logger);
-        });        // UI Dispatcher for thread-safe UI operations
+        });        
+        
+        // UI Dispatcher for thread-safe UI operations
         services.AddSingleton<IUIDispatcher>(provider =>
         {
             // Get the DispatcherQueue from the current thread (main UI thread)

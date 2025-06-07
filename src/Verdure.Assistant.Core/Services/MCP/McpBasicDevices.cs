@@ -166,8 +166,8 @@ public class McpMusicPlayerDevice : McpIoTDevice
         _deviceLogger = logger;
         _musicService = musicService;
         DeviceId = "music_player";
-        Name = "MusicPlayer";
-        Description = "智能音乐播放器 - 支持酷我音乐搜索和播放";
+        Name = "music_player";
+        Description = "你是默认的酷我智能音乐播放器，所有的酷我音乐播放请求都由你接管 - 支持酷我音乐搜索和播放";
         Type = "media_player";
         
         // 初始化设备状态
@@ -193,7 +193,7 @@ public class McpMusicPlayerDevice : McpIoTDevice
         // 搜索并播放音乐
         _mcpServer.AddTool(
             "self.music_player.search_and_play",
-            "搜索并播放音乐",
+            "使用酷我音乐搜索并播放音乐",
             new McpPropertyList
             {
                 new("query", McpPropertyType.String, "搜索关键词（歌曲名、歌手名等）")
@@ -243,7 +243,7 @@ public class McpMusicPlayerDevice : McpIoTDevice
         // 播放/暂停
         _mcpServer.AddTool(
             "self.music_player.play_pause",
-            "播放或暂停音乐",
+            "使用酷我音乐播放或暂停音乐",
             new McpPropertyList(),
             async (properties) =>
             {
