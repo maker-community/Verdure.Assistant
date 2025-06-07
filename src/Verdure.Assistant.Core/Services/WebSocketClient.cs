@@ -954,11 +954,11 @@ public class WebSocketClient : ICommunicationClient, IDisposable
             if (message?.Payload?.RootElement is JsonElement payloadElement)
             {
                 // 成功响应
-                if (payloadElement.TryGetProperty("id", out var idElement) && idElement.TryGetInt32(out var requestId))
+                if (payloadElement.TryGetProperty("id", out var idElement))
                 {
                     // 成功响应
                     var responseJson = JsonSerializer.Serialize(message.Payload, JsonOptions);
-                    _logger?.LogDebug("Resolved pending MCP request {RequestId}", requestId);
+                    _logger?.LogDebug("Resolved pending MCP request {RequestId}", idElement);
 
                     // 触发响应事件
                     McpResponseReceived?.Invoke(this, responseJson);
