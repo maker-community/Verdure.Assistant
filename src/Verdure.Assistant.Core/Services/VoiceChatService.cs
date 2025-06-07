@@ -32,12 +32,7 @@ public class VoiceChatService : IVoiceChatService
     private InterruptManager? _interruptManager;    
     // Keyword spotting service (Microsoft Cognitive Services based)
     private IKeywordSpottingService? _keywordSpottingService;
-    private bool _keywordDetectionEnabled = false;
-
-    // IoT device management (similar to py-xiaozhi ThingManager)
-    private IoTDeviceManager? _iotDeviceManager;
-
-    // MCP integration service (new architecture based on xiaozhi-esp32)
+    private bool _keywordDetectionEnabled = false;    // MCP integration service (new architecture based on xiaozhi-esp32)
     private McpIntegrationService? _mcpIntegrationService;
 
 
@@ -202,20 +197,7 @@ public class VoiceChatService : IVoiceChatService
         _keywordSpottingService.KeywordDetected += OnKeywordDetected;
         _keywordSpottingService.ErrorOccurred += OnKeywordDetectionError;
         
-        _logger?.LogInformation("关键词唤醒服务已设置");
-    }    /// <summary>
-    /// 设置IoT设备管理器（对应py-xiaozhi的ThingManager集成）
-    /// </summary>
-    public void SetIoTDeviceManager(IoTDeviceManager iotDeviceManager)
-    {
-        _iotDeviceManager = iotDeviceManager;
-        
-        // 订阅IoT设备状态变化事件
-        _iotDeviceManager.DeviceStateChanged += OnIoTDeviceStateChanged;
-        
-        _logger?.LogInformation("IoT设备管理器已设置，当前设备数量: {DeviceCount}", 
-            _iotDeviceManager.GetDevices().Count);
-    }    /// <summary>
+        _logger?.LogInformation("关键词唤醒服务已设置");    }    /// <summary>
     /// 设置MCP集成服务（新架构，基于xiaozhi-esp32的MCP实现）
     /// </summary>
     public void SetMcpIntegrationService(McpIntegrationService mcpIntegrationService)
@@ -223,76 +205,28 @@ public class VoiceChatService : IVoiceChatService
         _mcpIntegrationService = mcpIntegrationService;
         
         _logger?.LogInformation("MCP集成服务已设置");
-    }
-
-    /// <summary>
-    /// 处理IoT设备状态变化事件（对应py-xiaozhi的ThingManager事件处理）
-    /// </summary>
-    private void OnIoTDeviceStateChanged(object? sender, IoTDeviceStateChangedEventArgs e)
-    {
-        try
-        {
-            _logger?.LogInformation("IoT设备状态变化: 设备={DeviceName}, 状态={StateJson}", 
-                e.DeviceName, e.StateJson);
-
-            // 通过WebSocket通知服务器IoT设备状态变化（类似py-xiaozhi的_send_iot_states）
-            if (_communicationClient is WebSocketClient webSocketClient && IsConnected)
-            {
-                var deviceStatesJson = _iotDeviceManager?.GetStatesJson();
-                if (!string.IsNullOrEmpty(deviceStatesJson))
-                {                    Task.Run(async () =>
-                    {
-                        try
-                        {
-                            var statesData = System.Text.Json.JsonSerializer.Deserialize<object>(deviceStatesJson);
-                            if (statesData != null)
-                            {
-                                await webSocketClient.SendIotStatesAsync(statesData);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger?.LogError(ex, "发送IoT设备状态失败");
-                        }
-                    });
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "处理IoT设备状态变化失败");
-            ErrorOccurred?.Invoke(this, $"处理IoT设备状态变化失败: {ex.Message}");
-        }
     }    /// <summary>
-    /// 处理IoT命令执行（对应py-xiaozhi的_handle_iot_message方法）
-    /// 支持传统IoT和新MCP架构
+    /// 处理IoT命令执行（基于xiaozhi-esp32的MCP架构）
     /// </summary>
     private async Task HandleIoTCommandAsync(IotCommandMessage command)
     {
         try
         {
-            _logger?.LogInformation("执行IoT命令: 设备ID={DeviceId}, 方法={Method}", 
+            _logger?.LogInformation("执行MCP IoT命令: 设备ID={DeviceId}, 方法={Method}", 
                 command.DeviceId, command.Method);
 
-            // 优先使用MCP架构（新架构，基于xiaozhi-esp32设计）
+            // 使用MCP架构处理IoT命令（基于xiaozhi-esp32设计）
             if (_mcpIntegrationService != null)
             {
                 await HandleMcpIoTCommandAsync(command);
                 return;
             }
 
-            // 回退到传统IoT架构（向后兼容）
-            if (_iotDeviceManager != null)
-            {
-                await HandleTraditionalIoTCommandAsync(command);
-                return;
-            }
-
-            _logger?.LogWarning("IoT设备管理器未设置，无法执行命令");
+            _logger?.LogWarning("MCP集成服务未设置，无法执行命令");
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "执行IoT命令失败: {DeviceId}.{Method}", 
+            _logger?.LogError(ex, "执行MCP IoT命令失败: {DeviceId}.{Method}", 
                 command.DeviceId, command.Method);
             
             // 发送错误结果
@@ -301,7 +235,7 @@ public class VoiceChatService : IVoiceChatService
     }
 
     /// <summary>
-    /// 使用MCP架构处理IoT命令
+    /// 使用MCP架构处理IoT命令（基于xiaozhi-esp32实现）
     /// </summary>
     private async Task HandleMcpIoTCommandAsync(IotCommandMessage command)
     {
@@ -321,45 +255,6 @@ public class VoiceChatService : IVoiceChatService
         catch (Exception ex)
         {
             _logger?.LogError(ex, "MCP IoT命令执行失败: {DeviceId}.{Method}", 
-                command.DeviceId, command.Method);
-            await SendIoTCommandErrorResult(command, ex.Message);
-        }
-    }
-
-    /// <summary>
-    /// 使用传统架构处理IoT命令（向后兼容）
-    /// </summary>
-    private async Task HandleTraditionalIoTCommandAsync(IotCommandMessage command)
-    {
-        try
-        {
-            // 构建IoT命令对象
-            var iotCommand = new IoTCommand
-            {
-                Name = command.DeviceId ?? string.Empty,
-                Method = command.Method ?? string.Empty,
-                Parameters = command.Parameters ?? new Dictionary<string, object>()
-            };
-
-            // 执行IoT设备命令
-            var result = await _iotDeviceManager!.ExecuteCommandAsync(iotCommand);
-
-            // 发送命令执行结果
-            if (result.Success)
-            {
-                await SendIoTCommandSuccessResult(command, result.Data);
-            }
-            else
-            {
-                await SendIoTCommandErrorResult(command, result.Message);
-            }
-                
-            _logger?.LogInformation("传统IoT命令执行完成: 成功={Success}, 结果={Result}", 
-                result.Success, result.Data);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "传统IoT命令执行失败: {DeviceId}.{Method}", 
                 command.DeviceId, command.Method);
             await SendIoTCommandErrorResult(command, ex.Message);
         }

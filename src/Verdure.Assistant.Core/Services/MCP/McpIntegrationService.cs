@@ -245,7 +245,8 @@ namespace Verdure.Assistant.Core.Services.MCP
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to get device context");
-                return "IoT device information is currently unavailable.";            }
+                return "IoT device information is currently unavailable.";            
+            }
         }
 
         #region IDisposable Support

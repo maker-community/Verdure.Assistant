@@ -311,9 +311,6 @@ public class MockVoiceChatService : IVoiceChatService
     }    public void SetKeywordSpottingService(IKeywordSpottingService keywordSpottingService)
     {
         // 模拟实现
-    }    public void SetIoTDeviceManager(IoTDeviceManager iotDeviceManager)
-    {
-        // 模拟实现
     }
 
     public void SetMcpIntegrationService(McpIntegrationService mcpIntegrationService)

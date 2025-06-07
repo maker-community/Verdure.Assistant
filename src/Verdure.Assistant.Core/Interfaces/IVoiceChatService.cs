@@ -119,12 +119,12 @@ public interface IVoiceChatService : IDisposable
     /// <summary>
     /// 停止关键词唤醒检测
     /// </summary>
-    Task StopKeywordDetectionAsync();    /// <summary>
+    Task StopKeywordDetectionAsync();    
+    
+    /// <summary>
     /// 关键词唤醒是否启用
     /// </summary>
     bool IsKeywordDetectionEnabled { get; }
-
-    void SetIoTDeviceManager(IoTDeviceManager iotDeviceManager);
 
     /// <summary>
     /// 设置MCP集成服务（新架构，基于xiaozhi-esp32的MCP实现）

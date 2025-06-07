@@ -52,10 +52,8 @@ public partial class App : Application
         {
             await themeService.InitializeAsync();
             themeService.StartSystemThemeListener();
-        }
-
-        // Initialize IoT device management (similar to py-xiaozhi's _initialize_iot_devices)
-        InitializeIoTDevices();
+        }        // Initialize MCP device management (based on xiaozhi-esp32 architecture)
+        await InitializeMcpDevicesAsync();
     }
     private void ConfigureServices(IServiceCollection services)
     {
@@ -107,16 +105,7 @@ public partial class App : Application
           // Music player service
         services.AddSingleton<IMusicAudioPlayer, WinUIMusicAudioPlayer>();
         services.AddSingleton<IMusicPlayerService, KugouMusicService>();        
-        
-        // IoT Device Management (similar to py-xiaozhi ThingManager)
-        services.AddSingleton<IoTDeviceManager>();
-        
-        // Register IoT devices
-        services.AddSingleton<MusicPlayerIoTDevice>();
-        services.AddSingleton<LampIoTDevice>();
-        services.AddSingleton<SpeakerIoTDevice>();
-
-        // Register MCP services (new architecture based on xiaozhi-esp32)
+          // Register MCP services (new architecture based on xiaozhi-esp32)
         services.AddSingleton<McpServer>();
         services.AddSingleton<McpDeviceManager>();
         services.AddSingleton<McpIntegrationService>();
@@ -139,62 +128,46 @@ public partial class App : Application
         services.AddTransient<HomePage>();
         services.AddTransient<SettingsPage>();
         services.AddTransient<MainWindow>();    }    
-    
-    /// <summary>
-    /// Initialize IoT devices and setup integration (similar to py-xiaozhi's _initialize_iot_devices)
+      /// <summary>
+    /// Initialize MCP devices and setup integration (based on xiaozhi-esp32 architecture)
     /// </summary>
-    private void InitializeIoTDevices()
+    private async Task InitializeMcpDevicesAsync()
     {
         try
         {
             var logger = GetService<ILogger<App>>();
-            logger?.LogInformation("开始初始化IoT设备...");
+            logger?.LogInformation("开始初始化MCP设备...");
 
             // Get required services
-            var iotDeviceManager = GetService<IoTDeviceManager>();
+            var mcpServer = GetService<McpServer>();
+            var mcpDeviceManager = GetService<McpDeviceManager>();
+            var mcpIntegrationService = GetService<McpIntegrationService>();
             var voiceChatService = GetService<IVoiceChatService>();
-            var musicPlayerDevice = GetService<MusicPlayerIoTDevice>();
-            var lampDevice = GetService<LampIoTDevice>();
-            var speakerDevice = GetService<SpeakerIoTDevice>();
 
-            if (iotDeviceManager == null)
+            if (mcpServer == null || mcpDeviceManager == null || mcpIntegrationService == null)
             {
-                logger?.LogError("IoTDeviceManager service not found");
+                logger?.LogError("Required MCP services not found");
                 return;
             }
+
             if (voiceChatService == null)
             {
                 logger?.LogError("VoiceChatService not found");
                 return;
-            }
+            }            // Initialize MCP server and device manager
+            await mcpServer.InitializeAsync();
+            logger?.LogInformation("MCP服务器已初始化");
 
-            // Add IoT devices to manager (similar to py-xiaozhi's thing_manager.add_thing)
-            if (musicPlayerDevice != null)
-            {
-                iotDeviceManager.AddDevice(musicPlayerDevice);
-                logger?.LogInformation("已添加音乐播放器IoT设备");
-            }
-            if (lampDevice != null)
-            {
-                iotDeviceManager.AddDevice(lampDevice);
-                logger?.LogInformation("已添加智能灯IoT设备");
-            }
-            if (speakerDevice != null)
-            {
-                iotDeviceManager.AddDevice(speakerDevice);
-                logger?.LogInformation("已添加智能音箱IoT设备");
-            }
+            // Set MCP integration service on VoiceChatService
+            voiceChatService.SetMcpIntegrationService(mcpIntegrationService);
+            logger?.LogInformation("MCP集成服务已设置到语音聊天服务");
 
-            // Set IoT device manager on VoiceChatService (similar to py-xiaozhi integration)
-            voiceChatService.SetIoTDeviceManager(iotDeviceManager);
-
-            logger?.LogInformation("IoT设备初始化完成，共注册了 {DeviceCount} 个设备", 
-                iotDeviceManager.GetDevices().Count);
+            logger?.LogInformation("MCP设备初始化完成");
         }
         catch (Exception ex)
         {
             var logger = GetService<ILogger<App>>();
-            logger?.LogError(ex, "IoT设备初始化失败");
+            logger?.LogError(ex, "MCP设备初始化失败");
         }
     }
     

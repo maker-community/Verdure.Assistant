@@ -46,9 +46,8 @@ class Program
             await interruptManager.InitializeAsync();
               // Set up Microsoft Cognitive Services keyword spotting (matches py-xiaozhi wake word detector)
             _voiceChatService.SetKeywordSpottingService(keywordSpottingService);
-            System.Console.WriteLine("关键词唤醒功能已启用（基于Microsoft认知服务）");
-              // Initialize IoT devices BEFORE initializing VoiceChatService (similar to py-xiaozhi's _initialize_iot_devices)
-            InitializeIoTDevices(host.Services);
+            System.Console.WriteLine("关键词唤醒功能已启用（基于Microsoft认知服务）");              // Initialize MCP IoT devices (new architecture based on xiaozhi-esp32)
+            await InitializeMcpDevicesAsync(host.Services);
 
             // Initialize MCP services (new architecture based on xiaozhi-esp32)
             await InitializeMcpServicesAsync(host.Services);
@@ -93,14 +92,9 @@ class Program
                 services.AddSingleton<AudioStreamManager>(provider =>
                 {
                     var logger = provider.GetService<ILogger<AudioStreamManager>>();
-                    return AudioStreamManager.GetInstance(logger);
-                });                // Music player service (required for MusicPlayerIoTDevice)
+                    return AudioStreamManager.GetInstance(logger);                });                // Music player service (required for MCP music device)
                 services.AddSingleton<IMusicPlayerService, KugouMusicService>();
-                services.AddSingleton<IMusicAudioPlayer, ConsoleMusicAudioPlayer>();                // Register IoT Device Manager and devices (similar to py-xiaozhi's _initialize_iot_devices)
-                services.AddSingleton<IoTDeviceManager>();
-                services.AddSingleton<MusicPlayerIoTDevice>();
-                services.AddSingleton<LampIoTDevice>();
-                services.AddSingleton<SpeakerIoTDevice>();
+                services.AddSingleton<IMusicAudioPlayer, ConsoleMusicAudioPlayer>();
 
                 // Register MCP services (new architecture based on xiaozhi-esp32)
                 services.AddSingleton<McpServer>();
@@ -120,25 +114,34 @@ class Program
         
         return config;
     }    /// <summary>
-    /// Initialize IoT devices and setup integration (similar to py-xiaozhi's _initialize_iot_devices)
+    /// Initialize MCP IoT devices and setup integration (based on xiaozhi-esp32's MCP architecture)
     /// </summary>
-    static void InitializeIoTDevices(IServiceProvider services)
+    static async Task InitializeMcpDevicesAsync(IServiceProvider services)
     {
         try
         {
             var logger = services.GetService<ILogger<Program>>();
-            logger?.LogInformation("开始初始化IoT设备...");
+            logger?.LogInformation("开始初始化MCP IoT设备...");
 
             // Get required services
-            var iotDeviceManager = services.GetService<IoTDeviceManager>();
+            var mcpServer = services.GetService<McpServer>();
+            var mcpDeviceManager = services.GetService<McpDeviceManager>();
+            var mcpIntegrationService = services.GetService<McpIntegrationService>();
             var voiceChatService = services.GetService<IVoiceChatService>();
-            var musicPlayerDevice = services.GetService<MusicPlayerIoTDevice>();
-            var lampDevice = services.GetService<LampIoTDevice>();
-            var speakerDevice = services.GetService<SpeakerIoTDevice>();
 
-            if (iotDeviceManager == null)
+            if (mcpServer == null)
             {
-                logger?.LogError("IoTDeviceManager service not found");
+                logger?.LogError("McpServer service not found");
+                return;
+            }
+            if (mcpDeviceManager == null)
+            {
+                logger?.LogError("McpDeviceManager service not found");
+                return;
+            }
+            if (mcpIntegrationService == null)
+            {
+                logger?.LogError("McpIntegrationService service not found");
                 return;
             }
             if (voiceChatService == null)
@@ -147,38 +150,26 @@ class Program
                 return;
             }
 
-            // Add IoT devices to manager (similar to py-xiaozhi's thing_manager.add_thing)
-            if (musicPlayerDevice != null)
-            {
-                iotDeviceManager.AddDevice(musicPlayerDevice);
-                logger?.LogInformation("已添加音乐播放器IoT设备");
-            }
-            if (lampDevice != null)
-            {
-                iotDeviceManager.AddDevice(lampDevice);
-                logger?.LogInformation("已添加智能灯IoT设备");
-            }
-            if (speakerDevice != null)
-            {
-                iotDeviceManager.AddDevice(speakerDevice);
-                logger?.LogInformation("已添加智能音箱IoT设备");
-            }
+            // Initialize MCP server and device manager (similar to xiaozhi-esp32 MCP initialization)
+            await mcpServer.InitializeAsync();
+            await mcpDeviceManager.InitializeAsync();
+            await mcpIntegrationService.InitializeAsync();
 
-            // Set IoT device manager on VoiceChatService (similar to py-xiaozhi integration)
-            voiceChatService.SetIoTDeviceManager(iotDeviceManager);
+            // Set MCP integration service on VoiceChatService (new MCP-based integration)
+            voiceChatService.SetMcpIntegrationService(mcpIntegrationService);
 
-            logger?.LogInformation("IoT设备初始化完成，共注册了 {DeviceCount} 个设备", 
-                iotDeviceManager.GetDevices().Count);
+            logger?.LogInformation("MCP IoT设备初始化完成，共注册了 {DeviceCount} 个设备", 
+                mcpDeviceManager.Devices.Count);
                 
-            System.Console.WriteLine($"IoT设备初始化完成，注册了 {iotDeviceManager.GetDevices().Count} 个设备");
+            System.Console.WriteLine($"MCP IoT设备初始化完成，注册了 {mcpDeviceManager.Devices.Count} 个设备");
         }
         catch (Exception ex)
         {
             var logger = services.GetService<ILogger<Program>>();
-            logger?.LogError(ex, "IoT设备初始化失败");
-            System.Console.WriteLine($"IoT设备初始化失败: {ex.Message}");
+            logger?.LogError(ex, "MCP IoT设备初始化失败");
+            System.Console.WriteLine($"MCP IoT设备初始化失败: {ex.Message}");
         }
-    }    /// <summary>
+    }/// <summary>
     /// Initialize MCP services (new architecture based on xiaozhi-esp32)
     /// </summary>
     static async Task InitializeMcpServicesAsync(IServiceProvider services)
