@@ -20,8 +20,10 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     private readonly ILogger? _logger;
     private bool _isConnected;
     private string? _sessionId;
-    private readonly TaskCompletionSource<bool> _helloReceived = new();      public event EventHandler<ChatMessage>? MessageReceived;
-    public event EventHandler<bool>? ConnectionStateChanged;    public event EventHandler<ProtocolMessage>? ProtocolMessageReceived;
+    private readonly TaskCompletionSource<bool> _helloReceived = new();      
+    public event EventHandler<ChatMessage>? MessageReceived;
+    public event EventHandler<bool>? ConnectionStateChanged;    
+    public event EventHandler<ProtocolMessage>? ProtocolMessageReceived;
     public event EventHandler<byte[]>? AudioDataReceived;
     public event EventHandler<TtsMessage>? TtsStateChanged;
     public event EventHandler<MusicMessage>? MusicMessageReceived;
