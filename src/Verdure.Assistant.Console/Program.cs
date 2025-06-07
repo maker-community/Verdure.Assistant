@@ -94,11 +94,15 @@ class Program
                     var logger = provider.GetService<ILogger<AudioStreamManager>>();
                     return AudioStreamManager.GetInstance(logger);                });                // Music player service (required for MCP music device)
                 services.AddSingleton<IMusicPlayerService, KugouMusicService>();
-                services.AddSingleton<IMusicAudioPlayer, ConsoleMusicAudioPlayer>();
-
-                // Register MCP services (new architecture based on xiaozhi-esp32)
+                services.AddSingleton<IMusicAudioPlayer, ConsoleMusicAudioPlayer>();                // Register MCP services (new architecture based on xiaozhi-esp32)
                 services.AddSingleton<McpServer>();
-                services.AddSingleton<McpDeviceManager>();
+                services.AddSingleton<McpDeviceManager>(provider =>
+                {
+                    var logger = provider.GetRequiredService<ILogger<McpDeviceManager>>();
+                    var mcpServer = provider.GetRequiredService<McpServer>();
+                    var musicService = provider.GetService<IMusicPlayerService>();
+                    return new McpDeviceManager(logger, mcpServer, musicService);
+                });
                 services.AddSingleton<McpIntegrationService>();
 
             });static VerdureConfig LoadConfiguration()

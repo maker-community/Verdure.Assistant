@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Verdure.Assistant.Core.Models;
+using Verdure.Assistant.Core.Interfaces;
 
 namespace Verdure.Assistant.Core.Services.MCP
 {
@@ -15,6 +16,7 @@ namespace Verdure.Assistant.Core.Services.MCP
     {
         private readonly ILogger<McpDeviceManager> _logger;
         private readonly McpServer _mcpServer;
+        private readonly IMusicPlayerService? _musicPlayerService;
         private readonly Dictionary<string, McpIoTDevice> _devices;
         private readonly Dictionary<string, McpTool> _deviceTools;
         private bool _disposed = false;
@@ -26,14 +28,15 @@ namespace Verdure.Assistant.Core.Services.MCP
         public IReadOnlyDictionary<string, McpIoTDevice> Devices => _devices;
         public IReadOnlyDictionary<string, McpTool> DeviceTools => _deviceTools;
 
-        public McpDeviceManager(ILogger<McpDeviceManager> logger, McpServer mcpServer)
+        public McpDeviceManager(ILogger<McpDeviceManager> logger, McpServer mcpServer, IMusicPlayerService? musicPlayerService = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _mcpServer = mcpServer ?? throw new ArgumentNullException(nameof(mcpServer));
+            _musicPlayerService = musicPlayerService;
             _devices = new Dictionary<string, McpIoTDevice>();
             _deviceTools = new Dictionary<string, McpTool>();
 
-            _logger.LogInformation("MCP Device Manager initialized");
+            _logger.LogInformation("MCP Device Manager initialized with music service: {HasMusicService}", _musicPlayerService != null);
         }
 
         /// <summary>
@@ -63,17 +66,18 @@ namespace Verdure.Assistant.Core.Services.MCP
         /// </summary>
         private async Task InitializeDefaultDevicesAsync()
         {
-            // Create basic IoT devices
+            // Create basic IoT devices with real services
             var lamp = new McpLampDevice(_mcpServer, null);
             var speaker = new McpSpeakerDevice(_mcpServer, null);
-            var musicPlayer = new McpMusicPlayerDevice(_mcpServer, null);
+            var musicPlayer = new McpMusicPlayerDevice(_mcpServer, _musicPlayerService, null);
 
             // Add devices
             await AddDeviceAsync(lamp);
             await AddDeviceAsync(speaker);
             await AddDeviceAsync(musicPlayer);
 
-            _logger.LogInformation("Default MCP devices initialized");
+            _logger.LogInformation("Default MCP devices initialized - Music service available: {HasMusicService}", 
+                _musicPlayerService != null);
         }
 
         /// <summary>

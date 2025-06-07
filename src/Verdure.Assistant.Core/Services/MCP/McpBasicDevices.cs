@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Verdure.Assistant.Core.Services.MCP;
+using Verdure.Assistant.Core.Interfaces;
+using Verdure.Assistant.Core.Models;
 
 namespace Verdure.Assistant.Core.Services.MCP;
 
@@ -39,8 +41,7 @@ public class McpLampDevice : McpIoTDevice
                 _deviceLogger?.LogInformation("智能灯已打开");
                 return await Task.FromResult<McpReturnValue>("台灯已打开");
             });
-        
-        // 关闭灯
+          // 关闭灯
         _mcpServer.AddTool(
             "self.lamp.turn_off",
             "关闭台灯",
@@ -49,10 +50,9 @@ public class McpLampDevice : McpIoTDevice
             {
                 SetState("power", false);
                 _deviceLogger?.LogInformation("智能灯已关闭");
-                return "台灯已关闭";
+                return await Task.FromResult("台灯已关闭");
             });
-        
-        // 设置亮度
+          // 设置亮度
         _mcpServer.AddTool(
             "self.lamp.set_brightness",
             "设置台灯亮度",
@@ -65,10 +65,9 @@ public class McpLampDevice : McpIoTDevice
                 var brightness = properties["brightness"].GetValue<int>();
                 SetState("brightness", brightness);
                 _deviceLogger?.LogInformation("台灯亮度已设置为: {Brightness}", brightness);
-                return $"台灯亮度已设置为 {brightness}%";
+                return await Task.FromResult($"台灯亮度已设置为 {brightness}%");
             });
-        
-        // 设置颜色
+          // 设置颜色
         _mcpServer.AddTool(
             "self.lamp.set_color",
             "设置台灯颜色",
@@ -81,7 +80,7 @@ public class McpLampDevice : McpIoTDevice
                 var color = properties["color"].GetValue<string>() ?? "white";
                 SetState("color", color);
                 _deviceLogger?.LogInformation("台灯颜色已设置为: {Color}", color);
-                return $"台灯颜色已设置为 {color}";
+                return await Task.FromResult($"台灯颜色已设置为 {color}");
             });
     }
 }
@@ -111,8 +110,7 @@ public class McpSpeakerDevice : McpIoTDevice
     {
         // 添加设备状态获取工具
         AddGetDeviceStatusTool();
-        
-        // 设置音量
+          // 设置音量
         _mcpServer.AddTool(
             "self.audio_speaker.set_volume",
             "设置扬声器音量。如果当前音量未知，请先调用获取设备状态工具。",
@@ -126,10 +124,9 @@ public class McpSpeakerDevice : McpIoTDevice
                 SetState("volume", volume);
                 SetState("muted", false); // 设置音量时取消静音
                 _deviceLogger?.LogInformation("扬声器音量已设置为: {Volume}", volume);
-                return $"扬声器音量已设置为 {volume}%";
+                return await Task.FromResult($"扬声器音量已设置为 {volume}%");
             });
-        
-        // 静音
+          // 静音
         _mcpServer.AddTool(
             "self.speaker.mute",
             "将扬声器静音",
@@ -138,7 +135,7 @@ public class McpSpeakerDevice : McpIoTDevice
             {
                 SetState("muted", true);
                 _deviceLogger?.LogInformation("扬声器已静音");
-                return "扬声器已静音";
+                return await Task.FromResult("扬声器已静音");
             });
         
         // 取消静音
@@ -150,24 +147,27 @@ public class McpSpeakerDevice : McpIoTDevice
             {
                 SetState("muted", false);
                 _deviceLogger?.LogInformation("扬声器已取消静音");
-                return "扬声器已取消静音";
+                return await Task.FromResult("扬声器已取消静音");
             });
     }
 }
 
 /// <summary>
 /// 音乐播放器MCP设备 - 对应xiaozhi-esp32的MusicPlayer模式
+/// 集成KugouMusicService实现真实的音乐播放功能
 /// </summary>
 public class McpMusicPlayerDevice : McpIoTDevice
 {
     private readonly ILogger<McpMusicPlayerDevice>? _deviceLogger;
-      public McpMusicPlayerDevice(McpServer mcpServer, ILogger<McpMusicPlayerDevice>? logger = null) 
+    private readonly IMusicPlayerService? _musicService;
+      public McpMusicPlayerDevice(McpServer mcpServer, IMusicPlayerService? musicService = null, ILogger<McpMusicPlayerDevice>? logger = null) 
         : base(mcpServer, logger)
     {
         _deviceLogger = logger;
+        _musicService = musicService;
         DeviceId = "music_player";
         Name = "MusicPlayer";
-        Description = "智能音乐播放器";
+        Description = "智能音乐播放器 - 支持酷我音乐搜索和播放";
         Type = "media_player";
         
         // 初始化设备状态
@@ -177,9 +177,15 @@ public class McpMusicPlayerDevice : McpIoTDevice
         SetState("progress", 0);
         SetState("duration", 0);
         SetState("volume", 50);
+        
+        // 如果有音乐服务，订阅事件更新状态
+        if (_musicService != null)
+        {
+            _musicService.PlaybackStateChanged += OnMusicServiceStateChanged;
+            _musicService.ProgressUpdated += OnMusicServiceProgressUpdated;
+        }
     }
-    
-    protected override void RegisterTools()
+      protected override void RegisterTools()
     {
         // 添加设备状态获取工具
         AddGetDeviceStatusTool();
@@ -195,10 +201,43 @@ public class McpMusicPlayerDevice : McpIoTDevice
             async (properties) =>
             {
                 var query = properties["query"].GetValue<string>() ?? "";
-                SetState("current_song", $"搜索歌曲: {query}");
-                SetState("playing", true);
-                _deviceLogger?.LogInformation("正在搜索并播放音乐: {Query}", query);
-                return $"正在播放搜索结果: {query}";
+                
+                if (_musicService != null)
+                {
+                    try
+                    {
+                        _deviceLogger?.LogInformation("通过酷我音乐搜索并播放: {Query}", query);
+                        var result = await _musicService.SearchAndPlayAsync(query);
+                        
+                        if (result.Success)
+                        {
+                            // 更新设备状态
+                            SetState("current_song", _musicService.CurrentTrack?.Name ?? query);
+                            SetState("artist", _musicService.CurrentTrack?.Artist ?? "");
+                            SetState("playing", _musicService.IsPlaying);
+                            
+                            return await Task.FromResult<McpReturnValue>($"正在播放: {_musicService.CurrentTrack?.Name ?? query}");
+                        }
+                        else
+                        {
+                            _deviceLogger?.LogWarning("音乐播放失败: {Message}", result.Message);
+                            return await Task.FromResult<McpReturnValue>($"播放失败: {result.Message}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _deviceLogger?.LogError(ex, "音乐播放异常");
+                        return await Task.FromResult<McpReturnValue>($"播放异常: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    // 模拟模式
+                    SetState("current_song", $"搜索歌曲: {query}");
+                    SetState("playing", true);
+                    _deviceLogger?.LogInformation("模拟播放音乐: {Query}", query);
+                    return await Task.FromResult<McpReturnValue>($"正在播放搜索结果: {query}");
+                }
             });
         
         // 播放/暂停
@@ -208,37 +247,64 @@ public class McpMusicPlayerDevice : McpIoTDevice
             new McpPropertyList(),
             async (properties) =>
             {
-                var isPlaying = GetState<bool>("playing");
-                SetState("playing", !isPlaying);
-                var action = !isPlaying ? "播放" : "暂停";
-                _deviceLogger?.LogInformation("音乐播放器状态: {Action}", action);
-                return $"音乐已{action}";
+                if (_musicService != null)
+                {
+                    try
+                    {
+                        var result = await _musicService.TogglePlayPauseAsync();
+                        if (result.Success)
+                        {
+                            SetState("playing", _musicService.IsPlaying);
+                            var action = _musicService.IsPlaying ? "播放" : "暂停";
+                            _deviceLogger?.LogInformation("音乐播放器状态: {Action}", action);
+                            return await Task.FromResult<McpReturnValue>($"音乐已{action}");
+                        }
+                        else
+                        {
+                            return await Task.FromResult<McpReturnValue>($"操作失败: {result.Message}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _deviceLogger?.LogError(ex, "播放/暂停操作异常");
+                        return await Task.FromResult<McpReturnValue>($"操作异常: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    // 模拟模式
+                    var isPlaying = GetState<bool>("playing");
+                    SetState("playing", !isPlaying);
+                    var action = !isPlaying ? "播放" : "暂停";
+                    _deviceLogger?.LogInformation("音乐播放器状态: {Action}", action);
+                    return await Task.FromResult<McpReturnValue>($"音乐已{action}");
+                }
             });
-        
-        // 下一首
+          // 下一首
         _mcpServer.AddTool(
             "self.music_player.next",
             "切换到下一首歌曲",
             new McpPropertyList(),
             async (properties) =>
             {
+                // TODO: 实现下一首功能（需要KugouMusicService支持播放列表）
                 SetState("current_song", "下一首歌曲");
                 SetState("progress", 0);
                 _deviceLogger?.LogInformation("切换到下一首歌曲");
-                return "已切换到下一首歌曲";
+                return await Task.FromResult<McpReturnValue>("已切换到下一首歌曲");
             });
-        
-        // 上一首
+          // 上一首
         _mcpServer.AddTool(
             "self.music_player.previous",
             "切换到上一首歌曲",
             new McpPropertyList(),
             async (properties) =>
             {
+                // TODO: 实现上一首功能（需要KugouMusicService支持播放列表）
                 SetState("current_song", "上一首歌曲");
                 SetState("progress", 0);
                 _deviceLogger?.LogInformation("切换到上一首歌曲");
-                return "已切换到上一首歌曲";
+                return await Task.FromResult<McpReturnValue>("已切换到上一首歌曲");
             });
         
         // 设置音量
@@ -252,9 +318,66 @@ public class McpMusicPlayerDevice : McpIoTDevice
             async (properties) =>
             {
                 var volume = properties["volume"].GetValue<int>();
-                SetState("volume", volume);
-                _deviceLogger?.LogInformation("音乐播放器音量已设置为: {Volume}", volume);
-                return $"音乐播放器音量已设置为 {volume}%";
+                
+                if (_musicService != null)
+                {
+                    try
+                    {
+                        var result = await _musicService.SetVolumeAsync(volume);
+                        if (result.Success)
+                        {
+                            SetState("volume", volume);
+                            _deviceLogger?.LogInformation("音乐播放器音量已设置为: {Volume}", volume);
+                            return await Task.FromResult<McpReturnValue>($"音乐播放器音量已设置为 {volume}%");
+                        }
+                        else
+                        {
+                            return await Task.FromResult<McpReturnValue>($"设置音量失败: {result.Message}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _deviceLogger?.LogError(ex, "设置音量异常");
+                        return await Task.FromResult<McpReturnValue>($"设置音量异常: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    // 模拟模式
+                    SetState("volume", volume);
+                    _deviceLogger?.LogInformation("音乐播放器音量已设置为: {Volume}", volume);
+                    return await Task.FromResult<McpReturnValue>($"音乐播放器音量已设置为 {volume}%");
+                }
             });
+    }
+    
+    // 事件处理方法
+    private void OnMusicServiceStateChanged(object? sender, MusicPlaybackEventArgs e)
+    {
+        try
+        {
+            SetState("playing", e.Status == "Playing");
+            SetState("current_song", e.Track?.Name ?? "");
+            SetState("artist", e.Track?.Artist ?? "");
+            _deviceLogger?.LogDebug("音乐播放状态更新: {Status}", e.Status);
+        }
+        catch (Exception ex)
+        {
+            _deviceLogger?.LogError(ex, "处理音乐状态变化事件失败");
+        }
+    }
+    
+    private void OnMusicServiceProgressUpdated(object? sender, ProgressUpdateEventArgs e)
+    {
+        try
+        {
+            SetState("progress", (int)e.Position);
+            SetState("duration", (int)e.Duration);
+            _deviceLogger?.LogDebug("音乐播放进度更新: {Position}/{Duration}", e.Position, e.Duration);
+        }
+        catch (Exception ex)
+        {
+            _deviceLogger?.LogError(ex, "处理音乐进度更新事件失败");
+        }
     }
 }
