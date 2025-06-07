@@ -20,8 +20,8 @@ public static class WebSocketProtocol
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
-    #region Hello Messages
-
+    #region Hello Messages    
+    
     /// <summary>
     /// 创建客户端Hello消息
     /// </summary>
@@ -29,14 +29,22 @@ public static class WebSocketProtocol
     /// <param name="sampleRate">采样率</param>
     /// <param name="channels">声道数</param>
     /// <param name="frameDuration">帧持续时间</param>
+    /// <param name="supportMcp">是否支持MCP协议</param>
     /// <returns>Hello消息JSON字符串</returns>
-    public static string CreateHelloMessage(string? sessionId = null, int sampleRate = 24000, int channels = 1, int frameDuration = 60)
+    public static string CreateHelloMessage(string? sessionId = null, int sampleRate = 24000, int channels = 1, int frameDuration = 60, bool supportMcp = true)
     {
+        var features = new Dictionary<string, object>();
+        if (supportMcp)
+        {
+            features["mcp"] = true;
+        }
+
         var message = new HelloMessage
         {
             SessionId = sessionId,
             Version = 1,
             Transport = "websocket",
+            Features = features.Count > 0 ? features : null,
             AudioParams = new AudioParams
             {
                 Format = "opus",

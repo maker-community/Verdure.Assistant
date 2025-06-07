@@ -27,6 +27,9 @@ public class HelloMessage : ProtocolMessage
     [JsonPropertyName("transport")]
     public string Transport { get; set; } = "websocket";
 
+    [JsonPropertyName("features")]
+    public Dictionary<string, object>? Features { get; set; }
+
     [JsonPropertyName("audio_params")]
     public AudioParams? AudioParams { get; set; }
 }

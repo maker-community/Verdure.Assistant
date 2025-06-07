@@ -12,7 +12,9 @@ namespace Verdure.Assistant.Core.Services.MCP;
 /// 对应xiaozhi-esp32中的MCP客户端功能，提供完整的MCP工具调用能力
 /// </summary>
 public class McpWebSocketClient : IDisposable
-{    private readonly ILogger<McpWebSocketClient>? _logger;
+{    
+    
+    private readonly ILogger<McpWebSocketClient>? _logger;
     private readonly WebSocketClient _webSocketClient;
     private readonly McpIntegrationService _mcpIntegrationService;
     private readonly ConcurrentDictionary<int, TaskCompletionSource<string>> _pendingRequests = new();
@@ -24,8 +26,7 @@ public class McpWebSocketClient : IDisposable
     public event EventHandler<Exception>? McpErrorOccurred;
 
     public bool IsConnected => _webSocketClient.IsConnected;
-    public bool IsInitialized => _isInitialized;
-
+    public bool IsInitialized => _isInitialized;    
     public McpWebSocketClient(
         WebSocketClient webSocketClient,
         McpIntegrationService mcpIntegrationService,
@@ -37,6 +38,9 @@ public class McpWebSocketClient : IDisposable
 
         // 订阅MCP消息事件
         _webSocketClient.McpMessageReceived += OnMcpMessageReceived;
+        
+        // 订阅MCP准备就绪事件，当设备声明支持MCP时自动初始化
+        _webSocketClient.McpReadyForInitialization += OnMcpReadyForInitialization;
     }
 
     /// <summary>
@@ -182,9 +186,7 @@ public class McpWebSocketClient : IDisposable
     {
         try
         {
-            _logger?.LogDebug("Received MCP message: {Payload}", JsonSerializer.Serialize(message.Payload));
-
-            // 尝试解析为JSON-RPC响应
+            _logger?.LogDebug("Received MCP message: {Payload}", JsonSerializer.Serialize(message.Payload));            // 尝试解析为JSON-RPC响应
             if (message.Payload is JsonElement payloadElement)
             {
                 if (payloadElement.TryGetProperty("id", out var idElement) && idElement.TryGetInt32(out var requestId))
@@ -192,9 +194,26 @@ public class McpWebSocketClient : IDisposable
                     // 这是一个响应消息
                     if (_pendingRequests.TryRemove(requestId, out var tcs))
                     {
-                        var responseJson = JsonSerializer.Serialize(message.Payload);
-                        tcs.SetResult(responseJson);
-                        _logger?.LogDebug("Resolved pending request {RequestId}", requestId);
+                        // 检查是否是错误响应
+                        if (payloadElement.TryGetProperty("error", out var errorElement))
+                        {
+                            var errorMessage = "MCP Error";
+                            if (errorElement.TryGetProperty("message", out var errorMessageElement))
+                            {
+                                errorMessage = errorMessageElement.GetString() ?? errorMessage;
+                            }
+                            
+                            var exception = new Exception($"MCP JSON-RPC Error: {errorMessage}");
+                            tcs.SetException(exception);
+                            _logger?.LogError("MCP request {RequestId} failed with error: {Error}", requestId, errorMessage);
+                        }
+                        else
+                        {
+                            // 成功响应
+                            var responseJson = JsonSerializer.Serialize(message.Payload);
+                            tcs.SetResult(responseJson);
+                            _logger?.LogDebug("Resolved pending request {RequestId}", requestId);
+                        }
                     }
                 }
                 else
@@ -209,6 +228,23 @@ public class McpWebSocketClient : IDisposable
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error processing MCP message");
+            McpErrorOccurred?.Invoke(this, ex);
+        }
+    }
+
+    /// <summary>
+    /// 处理MCP准备就绪事件，当设备声明支持MCP时自动初始化MCP会话
+    /// </summary>
+    private async void OnMcpReadyForInitialization(object? sender, EventArgs e)
+    {
+        try
+        {
+            _logger?.LogInformation("Device declared MCP support, starting MCP initialization");
+            await InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to auto-initialize MCP after device declared support");
             McpErrorOccurred?.Invoke(this, ex);
         }
     }
@@ -234,12 +270,13 @@ public class McpWebSocketClient : IDisposable
                 {
                     tcs.TrySetCanceled();
                 }
-                _pendingRequests.Clear();
-
+                _pendingRequests.Clear();                
+                
                 // 取消订阅事件
                 if (_webSocketClient != null)
                 {
                     _webSocketClient.McpMessageReceived -= OnMcpMessageReceived;
+                    _webSocketClient.McpReadyForInitialization -= OnMcpReadyForInitialization;
                 }
 
                 _mcpIntegrationService?.Dispose();

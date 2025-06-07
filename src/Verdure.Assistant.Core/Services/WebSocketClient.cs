@@ -20,8 +20,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     private readonly ILogger? _logger;
     private bool _isConnected;
     private string? _sessionId;
-    private readonly TaskCompletionSource<bool> _helloReceived = new();    
-    public event EventHandler<ChatMessage>? MessageReceived;
+    private readonly TaskCompletionSource<bool> _helloReceived = new();      public event EventHandler<ChatMessage>? MessageReceived;
     public event EventHandler<bool>? ConnectionStateChanged;    public event EventHandler<ProtocolMessage>? ProtocolMessageReceived;
     public event EventHandler<byte[]>? AudioDataReceived;
     public event EventHandler<TtsMessage>? TtsStateChanged;
@@ -32,6 +31,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     public event EventHandler<IotCommandResultMessage>? IotCommandResultMessageReceived;
     public event EventHandler<LlmMessage>? LlmMessageReceived;
     public event EventHandler<McpMessage>? McpMessageReceived;
+    public event EventHandler<EventArgs>? McpReadyForInitialization;
 
     public bool IsConnected => _isConnected;
     public string? SessionId => _sessionId;
@@ -68,14 +68,15 @@ public class WebSocketClient : ICommunicationClient, IDisposable
             _logger?.LogInformation("WebSocket连接已建立，正在发送Hello消息");
 
             // 开始接收消息
-            _ = Task.Run(ReceiveMessagesAsync);
-
+            _ = Task.Run(ReceiveMessagesAsync);            
+            
             // 发送客户端Hello消息
             var helloMessage = WebSocketProtocol.CreateHelloMessage(
                 sessionId: null,
                 sampleRate: 16000,
                 channels: 1,
-                frameDuration: 60
+                frameDuration: 60,
+                supportMcp: true  // 声明支持MCP协议
             );
             
             await SendTextAsync(helloMessage);
@@ -467,9 +468,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
                 _logger?.LogDebug("收到未知类型的协议消息: {Type}", message.Type);
                 break;
         }
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// 处理Hello消息
     /// </summary>
     private async Task HandleHelloMessageAsync(HelloMessage message)
@@ -486,10 +485,25 @@ public class WebSocketClient : ICommunicationClient, IDisposable
         // 设置会话ID
         _sessionId = message.SessionId;
         
+        // 检查设备是否支持MCP协议
+        bool deviceSupportsMcp = false;
+        if (message.Features != null && message.Features.TryGetValue("mcp", out var mcpValue))
+        {
+            deviceSupportsMcp = mcpValue is bool mcpBool && mcpBool;
+        }
+
+        _logger?.LogInformation("设备MCP支持状态: {McpSupported}", deviceSupportsMcp);
+
         // 设置Hello接收事件
         if (!_helloReceived.Task.IsCompleted)
         {
             _helloReceived.SetResult(true);
+        }
+
+        // 如果设备支持MCP，触发MCP准备就绪事件以便外部组件开始MCP初始化
+        if (deviceSupportsMcp)
+        {
+            McpReadyForInitialization?.Invoke(this, EventArgs.Empty);
         }
 
         _logger?.LogInformation("Hello握手完成，会话ID: {SessionId}", _sessionId);
