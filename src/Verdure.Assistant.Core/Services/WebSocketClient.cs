@@ -31,6 +31,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     public event EventHandler<IotCommandMessage>? IotCommandMessageReceived;
     public event EventHandler<IotCommandResultMessage>? IotCommandResultMessageReceived;
     public event EventHandler<LlmMessage>? LlmMessageReceived;
+    public event EventHandler<McpMessage>? McpMessageReceived;
 
     public bool IsConnected => _isConnected;
     public string? SessionId => _sessionId;
@@ -267,6 +268,55 @@ public class WebSocketClient : ICommunicationClient, IDisposable
         _logger?.LogDebug("已发送IoT设备状态消息");
     }
 
+    /// <summary>
+    /// 发送MCP消息
+    /// 对应xiaozhi-esp32的SendMcpMessage方法
+    /// </summary>
+    /// <param name="payload">MCP JSON-RPC负载</param>
+    public async Task SendMcpMessageAsync(object payload)
+    {
+        var message = WebSocketProtocol.CreateMcpMessage(_sessionId, payload);
+        await SendTextAsync(message);
+        _logger?.LogDebug("已发送MCP消息");
+    }
+
+    /// <summary>
+    /// 发送MCP初始化请求
+    /// </summary>
+    /// <param name="id">请求ID</param>
+    /// <param name="capabilities">客户端能力</param>
+    public async Task SendMcpInitializeAsync(int id, object? capabilities = null)
+    {
+        var message = WebSocketProtocol.CreateMcpInitializeMessage(_sessionId, id, capabilities);
+        await SendTextAsync(message);
+        _logger?.LogDebug("已发送MCP初始化请求，ID: {Id}", id);
+    }
+
+    /// <summary>
+    /// 发送MCP工具列表请求
+    /// </summary>
+    /// <param name="id">请求ID</param>
+    /// <param name="cursor">分页游标</param>
+    public async Task SendMcpToolsListAsync(int id, string cursor = "")
+    {
+        var message = WebSocketProtocol.CreateMcpToolsListMessage(_sessionId, id, cursor);
+        await SendTextAsync(message);
+        _logger?.LogDebug("已发送MCP工具列表请求，ID: {Id}, Cursor: {Cursor}", id, cursor);
+    }
+
+    /// <summary>
+    /// 发送MCP工具调用请求
+    /// </summary>
+    /// <param name="id">请求ID</param>
+    /// <param name="toolName">工具名称</param>
+    /// <param name="arguments">工具参数</param>
+    public async Task SendMcpToolCallAsync(int id, string toolName, Dictionary<string, object>? arguments = null)
+    {
+        var message = WebSocketProtocol.CreateMcpToolCallMessage(_sessionId, id, toolName, arguments);
+        await SendTextAsync(message);
+        _logger?.LogDebug("已发送MCP工具调用请求，ID: {Id}, Tool: {ToolName}", id, toolName);
+    }
+
     #endregion
 
     private async Task ReceiveMessagesAsync()
@@ -395,7 +445,9 @@ public class WebSocketClient : ICommunicationClient, IDisposable
 
             case "system_status":
                 await HandleSystemStatusMessageAsync((SystemStatusMessage)message);
-                break;            case "iot":
+                break;
+            
+            case "iot":
                 await HandleIotMessageAsync((IotMessage)message);
                 break;
 
@@ -405,6 +457,10 @@ public class WebSocketClient : ICommunicationClient, IDisposable
 
             case "iot_command_result":
                 await HandleIotCommandResultMessageAsync((IotCommandResultMessage)message);
+                break;
+
+            case "mcp":
+                await HandleMcpMessageAsync((McpMessage)message);
                 break;
                 
             default:
@@ -561,6 +617,16 @@ public class WebSocketClient : ICommunicationClient, IDisposable
         _logger?.LogDebug("收到IoT命令结果消息，设备ID: {DeviceId}，成功: {Success}", 
             message.DeviceId, message.Success);
         IotCommandResultMessageReceived?.Invoke(this, message);
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 处理MCP消息
+    /// </summary>
+    private async Task HandleMcpMessageAsync(McpMessage message)
+    {
+        _logger?.LogDebug("收到MCP消息，会话ID: {SessionId}", message.SessionId);
+        McpMessageReceived?.Invoke(this, message);
         await Task.CompletedTask;
     }
 

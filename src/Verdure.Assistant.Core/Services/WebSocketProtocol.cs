@@ -342,6 +342,7 @@ public static class WebSocketProtocol
                 "goodbye" => JsonSerializer.Deserialize<GoodbyeMessage>(json, JsonOptions),
                 "music" => JsonSerializer.Deserialize<MusicMessage>(json, JsonOptions),
                 "system_status" => JsonSerializer.Deserialize<SystemStatusMessage>(json, JsonOptions),
+                "mcp" => JsonSerializer.Deserialize<McpMessage>(json, JsonOptions),
                 _ => null
             };
         }
@@ -369,6 +370,105 @@ public static class WebSocketProtocol
         {
             return null;
         }
+    }
+
+    #endregion
+
+    #region MCP Messages
+
+    /// <summary>
+    /// 创建MCP消息
+    /// 对应xiaozhi-esp32的SendMcpMessage方法
+    /// </summary>
+    /// <param name="sessionId">会话ID</param>
+    /// <param name="payload">MCP JSON-RPC负载</param>
+    /// <returns>MCP消息JSON字符串</returns>
+    public static string CreateMcpMessage(string? sessionId, object payload)
+    {
+        var message = new McpMessage
+        {
+            SessionId = sessionId,
+            Payload = payload
+        };
+
+        return JsonSerializer.Serialize(message, JsonOptions);
+    }
+
+    /// <summary>
+    /// 创建MCP初始化请求消息
+    /// </summary>
+    /// <param name="sessionId">会话ID</param>
+    /// <param name="id">请求ID</param>
+    /// <param name="capabilities">客户端能力</param>
+    /// <returns>MCP初始化消息JSON字符串</returns>
+    public static string CreateMcpInitializeMessage(string? sessionId, int id, object? capabilities = null)
+    {
+        var payload = new
+        {
+            jsonrpc = "2.0",
+            method = "initialize",
+            @params = new
+            {
+                protocolVersion = "2024-11-05",
+                capabilities = capabilities ?? new { },
+                clientInfo = new
+                {
+                    name = "Verdure Assistant MCP Client",
+                    version = "1.0.0"
+                }
+            },
+            id = id
+        };
+
+        return CreateMcpMessage(sessionId, payload);
+    }
+
+    /// <summary>
+    /// 创建MCP工具列表请求消息
+    /// </summary>
+    /// <param name="sessionId">会话ID</param>
+    /// <param name="id">请求ID</param>
+    /// <param name="cursor">分页游标</param>
+    /// <returns>MCP工具列表请求消息JSON字符串</returns>
+    public static string CreateMcpToolsListMessage(string? sessionId, int id, string cursor = "")
+    {
+        var payload = new
+        {
+            jsonrpc = "2.0",
+            method = "tools/list",
+            @params = new
+            {
+                cursor = cursor
+            },
+            id = id
+        };
+
+        return CreateMcpMessage(sessionId, payload);
+    }
+
+    /// <summary>
+    /// 创建MCP工具调用请求消息
+    /// </summary>
+    /// <param name="sessionId">会话ID</param>
+    /// <param name="id">请求ID</param>
+    /// <param name="toolName">工具名称</param>
+    /// <param name="arguments">工具参数</param>
+    /// <returns>MCP工具调用请求消息JSON字符串</returns>
+    public static string CreateMcpToolCallMessage(string? sessionId, int id, string toolName, Dictionary<string, object>? arguments = null)
+    {
+        var payload = new
+        {
+            jsonrpc = "2.0",
+            method = "tools/call",
+            @params = new
+            {
+                name = toolName,
+                arguments = arguments ?? new Dictionary<string, object>()
+            },
+            id = id
+        };
+
+        return CreateMcpMessage(sessionId, payload);
     }
 
     #endregion

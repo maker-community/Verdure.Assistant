@@ -251,3 +251,15 @@ public class SystemStatusMessage : ProtocolMessage
     [JsonPropertyName("data")]
     public Dictionary<string, object>? Data { get; set; }
 }
+
+/// <summary>
+/// MCP消息 - 用于Model Context Protocol通信
+/// 对应xiaozhi-esp32的MCP消息格式：{"session_id":"...","type":"mcp","payload":{JSON-RPC内容}}
+/// </summary>
+public class McpMessage : ProtocolMessage
+{
+    public override string Type => "mcp";
+    
+    [JsonPropertyName("payload")]
+    public object Payload { get; set; } = new();
+}
