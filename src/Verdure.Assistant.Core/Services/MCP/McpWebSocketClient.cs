@@ -204,7 +204,9 @@ public class McpWebSocketClient : IDisposable
             _logger?.LogError(ex, "Failed to get tools list");
             throw;
         }
-    }    /// <summary>
+    }    
+    
+    /// <summary>
     /// 调用设备工具
     /// </summary>
     /// <param name="toolName">工具名称</param>

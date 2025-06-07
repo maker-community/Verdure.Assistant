@@ -195,7 +195,6 @@ public partial class HomePageViewModel : ViewModelBase
             _voiceChatService.ErrorOccurred += OnErrorOccurred;
             _voiceChatService.MusicMessageReceived += OnMusicMessageReceived;
             _voiceChatService.SystemStatusMessageReceived += OnSystemStatusMessageReceived;
-            _voiceChatService.IotMessageReceived += OnIotMessageReceived;
             _voiceChatService.LlmMessageReceived += OnLlmMessageReceived;
             _voiceChatService.TtsStateChanged += OnTtsStateChanged;
         }
@@ -1252,7 +1251,6 @@ public partial class HomePageViewModel : ViewModelBase
             _voiceChatService.DeviceStateChanged -= OnDeviceStateChanged;
             _voiceChatService.MusicMessageReceived -= OnMusicMessageReceived;
             _voiceChatService.SystemStatusMessageReceived -= OnSystemStatusMessageReceived;
-            _voiceChatService.IotMessageReceived -= OnIotMessageReceived;
             _voiceChatService.LlmMessageReceived -= OnLlmMessageReceived;
             _voiceChatService.TtsStateChanged -= OnTtsStateChanged;
         }

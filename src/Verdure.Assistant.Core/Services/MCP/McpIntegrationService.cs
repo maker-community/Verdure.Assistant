@@ -6,7 +6,8 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace Verdure.Assistant.Core.Services.MCP
-{    /// <summary>
+{    
+    /// <summary>
     /// Integration service that bridges MCP IoT devices with the voice chat system
     /// Provides backward compatibility and seamless integration
     /// </summary>
@@ -247,7 +248,9 @@ namespace Verdure.Assistant.Core.Services.MCP
                 _logger.LogError(ex, "Failed to get device context");
                 return "IoT device information is currently unavailable.";            
             }
-        }        /// <summary>
+        }        
+        
+        /// <summary>
         /// Register a tool from the MCP server response
         /// </summary>
         public async Task RegisterToolAsync(string toolName, string description, string toolDefinition)
@@ -295,7 +298,9 @@ namespace Verdure.Assistant.Core.Services.MCP
             {
                 _logger.LogError(ex, "Failed to process tool call completion for: {ToolName}", toolName);
             }
-        }        /// <summary>
+        }        
+        
+        /// <summary>
         /// Handle failed tool call
         /// </summary>
         public async Task OnToolCallFailedAsync(string toolName, string error)
@@ -313,7 +318,9 @@ namespace Verdure.Assistant.Core.Services.MCP
             {
                 _logger.LogError(ex, "Failed to process tool call failure for: {ToolName}", toolName);
             }
-        }        /// <summary>
+        }        
+        
+        /// <summary>
         /// Update device state based on tool execution results
         /// </summary>
         public async Task UpdateDeviceStateAsync(string deviceName, string property, object value)

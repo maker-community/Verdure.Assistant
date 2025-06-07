@@ -13,7 +13,6 @@ public interface IVoiceChatService : IDisposable
     // Protocol message events
     event EventHandler<MusicMessage>? MusicMessageReceived;
     event EventHandler<SystemStatusMessage>? SystemStatusMessageReceived;
-    event EventHandler<IotMessage>? IotMessageReceived;
     event EventHandler<LlmMessage>? LlmMessageReceived;
     event EventHandler<TtsMessage>? TtsStateChanged;
     /// <summary>

@@ -47,7 +47,6 @@ public class VoiceChatService : IVoiceChatService
     // Protocol message events
     public event EventHandler<MusicMessage>? MusicMessageReceived;
     public event EventHandler<SystemStatusMessage>? SystemStatusMessageReceived;
-    public event EventHandler<IotMessage>? IotMessageReceived;
     public event EventHandler<LlmMessage>? LlmMessageReceived;
     public event EventHandler<TtsMessage>? TtsStateChanged;
 
@@ -494,9 +493,6 @@ public class VoiceChatService : IVoiceChatService
                 wsClient.AudioDataReceived += OnWebSocketAudioDataReceived;
                 wsClient.MusicMessageReceived += OnMusicMessageReceived;
                 wsClient.SystemStatusMessageReceived += OnSystemStatusMessageReceived;
-                wsClient.IotMessageReceived += OnIotMessageReceived;
-                wsClient.IotCommandMessageReceived += OnIotCommandMessageReceived;
-                wsClient.IotCommandResultMessageReceived += OnIotCommandResultMessageReceived;
                 wsClient.LlmMessageReceived += OnLlmMessageReceived;
             }// 连接到服务器
             await _communicationClient.ConnectAsync();
@@ -1044,69 +1040,7 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogError(ex, "处理系统状态消息失败");
             ErrorOccurred?.Invoke(this, $"处理系统状态消息失败: {ex.Message}");
         }
-    }    /// <summary>
-    /// 处理IoT设备消息事件
-    /// </summary>
-    private void OnIotMessageReceived(object? sender, IotMessage message)
-    {
-        try
-        {
-            _logger?.LogDebug("收到IoT消息");
-            IotMessageReceived?.Invoke(this, message);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "处理IoT消息失败");
-            ErrorOccurred?.Invoke(this, $"处理IoT消息失败: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// 处理IoT命令消息事件（对应py-xiaozhi的_handle_iot_message）
-    /// </summary>
-    private void OnIotCommandMessageReceived(object? sender, IotCommandMessage message)
-    {
-        try
-        {
-            _logger?.LogDebug("收到IoT命令消息: 设备={DeviceId}, 方法={Method}", 
-                message.DeviceId, message.Method);
-            
-            // 异步处理IoT命令，避免阻塞事件处理
-            Task.Run(async () =>
-            {
-                try
-                {
-                    await HandleIoTCommandAsync(message);
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "异步处理IoT命令失败");
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "处理IoT命令消息失败");
-            ErrorOccurred?.Invoke(this, $"处理IoT命令消息失败: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// 处理IoT命令结果消息事件
-    /// </summary>
-    private void OnIotCommandResultMessageReceived(object? sender, IotCommandResultMessage message)
-    {
-        try
-        {
-            _logger?.LogDebug("收到IoT命令结果: 设备={DeviceId}, 成功={Success}, 结果={Result}", 
-                message.DeviceId, message.Success, message.Result);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "处理IoT命令结果消息失败");
-            ErrorOccurred?.Invoke(this, $"处理IoT命令结果消息失败: {ex.Message}");
-        }
-    }
+    }   
 
     /// <summary>
     /// 处理LLM情感消息事件
@@ -1124,7 +1058,7 @@ public class VoiceChatService : IVoiceChatService
             ErrorOccurred?.Invoke(this, $"处理LLM情感消息失败: {ex.Message}");
         }
     }
-    
+   
     public void Dispose()
     {
         try
@@ -1151,7 +1085,8 @@ public class VoiceChatService : IVoiceChatService
                 try
                 {
                     _communicationClient.MessageReceived -= OnMessageReceived;
-                    _communicationClient.ConnectionStateChanged -= OnConnectionStateChanged;                    // 如果是WebSocket客户端，取消订阅更多事件
+                    _communicationClient.ConnectionStateChanged -= OnConnectionStateChanged;                    
+                    // 如果是WebSocket客户端，取消订阅更多事件
                     if (_communicationClient is WebSocketClient webSocketClient)
                     {
                         //webSocketClient.ProtocolMessageReceived -= OnProtocolMessageReceived;
@@ -1159,9 +1094,6 @@ public class VoiceChatService : IVoiceChatService
                         webSocketClient.TtsStateChanged -= OnTtsStateChanged;
                         webSocketClient.MusicMessageReceived -= OnMusicMessageReceived;
                         webSocketClient.SystemStatusMessageReceived -= OnSystemStatusMessageReceived;
-                        webSocketClient.IotMessageReceived -= OnIotMessageReceived;
-                        webSocketClient.IotCommandMessageReceived -= OnIotCommandMessageReceived;
-                        webSocketClient.IotCommandResultMessageReceived -= OnIotCommandResultMessageReceived;
                         webSocketClient.LlmMessageReceived -= OnLlmMessageReceived;
                     }
                     
@@ -1180,7 +1112,6 @@ public class VoiceChatService : IVoiceChatService
                 try
                 {
                     _audioRecorder.DataAvailable -= OnAudioDataReceived;
-                    //_audioRecorder.RecordingStopped -= OnAudioRecordingStopped;
                     
                     if (_audioRecorder is IDisposable disposableRecorder)
                     {
