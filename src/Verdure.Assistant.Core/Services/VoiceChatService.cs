@@ -1014,11 +1014,11 @@ public class VoiceChatService : IVoiceChatService
                 if (responseElement.RootElement.TryGetProperty("id", out var idElement) &&
                     responseElement.RootElement.TryGetProperty("method", out var methodElement))
                 {
-                    var requestId = idElement.GetInt32();
+                    //var requestId = idElement.GetString();
 
                     var method = methodElement.GetString();
 
-                    _logger?.LogDebug("处理MCP响应，ID: {Id}, 方法: {Method}", requestId, method);
+                    _logger?.LogDebug("处理MCP响应, 方法: {Method}", method);
 
                     responseElement.RootElement.TryGetProperty("params", out var resultElement);
                     switch (method)

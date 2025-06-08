@@ -1,13 +1,14 @@
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 
@@ -19,11 +20,21 @@ namespace Verdure.Assistant.Core.Services
     /// </summary>
     public class KugouMusicService : IMusicPlayerService, IDisposable
     {
+        private static readonly JsonSerializerOptions JsonOptions = new()
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            AllowTrailingCommas = true,
+            ReadCommentHandling = JsonCommentHandling.Skip,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        };
         private readonly ILogger<KugouMusicService> _logger;
         private readonly HttpClient _httpClient;
         private readonly IMusicAudioPlayer _audioPlayer;
         private readonly Timer _progressTimer;
-        private readonly SemaphoreSlim _operationSemaphore;        // 播放状态
+        private readonly SemaphoreSlim _operationSemaphore;        
+        
+        // 播放状态
         private MusicTrack? _currentTrack;
         private List<LyricLine> _currentLyrics = new();
         private int _currentLyricIndex = -1;
@@ -445,7 +456,7 @@ namespace Verdure.Assistant.Core.Services
                         if (lrcItem.TryGetProperty("time", out var timeElement) &&
                             lrcItem.TryGetProperty("lineLyric", out var textElement))
                         {
-                            var timeSec = timeElement.GetDouble();
+                            var timeSec = timeElement.GetString();
                             var text = textElement.GetString()?.Trim();
                               // 跳过空歌词和元信息歌词
                             if (!string.IsNullOrEmpty(text) && 
@@ -455,7 +466,7 @@ namespace Verdure.Assistant.Core.Services
                             {
                                 lyrics.Add(new LyricLine
                                 {
-                                    Time = timeSec,
+                                    Time = Convert.ToDouble(timeSec),
                                     Text = text
                                 });
                             }

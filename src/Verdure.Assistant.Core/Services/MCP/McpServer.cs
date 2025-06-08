@@ -38,7 +38,7 @@ public class McpServer
         }
 
         _tools.Add(tool);
-        _logger?.LogInformation("Added MCP tool: {ToolName}", tool.Name);
+        _logger?.LogDebug("Added MCP tool: {ToolName}", tool.Name);
     }
 
     /// <summary>
@@ -59,7 +59,7 @@ public class McpServer
         if (tool != null)
         {
             _tools.Remove(tool);
-            _logger?.LogInformation("Removed MCP tool: {ToolName}", toolName);
+            _logger?.LogDebug("Removed MCP tool: {ToolName}", toolName);
             return true;
         }
         return false;
@@ -322,7 +322,7 @@ public class McpServer
     /// </summary>
     public async Task RegisterToolsAsync()
     {
-        _logger?.LogInformation("Registering {Count} MCP tools", _tools.Count);
+        _logger?.LogDebug("Registering {Count} MCP tools", _tools.Count);
         await Task.CompletedTask; // Placeholder for future registration logic
     }
 }

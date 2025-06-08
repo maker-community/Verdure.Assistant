@@ -85,14 +85,17 @@ class Program
                 {
                     builder.AddConsole();
                     // Set Debug as the minimum level, can be overridden by appsettings.json
-                    builder.SetMinimumLevel(LogLevel.Debug);
-                });                // Register services with dependency injection
+                    builder.SetMinimumLevel(LogLevel.Information);
+                });                
+                
+                // Register services with dependency injection
                 services.AddSingleton<IVerificationService, VerificationService>();
                 services.AddSingleton<IConfigurationService, ConfigurationService>();
                 services.AddSingleton<IVoiceChatService, VoiceChatService>();
                 
                 // Add InterruptManager for wake word detector coordination
-                services.AddSingleton<InterruptManager>();                // Add Microsoft Cognitive Services keyword spotting service
+                services.AddSingleton<InterruptManager>();                
+                // Add Microsoft Cognitive Services keyword spotting service
                 services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
                 
                 // Add Music-Voice Coordination Service for automatic pause/resume synchronization
@@ -102,9 +105,11 @@ class Program
                 services.AddSingleton<AudioStreamManager>(provider =>
                 {
                     var logger = provider.GetService<ILogger<AudioStreamManager>>();
-                    return AudioStreamManager.GetInstance(logger);                });                // Music player service (required for MCP music device)
+                    return AudioStreamManager.GetInstance(logger);                });                
+                // Music player service (required for MCP music device)
                 services.AddSingleton<IMusicPlayerService, KugouMusicService>();
-                services.AddSingleton<IMusicAudioPlayer, ConsoleMusicAudioPlayer>();                // Register MCP services (new architecture based on xiaozhi-esp32)
+                services.AddSingleton<IMusicAudioPlayer, ConsoleMusicAudioPlayer>();                
+                // Register MCP services (new architecture based on xiaozhi-esp32)
                 services.AddSingleton<McpServer>();
                 services.AddSingleton<McpDeviceManager>(provider =>
                 {
@@ -127,7 +132,9 @@ class Program
         configuration.Bind(config);
         
         return config;
-    }    /// <summary>
+    }    
+    
+    /// <summary>
     /// Initialize MCP IoT devices and setup integration (based on xiaozhi-esp32's MCP architecture)
     /// </summary>
     static async Task InitializeMcpDevicesAsync(IServiceProvider services)
