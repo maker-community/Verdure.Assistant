@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:i="using:Microsoft.Xaml.Interactivity"
     mc:Ignorable="d">
     <Page.Resources>
         <Style x:Key="SettingsExpanderStyle" TargetType="Expander">
@@ -193,18 +194,21 @@
                         x:Name="EnableLoggingToggle"
                         x:Uid="EnableLoggingToggle"
                         IsOn="{x:Bind ViewModel.EnableLogging, Mode=TwoWay}"
-                        Style="{StaticResource SettingsControlStyle}" />
+                        Style="{StaticResource SettingsControlStyle}" />                    
                     <ComboBox
                         x:Name="ThemeComboBox"
                         x:Uid="ThemeComboBox"
                         MinWidth="120"
                         HorizontalAlignment="Left"
-                        SelectedIndex="0"
-                        SelectedValue="{x:Bind ViewModel.Theme, Mode=TwoWay}"
+                        DisplayMemberPath="DataValue"
+                        ItemsSource="{x:Bind ViewModel.ThemeComboxModels}"
+                        SelectedItem="{x:Bind ViewModel.ThemeSelect, Mode=TwoWay}"
                         Style="{StaticResource SettingsControlStyle}">
-                        <ComboBoxItem x:Name="Default" x:Uid="ThemeComboBoxFollowSystem" />
-                        <ComboBoxItem x:Name="Light" x:Uid="ThemeComboBoxLight" />
-                        <ComboBoxItem x:Name="Dark" x:Uid="ThemeComboBoxDark" />
+                        <i:Interaction.Behaviors>
+                            <i:EventTriggerBehavior EventName="SelectionChanged">
+                                <i:InvokeCommandAction Command="{x:Bind ViewModel.ChangeThemeCommand}"/>
+                            </i:EventTriggerBehavior>
+                        </i:Interaction.Behaviors>
                     </ComboBox>
                 </StackPanel>
             </Expander>

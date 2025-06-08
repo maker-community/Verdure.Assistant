@@ -47,7 +47,8 @@
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.5" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.5" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.5" />        
-		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />        
+		<PackageReference Include="Microsoft.Xaml.Behaviors.WinUI.Managed" Version="3.0.0" />
         <PackageReference Include="WinUIEx" Version="2.4.0" />
 
         <Manifest Include="$(ApplicationManifest)" />

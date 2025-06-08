@@ -6,6 +6,9 @@ using Windows.Storage;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Threading.Tasks;
+using Verdure.Assistant.Core.Interfaces;
+using Verdure.Assistant.Core.Models;
+using Verdure.Assistant.WinUI.Services;
 
 namespace Verdure.Assistant.WinUI.Views;
 
@@ -67,61 +70,112 @@ public sealed partial class SettingsPage : Page
         {
             _logger?.LogError(ex, "Failed to initialize SettingsPage");
         }
-    }
-
-    private async void OnExportSettingsRequested(object? sender, EventArgs e)
+    }    private async void OnExportSettingsRequested(object? sender, EventArgs e)
     {
         try
         {
-            var savePicker = new FileSavePicker();
-            savePicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
-            savePicker.FileTypeChoices.Add("JSON files", new[] { ".json" });
-            savePicker.SuggestedFileName = "VerdureAssistantSettings";
-
-            // Get the current window handle
-            var window = App.MainWindow;
-            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
-            WinRT.Interop.InitializeWithWindow.Initialize(savePicker, hwnd);
-
-            var file = await savePicker.PickSaveFileAsync();
-            if (file != null)
+            _logger?.LogInformation("Export settings requested");
+            
+            var settingsService = App.GetService<ISettingsService<AppSettings>>();
+            if (settingsService != null)
             {
-                // Export settings logic would go here
-                _logger?.LogInformation($"Exporting settings to: {file.Path}");
+                // Get current settings
+                var currentSettings = await settingsService.LoadSettingsAsync();
+                if (currentSettings != null)
+                {
+                    // Use the settings service export functionality which handles file picker
+                    bool success = await settingsService.ExportSettingsAsync("", currentSettings);
+                    
+                    if (success)
+                    {
+                        _logger?.LogInformation("Settings exported successfully");
+                    }
+                    else
+                    {
+                        _logger?.LogWarning("Settings export was cancelled or failed");
+                    }
+                }
+                else
+                {
+                    _logger?.LogError("Failed to load current settings for export");
+                }
+            }
+            else
+            {
+                _logger?.LogError("Settings service not found");
+                
+                // Fallback to manual file picker
+                var savePicker = new FileSavePicker();
+                savePicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+                savePicker.FileTypeChoices.Add("JSON files", new[] { ".json" });
+                savePicker.SuggestedFileName = "VerdureAssistantSettings";
+
+                // Get the current window handle
+                var window = App.MainWindow;
+                var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+                WinRT.Interop.InitializeWithWindow.Initialize(savePicker, hwnd);
+
+                var file = await savePicker.PickSaveFileAsync();
+                if (file != null)
+                {
+                    _logger?.LogInformation($"Fallback: Exporting settings to: {file.Path}");
+                }
             }
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to export settings");
-            //ViewModel.SettingsError?.Invoke(this, $"导出设置失败: {ex.Message}");
         }
-    }
-
-    private async void OnImportSettingsRequested(object? sender, EventArgs e)
+    }    private async void OnImportSettingsRequested(object? sender, EventArgs e)
     {
         try
         {
-            var openPicker = new FileOpenPicker();
-            openPicker.ViewMode = PickerViewMode.List;
-            openPicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
-            openPicker.FileTypeFilter.Add(".json");
-
-            // Get the current window handle
-            var window = App.MainWindow;
-            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
-            WinRT.Interop.InitializeWithWindow.Initialize(openPicker, hwnd);
-
-            var file = await openPicker.PickSingleFileAsync();
-            if (file != null)
+            _logger?.LogInformation("Import settings requested");
+            
+            var settingsService = App.GetService<ISettingsService<AppSettings>>();
+            if (settingsService != null)
             {
-                // Import settings logic would go here
-                _logger?.LogInformation($"Importing settings from: {file.Path}");
+                // Use the settings service import functionality which handles file picker
+                var importedSettings = await settingsService.ImportSettingsAsync("");
+                
+                if (importedSettings != null)
+                {
+                    _logger?.LogInformation("Settings imported successfully");
+                    
+                    // Reload the ViewModel with the imported settings
+                    await ViewModel.LoadSettingsCommand.ExecuteAsync(null);
+                }
+                else
+                {
+                    _logger?.LogWarning("Settings import was cancelled or failed");
+                }
+            }
+            else
+            {
+                _logger?.LogError("Settings service not found");
+                
+                // Fallback to manual file picker
+                var openPicker = new FileOpenPicker();
+                openPicker.ViewMode = PickerViewMode.List;
+                openPicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+                openPicker.FileTypeFilter.Add(".json");
+
+                // Get the current window handle
+                var window = App.MainWindow;
+                var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+                WinRT.Interop.InitializeWithWindow.Initialize(openPicker, hwnd);
+
+                var file = await openPicker.PickSingleFileAsync();
+                if (file != null)
+                {
+                    _logger?.LogInformation($"Selected file for import: {file.Path}");
+                    // Manual import logic would go here if needed
+                }
             }
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Failed to import settings");
-            //ViewModel.SettingsError?.Invoke(this, $"导入设置失败: {ex.Message}");
+            _logger?.LogError(ex, "Failed to import settings");     
         }
     }
 
@@ -141,16 +195,13 @@ public sealed partial class SettingsPage : Page
             _logger?.LogError(ex, "Failed to refresh audio devices");
             //ViewModel.SettingsError?.Invoke(this, $"刷新音频设备失败: {ex.Message}");
         }
-    }
-
-    private void OnThemeChangeRequested(object? sender, string theme)
+    }    private void OnThemeChangeRequested(object? sender, string theme)
     {
         try
         {
             _logger?.LogInformation($"Theme change requested: {theme}");
-            
-            // Theme change logic would be handled by the app-level theme service
-            // This event can be used to notify other parts of the application
+
+            App.ChangeTheme(theme);
         }
         catch (Exception ex)
         {
