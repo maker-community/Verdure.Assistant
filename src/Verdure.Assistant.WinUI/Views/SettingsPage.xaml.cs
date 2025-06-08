@@ -11,13 +11,14 @@ namespace Verdure.Assistant.WinUI.Views;
 
 public sealed partial class SettingsPage : Page
 {
-    private readonly ILogger<SettingsPage>? _logger;
-
-    public SettingsPageViewModel ViewModel { get; } = null!;
+    private readonly ILogger<SettingsPage>? _logger;    
+    public SettingsPageViewModel ViewModel { get; private set; } = null!;
 
     public SettingsPage()
     {
-        this.InitializeComponent();        try
+        this.InitializeComponent();
+        
+        try
         {
             _logger = App.GetService<ILogger<SettingsPage>>();
             ViewModel = App.GetService<SettingsPageViewModel>() ?? CreateDefaultViewModel();
@@ -38,7 +39,9 @@ public sealed partial class SettingsPage : Page
             ViewModel.ThemeChangeRequested += OnThemeChangeRequested;
             ViewModel.SettingsError += OnSettingsError;
         }        _ = InitializeAsync();
-    }    private SettingsPageViewModel CreateDefaultViewModel()
+    }    
+    
+    private SettingsPageViewModel CreateDefaultViewModel()
     {
         // Try to get logger service for ViewModel, or create a minimal logger
         var viewModelLogger = App.GetService<ILogger<SettingsPageViewModel>>();
