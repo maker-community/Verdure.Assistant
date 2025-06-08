@@ -322,9 +322,9 @@ public partial class SettingsPageViewModel : ViewModelBase
     {
         try
         {
-            Theme = ThemeSelect.DataKey ?? "Default";
-            ThemeChangeRequested?.Invoke(this, ThemeSelect.DataKey ?? "Default");
-            _logger?.LogInformation($"Theme changed to: {ThemeSelect.DataKey ?? "Default"}");
+            Theme = ThemeSelect?.DataKey ?? "Default";
+            ThemeChangeRequested?.Invoke(this, ThemeSelect?.DataKey ?? "Default");
+            _logger?.LogInformation($"Theme changed to: {ThemeSelect?.DataKey ?? "Default"}");
         }
         catch (Exception ex)
         {

@@ -31,9 +31,7 @@ public sealed partial class SettingsPage : Page
             System.Diagnostics.Debug.WriteLine($"Failed to get services: {ex.Message}");
             // Create a default ViewModel if service resolution fails
             ViewModel = CreateDefaultViewModel();
-        }
-
-        // Subscribe to ViewModel events
+        }        // Subscribe to ViewModel events
         if (ViewModel != null)
         {
             ViewModel.ExportSettingsRequested += OnExportSettingsRequested;
@@ -41,7 +39,9 @@ public sealed partial class SettingsPage : Page
             ViewModel.RefreshAudioDevicesRequested += OnRefreshAudioDevicesRequested;
             ViewModel.ThemeChangeRequested += OnThemeChangeRequested;
             ViewModel.SettingsError += OnSettingsError;
-        }        _ = InitializeAsync();
+            ViewModel.SettingsSaved += OnSettingsSaved;
+            ViewModel.SettingsReset += OnSettingsReset;
+        }_ = InitializeAsync();
     }    
     
     private SettingsPageViewModel CreateDefaultViewModel()
@@ -219,6 +219,56 @@ public sealed partial class SettingsPage : Page
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to handle settings error");
+        }
+    }
+
+    private async void OnSettingsSaved(object? sender, EventArgs e)
+    {
+        try
+        {
+            _logger?.LogInformation("Settings saved successfully");
+            
+            // Show success notification to user
+            await ShowSuccessNotificationAsync("Settings saved successfully", "Your settings have been saved.");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to handle settings saved event");
+        }
+    }
+
+    private async void OnSettingsReset(object? sender, EventArgs e)
+    {
+        try
+        {
+            _logger?.LogInformation("Settings reset successfully");
+            
+            // Show success notification to user
+            await ShowSuccessNotificationAsync("Settings reset", "Settings have been reset to defaults.");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to handle settings reset event");
+        }
+    }
+
+    private async Task ShowSuccessNotificationAsync(string title, string message)
+    {
+        try
+        {
+            var dialog = new ContentDialog
+            {
+                Title = title,
+                Content = message,
+                CloseButtonText = "OK",
+                XamlRoot = this.XamlRoot
+            };
+
+            await dialog.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to show success notification");
         }
     }
 }
