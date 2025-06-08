@@ -115,10 +115,13 @@ public partial class App : Application
         services.AddSingleton<McpIntegrationService>();
 
         // Interrupt manager and related services
-        services.AddSingleton<InterruptManager>();
-
+        services.AddSingleton<InterruptManager>();        
+        
         // Microsoft Cognitive Services keyword spotting service (matches py-xiaozhi wake word detector)
         services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
+        
+        // Add Music-Voice Coordination Service for automatic pause/resume synchronization
+        services.AddSingleton<MusicVoiceCoordinationService>();
 
         // Emotion Manager
         services.AddSingleton<IEmotionManager, EmotionManager>();
@@ -140,13 +143,16 @@ public partial class App : Application
         try
         {
             var logger = GetService<ILogger<App>>();
-            logger?.LogInformation("开始初始化MCP设备...");
-
+            logger?.LogInformation("开始初始化MCP设备...");            
+            
             // Get required services
             var mcpServer = GetService<McpServer>();
             var mcpDeviceManager = GetService<McpDeviceManager>();
             var mcpIntegrationService = GetService<McpIntegrationService>();
             var voiceChatService = GetService<IVoiceChatService>();
+            var interruptManager = GetService<InterruptManager>();
+            var keywordSpottingService = GetService<IKeywordSpottingService>();
+            var musicVoiceCoordinationService = GetService<MusicVoiceCoordinationService>();
 
             if (mcpServer == null || mcpDeviceManager == null || mcpIntegrationService == null)
             {
@@ -158,7 +164,28 @@ public partial class App : Application
             {
                 logger?.LogError("VoiceChatService not found");
                 return;
-            }            // Initialize MCP server and device manager
+            }
+
+            // Set up interrupt manager and keyword spotting service
+            if (interruptManager != null)
+            {
+                voiceChatService.SetInterruptManager(interruptManager);
+                await interruptManager.InitializeAsync();
+                logger?.LogInformation("中断管理器已设置并初始化");
+            }
+
+            if (keywordSpottingService != null)
+            {
+                voiceChatService.SetKeywordSpottingService(keywordSpottingService);
+                logger?.LogInformation("关键词唤醒服务已设置");
+            }
+
+            // Set up Music-Voice Coordination Service
+            if (musicVoiceCoordinationService != null)
+            {
+                voiceChatService.SetMusicVoiceCoordinationService(musicVoiceCoordinationService);
+                logger?.LogInformation("音乐语音协调服务已设置");
+            }// Initialize MCP server and device manager
             await mcpServer.InitializeAsync();
             logger?.LogInformation("MCP服务器已初始化");
 
