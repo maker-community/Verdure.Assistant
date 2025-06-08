@@ -9,6 +9,8 @@ using System.Threading.Tasks;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.WinUI.Services;
+using System.Text.Json;
+using System.IO;
 
 namespace Verdure.Assistant.WinUI.Views;
 
@@ -85,10 +87,10 @@ public sealed partial class SettingsPage : Page
                 {
                     // Use the settings service export functionality which handles file picker
                     bool success = await settingsService.ExportSettingsAsync("", currentSettings);
-                    
-                    if (success)
+                      if (success)
                     {
                         _logger?.LogInformation("Settings exported successfully");
+                        await ShowSuccessNotificationAsync("Settings exported successfully", "Your settings have been exported to file.");
                     }
                     else
                     {
@@ -126,51 +128,31 @@ public sealed partial class SettingsPage : Page
         {
             _logger?.LogError(ex, "Failed to export settings");
         }
-    }    private async void OnImportSettingsRequested(object? sender, EventArgs e)
+    }    
+    
+    private async void OnImportSettingsRequested(object? sender, EventArgs e)
     {
         try
         {
             _logger?.LogInformation("Import settings requested");
-            
-            var settingsService = App.GetService<ISettingsService<AppSettings>>();
-            if (settingsService != null)
-            {
-                // Use the settings service import functionality which handles file picker
-                var importedSettings = await settingsService.ImportSettingsAsync("");
-                
-                if (importedSettings != null)
-                {
-                    _logger?.LogInformation("Settings imported successfully");
-                    
-                    // Reload the ViewModel with the imported settings
-                    await ViewModel.LoadSettingsCommand.ExecuteAsync(null);
-                }
-                else
-                {
-                    _logger?.LogWarning("Settings import was cancelled or failed");
-                }
-            }
-            else
-            {
-                _logger?.LogError("Settings service not found");
-                
-                // Fallback to manual file picker
-                var openPicker = new FileOpenPicker();
-                openPicker.ViewMode = PickerViewMode.List;
-                openPicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
-                openPicker.FileTypeFilter.Add(".json");
 
-                // Get the current window handle
-                var window = App.MainWindow;
-                var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
-                WinRT.Interop.InitializeWithWindow.Initialize(openPicker, hwnd);
+            // Fallback to manual file picker
+            var openPicker = new FileOpenPicker();
+            openPicker.ViewMode = PickerViewMode.List;
+            openPicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+            openPicker.FileTypeFilter.Add(".json");
 
-                var file = await openPicker.PickSingleFileAsync();
-                if (file != null)
-                {
-                    _logger?.LogInformation($"Selected file for import: {file.Path}");
-                    // Manual import logic would go here if needed
-                }
+            // Get the current window handle
+            var window = App.MainWindow;
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+            WinRT.Interop.InitializeWithWindow.Initialize(openPicker, hwnd);
+            var file = await openPicker.PickSingleFileAsync();
+            if (file != null)
+            {
+                _logger?.LogInformation($"Selected file for import: {file.Path}");
+
+                // Manual import logic implementation
+                await ImportSettingsFromFileAsync(file.Path);
             }
         }
         catch (Exception ex)
@@ -269,6 +251,81 @@ public sealed partial class SettingsPage : Page
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to show success notification");
+        }
+    }
+
+    private async Task ImportSettingsFromFileAsync(string filePath)
+    {
+        try
+        {
+            _logger?.LogInformation($"Importing settings from file: {filePath}");
+            
+            if (!File.Exists(filePath))
+            {
+                _logger?.LogError($"Import file not found: {filePath}");
+                return;
+            }
+
+            // Read and deserialize the JSON file
+            var jsonContent = await File.ReadAllTextAsync(filePath);
+            
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                AllowTrailingCommas = true,
+                ReadCommentHandling = JsonCommentHandling.Skip
+            };
+
+            var importedSettings = JsonSerializer.Deserialize<AppSettings>(jsonContent, jsonOptions);
+            
+            if (importedSettings == null)
+            {
+                _logger?.LogError("Failed to deserialize settings from imported file");
+                return;
+            }
+
+            // Apply the imported settings using the settings service
+            var settingsService = App.GetService<ISettingsService<AppSettings>>();
+            if (settingsService != null)
+            {
+                await settingsService.SaveSettingsAsync(importedSettings);
+                _logger?.LogInformation("Imported settings saved successfully");
+            }            
+            // Reload the ViewModel with the imported settings
+            await ViewModel.LoadSettingsCommand.ExecuteAsync(null);
+            
+            // Show success notification
+            await ShowSuccessNotificationAsync("Settings imported successfully", "Your settings have been imported and applied.");
+        }
+        catch (JsonException ex)
+        {
+            _logger?.LogError(ex, "Failed to parse JSON from imported settings file");
+            await ShowErrorNotificationAsync("Import Failed", "The selected file is not a valid settings file.");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to import settings from file");
+            await ShowErrorNotificationAsync("Import Failed", $"Failed to import settings: {ex.Message}");
+        }
+    }
+
+    private async Task ShowErrorNotificationAsync(string title, string message)
+    {
+        try
+        {
+            var dialog = new ContentDialog
+            {
+                Title = title,
+                Content = message,
+                CloseButtonText = "OK",
+                XamlRoot = this.XamlRoot
+            };
+
+            await dialog.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to show error notification");
         }
     }
 }

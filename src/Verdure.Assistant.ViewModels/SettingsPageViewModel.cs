@@ -155,6 +155,16 @@ public partial class SettingsPageViewModel : ViewModelBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
+
+
+        // 初始化主题下拉列表
+        ThemeComboxModels.Clear();
+        ThemeComboxModels.Add(new ComboxItemModel("Default", "默认主题"));
+        ThemeComboxModels.Add(new ComboxItemModel("Dark", "暗黑主题"));
+        ThemeComboxModels.Add(new ComboxItemModel("Light", "亮色主题"));
+
+        ThemeSelect = ThemeComboxModels.FirstOrDefault(m => m.DataKey == Theme) ?? ThemeComboxModels[0];
+
         await LoadSettingsAsync();
     }
 
@@ -176,14 +186,6 @@ public partial class SettingsPageViewModel : ViewModelBase
 
             // 更新UI属性
             UpdatePropertiesFromSettings(_currentSettings);
-
-            // 初始化主题下拉列表
-            ThemeComboxModels.Clear();
-            ThemeComboxModels.Add(new ComboxItemModel("Default", "默认主题"));
-            ThemeComboxModels.Add(new ComboxItemModel("Dark", "暗黑主题"));
-            ThemeComboxModels.Add(new ComboxItemModel("Light", "亮色主题"));
-
-            ThemeSelect = ThemeComboxModels.FirstOrDefault(m => m.DataKey == Theme) ?? ThemeComboxModels[0];
 
             IsDirty = false;
 
