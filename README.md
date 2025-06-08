@@ -39,6 +39,12 @@
 
 作为一个多服务集成平台，绿荫助手不仅支持原有的小智服务，还计划集成更多AI助手服务，为用户提供更丰富的智能交互体验。
 
+目前项目内置关键词唤醒，支持你好小电，和你好小娜，默认为你好小电。
+
+绑定设备之后，然后启动控制台程序，说你好小电就可以开启对话。
+
+WinUI项目需要先点击连接按钮，然后再说你好小电，就可以开启对话。
+
 ### 🎯 设计目标
 
 - **跨平台兼容** - 支持 Windows、Linux、macOS
@@ -434,6 +440,7 @@ ENTRYPOINT ["./Verdure.Assistant.Console"]
 
 ## 🙏 致谢
 
+- 感谢 [xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) 项目提供的参考实现
 - 感谢 [py-xiaozhi](https://github.com/huangjunsen0406/py-xiaozhi) 项目提供的参考实现
 - 感谢 [xiaozhi-sharp](https://github.com/GreenShadeZhang/xiaozhi-sharp) 项目提供的参考实现
 - 感谢所有贡献者的努力
