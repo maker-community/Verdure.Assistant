@@ -64,7 +64,6 @@ public sealed partial class HomePage : Page
     }
 
     #region ViewModel事件处理
-
     private async void OnInterruptTriggered(object? sender, InterruptEventArgs e)
     {
         try
@@ -84,7 +83,9 @@ public sealed partial class HomePage : Page
         {
             MessagesScrollViewer.ChangeView(null, MessagesScrollViewer.ScrollableHeight, null);
         });      
-    }    private void OnManualButtonStateChanged(object? sender, ManualButtonStateEventArgs e)
+    }    
+    
+    private void OnManualButtonStateChanged(object? sender, ManualButtonStateEventArgs e)
     {
         switch (e.State)
         {
@@ -97,7 +98,8 @@ public sealed partial class HomePage : Page
             case ManualButtonState.Processing:
                 SetManualButtonProcessingVisualState();
                 break;
-        }    }
+        }    
+    }
 
     private async void OnEmotionGifPathChanged(object? sender, EmotionGifPathEventArgs e)
     {
@@ -109,8 +111,8 @@ public sealed partial class HomePage : Page
         {
             _logger?.LogError(ex, "Failed to update emotion display: {EmotionName}", e.EmotionName);
         }
-    }
-
+    }    
+    
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         // 更新连接状态指示器颜色
@@ -118,9 +120,17 @@ public sealed partial class HomePage : Page
         {
             UpdateConnectionIndicator();
         }
+        
+        // 更新音乐播放按钮图标
+        if (e.PropertyName == nameof(HomePageViewModel.MusicStatus))
+        {
+            UpdatePlayPauseButtonIcon();
+        }
     }
 
-    #endregion    
+    #endregion 
+    
+
     #region UI状态更新辅助方法
 
     private void UpdateConnectionIndicator()
@@ -138,11 +148,31 @@ public sealed partial class HomePage : Page
                 {
                     ConnectionIndicator.Background = brush as Microsoft.UI.Xaml.Media.Brush;
                 }
-            }
+            }        
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error updating connection indicator");
+        }
+    }
+
+    private void UpdatePlayPauseButtonIcon()
+    {
+        try
+        {
+            if (PlayPauseIcon != null)
+            {
+                // 根据音乐状态设置播放/暂停图标
+                var glyph = _viewModel.MusicStatus == "播放中" 
+                    ? "&#xE769;" // 暂停图标
+                    : "&#xE768;"; // 播放图标
+                
+                PlayPauseIcon.Glyph = glyph;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error updating play/pause button icon");
         }
     }
 
@@ -217,8 +247,8 @@ public sealed partial class HomePage : Page
     {
         // 当指针捕获丢失时，也要停止录音
         _ = _viewModel.StopManualRecordingCommand.ExecuteAsync(null);
-    }
-
+    }    
+    
     private void MessageTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (e.Key == Windows.System.VirtualKey.Enter)
@@ -226,6 +256,94 @@ public sealed partial class HomePage : Page
             _ = _viewModel.SendMessageCommand.ExecuteAsync(null);
         }
     }
+
+
+    #region 音乐控制事件处理
+    
+    private void PlayPauseButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            // 根据当前播放状态决定执行播放还是暂停
+            if (_viewModel.MusicStatus == "播放中")
+            {
+                _ = _viewModel.PauseMusicCommand.ExecuteAsync(null);
+            }
+            else
+            {
+                _ = _viewModel.ResumeMusicCommand.ExecuteAsync(null);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "播放/暂停按钮点击处理失败");
+        }
+    }
+
+    private void MusicProgressSlider_PointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        try
+        {
+            if (sender is Slider slider)
+            {
+                // 当用户释放进度条时，跳转到指定位置
+                _ = _viewModel.SeekMusicCommand.ExecuteAsync(slider.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "音乐进度条跳转失败");
+        }
+    }    
+    
+    private void VolumeSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+    {
+        //try
+        //{
+        //    // 设置音乐音量
+        //    _ = _viewModel.SetMusicVolumeCommand.ExecuteAsync(e.NewValue);
+        //}
+        //catch (Exception ex)
+        //{
+        //    _logger?.LogError(ex, "音量设置失败");
+        //}
+    }
+
+    private void MusicSearchTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == Windows.System.VirtualKey.Enter)
+        {
+            PerformMusicSearch();
+        }
+    }
+
+    private void SearchMusicButton_Click(object sender, RoutedEventArgs e)
+    {
+        PerformMusicSearch();
+    }
+
+    private void PerformMusicSearch()
+    {
+        try
+        {
+            var searchQuery = MusicSearchTextBox?.Text?.Trim();
+            if (!string.IsNullOrEmpty(searchQuery))
+            {
+                _ = _viewModel.PlayMusicCommand.ExecuteAsync(searchQuery);
+                // 清空搜索框
+                if (MusicSearchTextBox != null)
+                {
+                    MusicSearchTextBox.Text = string.Empty;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "音乐搜索失败");
+        }
+    }
+
+    #endregion
 
     #endregion
 

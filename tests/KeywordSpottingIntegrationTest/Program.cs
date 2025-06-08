@@ -5,6 +5,7 @@ using Verdure.Assistant.Core.Services;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Constants;
+using Verdure.Assistant.Core.Services.MCP;
 
 namespace KeywordSpottingIntegrationTest;
 
@@ -253,7 +254,6 @@ public class MockVoiceChatService : IVoiceChatService
     // Protocol message events
     public event EventHandler<MusicMessage>? MusicMessageReceived;
     public event EventHandler<SystemStatusMessage>? SystemStatusMessageReceived;
-    public event EventHandler<IotMessage>? IotMessageReceived;
     public event EventHandler<LlmMessage>? LlmMessageReceived;
     public event EventHandler<TtsMessage>? TtsStateChanged;
     
@@ -307,9 +307,15 @@ public class MockVoiceChatService : IVoiceChatService
     public void SetInterruptManager(InterruptManager interruptManager)
     {
         // 模拟实现
+    }    public void SetKeywordSpottingService(IKeywordSpottingService keywordSpottingService)
+    {
+        // 模拟实现
+    }    public void SetMcpIntegrationService(McpIntegrationService mcpIntegrationService)
+    {
+        // 模拟实现
     }
 
-    public void SetKeywordSpottingService(IKeywordSpottingService keywordSpottingService)
+    public void SetMusicVoiceCoordinationService(MusicVoiceCoordinationService musicVoiceCoordinationService)
     {
         // 模拟实现
     }
@@ -317,7 +323,7 @@ public class MockVoiceChatService : IVoiceChatService
     public Task<bool> StartKeywordDetectionAsync()
     {
         return Task.FromResult(true);
-    }    public Task StopKeywordDetectionAsync()
+    }public Task StopKeywordDetectionAsync()
     {
         // 模拟实现
         return Task.CompletedTask;

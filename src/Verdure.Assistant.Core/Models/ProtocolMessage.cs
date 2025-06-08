@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Verdure.Assistant.Core.Models;
@@ -26,6 +27,9 @@ public class HelloMessage : ProtocolMessage
 
     [JsonPropertyName("transport")]
     public string Transport { get; set; } = "websocket";
+
+    [JsonPropertyName("features")]
+    public Dictionary<string, object>? Features { get; set; }
 
     [JsonPropertyName("audio_params")]
     public AudioParams? AudioParams { get; set; }
@@ -100,20 +104,6 @@ public class AbortMessage : ProtocolMessage
 
     [JsonPropertyName("reason")]
     public string? Reason { get; set; } // wake_word_detected, user_interruption
-}
-
-/// <summary>
-/// IoT设备消息
-/// </summary>
-public class IotMessage : ProtocolMessage
-{
-    public override string Type => "iot";
-
-    [JsonPropertyName("descriptors")]
-    public object? Descriptors { get; set; }
-
-    [JsonPropertyName("states")]
-    public object? States { get; set; }
 }
 
 /// <summary>
@@ -204,4 +194,16 @@ public class SystemStatusMessage : ProtocolMessage
 
     [JsonPropertyName("data")]
     public Dictionary<string, object>? Data { get; set; }
+}
+
+/// <summary>
+/// MCP消息 - 用于Model Context Protocol通信
+/// 对应xiaozhi-esp32的MCP消息格式：{"session_id":"...","type":"mcp","payload":{JSON-RPC内容}}
+/// </summary>
+public class McpMessage : ProtocolMessage
+{
+    public override string Type => "mcp";
+    
+    [JsonPropertyName("payload")]
+    public JsonDocument? Payload { get; set; }
 }

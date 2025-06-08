@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Services;
+using Verdure.Assistant.Core.Services.MCP;
 using Verdure.Assistant.ViewModels;
 using Verdure.Assistant.WinUI.Services;
 using Windows.Storage;
@@ -45,15 +46,15 @@ public partial class App : Application
         await _host.StartAsync();
 
         MainWindow = new MainWindow();
-        MainWindow.Activate();
-
+        MainWindow.Activate();        
         // Initialize theme service after window is created
         var themeService = GetService<ThemeService>();
         if (themeService != null)
         {
             await themeService.InitializeAsync();
             themeService.StartSystemThemeListener();
-        }
+        }        // Initialize MCP device management (based on xiaozhi-esp32 architecture)
+        await InitializeMcpDevicesAsync();
     }
     private void ConfigureServices(IServiceCollection services)
     {
@@ -62,7 +63,7 @@ public partial class App : Application
         {
             builder.AddConsole();
             builder.AddDebug();
-            builder.SetMinimumLevel(LogLevel.Information);
+            builder.SetMinimumLevel(LogLevel.Debug);
         });        // Settings services
         services.AddSingleton<ISettingsService<AppSettings>, WindowsSettingsService<AppSettings>>();
 
@@ -71,12 +72,15 @@ public partial class App : Application
 
         // Core services
         services.AddSingleton<IVerificationService, VerificationService>();
-        services.AddSingleton<IConfigurationService, ConfigurationService>();          // Audio services
+        services.AddSingleton<IConfigurationService, ConfigurationService>();          
+        // Audio services
         services.AddSingleton<AudioStreamManager>(provider =>
         {
             var logger = provider.GetService<ILogger<AudioStreamManager>>();
             return AudioStreamManager.GetInstance(logger);
         });
+
+
         services.AddSingleton<IAudioRecorder>(provider => provider.GetService<AudioStreamManager>()!);
         services.AddSingleton<IAudioPlayer, PortAudioPlayer>();
         services.AddSingleton<IAudioCodec, OpusSharpAudioCodec>();
@@ -86,7 +90,9 @@ public partial class App : Application
         {
             var logger = provider.GetService<ILogger<MqttNetClient>>();
             return new MqttNetClient("localhost", 1883, "winui-client", "verdure/chat", logger);
-        });        // UI Dispatcher for thread-safe UI operations
+        });        
+        
+        // UI Dispatcher for thread-safe UI operations
         services.AddSingleton<IUIDispatcher>(provider =>
         {
             // Get the DispatcherQueue from the current thread (main UI thread)
@@ -96,16 +102,26 @@ public partial class App : Application
                 throw new InvalidOperationException("No DispatcherQueue available for current thread. This service must be resolved on the UI thread.");
             }
             return new WinUIDispatcher(dispatcherQueue);
-        });
-
+        });        
+        
         // Voice chat service
-        services.AddSingleton<IVoiceChatService, VoiceChatService>();
+        services.AddSingleton<IVoiceChatService, VoiceChatService>();        
+          // Music player service
+        services.AddSingleton<IMusicAudioPlayer, WinUIMusicAudioPlayer>();
+        services.AddSingleton<IMusicPlayerService, KugouMusicService>();        
+          // Register MCP services (new architecture based on xiaozhi-esp32)
+        services.AddSingleton<McpServer>();
+        services.AddSingleton<McpDeviceManager>();
+        services.AddSingleton<McpIntegrationService>();
 
         // Interrupt manager and related services
-        services.AddSingleton<InterruptManager>();
-
+        services.AddSingleton<InterruptManager>();        
+        
         // Microsoft Cognitive Services keyword spotting service (matches py-xiaozhi wake word detector)
         services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
+        
+        // Add Music-Voice Coordination Service for automatic pause/resume synchronization
+        services.AddSingleton<MusicVoiceCoordinationService>();
 
         // Emotion Manager
         services.AddSingleton<IEmotionManager, EmotionManager>();
@@ -118,8 +134,73 @@ public partial class App : Application
         // Views
         services.AddTransient<HomePage>();
         services.AddTransient<SettingsPage>();
-        services.AddTransient<MainWindow>();
-    }    
+        services.AddTransient<MainWindow>();    }    
+      /// <summary>
+    /// Initialize MCP devices and setup integration (based on xiaozhi-esp32 architecture)
+    /// </summary>
+    private async Task InitializeMcpDevicesAsync()
+    {
+        try
+        {
+            var logger = GetService<ILogger<App>>();
+            logger?.LogInformation("开始初始化MCP设备...");            
+            
+            // Get required services
+            var mcpServer = GetService<McpServer>();
+            var mcpDeviceManager = GetService<McpDeviceManager>();
+            var mcpIntegrationService = GetService<McpIntegrationService>();
+            var voiceChatService = GetService<IVoiceChatService>();
+            var interruptManager = GetService<InterruptManager>();
+            var keywordSpottingService = GetService<IKeywordSpottingService>();
+            var musicVoiceCoordinationService = GetService<MusicVoiceCoordinationService>();
+
+            if (mcpServer == null || mcpDeviceManager == null || mcpIntegrationService == null)
+            {
+                logger?.LogError("Required MCP services not found");
+                return;
+            }
+
+            if (voiceChatService == null)
+            {
+                logger?.LogError("VoiceChatService not found");
+                return;
+            }
+
+            // Set up interrupt manager and keyword spotting service
+            if (interruptManager != null)
+            {
+                voiceChatService.SetInterruptManager(interruptManager);
+                await interruptManager.InitializeAsync();
+                logger?.LogInformation("中断管理器已设置并初始化");
+            }
+
+            if (keywordSpottingService != null)
+            {
+                voiceChatService.SetKeywordSpottingService(keywordSpottingService);
+                logger?.LogInformation("关键词唤醒服务已设置");
+            }
+
+            // Set up Music-Voice Coordination Service
+            if (musicVoiceCoordinationService != null)
+            {
+                voiceChatService.SetMusicVoiceCoordinationService(musicVoiceCoordinationService);
+                logger?.LogInformation("音乐语音协调服务已设置");
+            }// Initialize MCP server and device manager
+            await mcpServer.InitializeAsync();
+            logger?.LogInformation("MCP服务器已初始化");
+
+            // Set MCP integration service on VoiceChatService
+            voiceChatService.SetMcpIntegrationService(mcpIntegrationService);
+            logger?.LogInformation("MCP集成服务已设置到语音聊天服务");
+
+            logger?.LogInformation("MCP设备初始化完成");
+        }
+        catch (Exception ex)
+        {
+            var logger = GetService<ILogger<App>>();
+            logger?.LogError(ex, "MCP设备初始化失败");
+        }
+    }
     
     /// <summary>
     /// Gets a service of the specified type from the dependency injection container

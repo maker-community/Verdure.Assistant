@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Services;
+using Verdure.Assistant.Core.Services.MCP;
 
 namespace Verdure.Assistant.Console;
 
@@ -40,16 +41,27 @@ class Program
             _voiceChatService.DeviceStateChanged += OnDeviceStateChanged;
             _voiceChatService.ListeningModeChanged += OnListeningModeChanged;
 
-            // 初始化服务
-            await _voiceChatService.InitializeAsync(_config);
-            
             // Set up wake word detector coordination (matches py-xiaozhi behavior)
             _voiceChatService.SetInterruptManager(interruptManager);
-            await interruptManager.InitializeAsync();
+            await interruptManager.InitializeAsync();            
             
             // Set up Microsoft Cognitive Services keyword spotting (matches py-xiaozhi wake word detector)
             _voiceChatService.SetKeywordSpottingService(keywordSpottingService);
             System.Console.WriteLine("关键词唤醒功能已启用（基于Microsoft认知服务）");
+            
+            // Set up Music-Voice Coordination Service for automatic synchronization
+            var musicVoiceCoordinationService = host.Services.GetRequiredService<MusicVoiceCoordinationService>();
+            _voiceChatService.SetMusicVoiceCoordinationService(musicVoiceCoordinationService);
+            System.Console.WriteLine("音乐语音协调服务已启用（自动暂停/恢复语音识别）");
+
+            // Initialize MCP IoT devices (new architecture based on xiaozhi-esp32)
+            await InitializeMcpDevicesAsync(host.Services);
+
+            // Initialize MCP services (new architecture based on xiaozhi-esp32)
+            await InitializeMcpServicesAsync(host.Services);
+
+            // 初始化服务 (this will establish WebSocket connection and trigger IoT initialization)
+            await _voiceChatService.InitializeAsync(_config);
             
             System.Console.WriteLine($"已连接到服务器: {(_config.UseWebSocket ? _config.ServerUrl : $"{_config.MqttBroker}:{_config.MqttPort}")}");
             System.Console.WriteLine();
@@ -73,28 +85,42 @@ class Program
                 {
                     builder.AddConsole();
                     // Set Debug as the minimum level, can be overridden by appsettings.json
-                    builder.SetMinimumLevel(LogLevel.Debug);
-                });                // Register services with dependency injection
+                    builder.SetMinimumLevel(LogLevel.Information);
+                });                
+                
+                // Register services with dependency injection
                 services.AddSingleton<IVerificationService, VerificationService>();
                 services.AddSingleton<IConfigurationService, ConfigurationService>();
                 services.AddSingleton<IVoiceChatService, VoiceChatService>();
                 
                 // Add InterruptManager for wake word detector coordination
-                services.AddSingleton<InterruptManager>();
-                
+                services.AddSingleton<InterruptManager>();                
                 // Add Microsoft Cognitive Services keyword spotting service
                 services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
+                
+                // Add Music-Voice Coordination Service for automatic pause/resume synchronization
+                services.AddSingleton<MusicVoiceCoordinationService>();
 
                 // 注册 AudioStreamManager 单例（使用正确的方式）
                 services.AddSingleton<AudioStreamManager>(provider =>
                 {
                     var logger = provider.GetService<ILogger<AudioStreamManager>>();
-                    return AudioStreamManager.GetInstance(logger);
+                    return AudioStreamManager.GetInstance(logger);                });                
+                // Music player service (required for MCP music device)
+                services.AddSingleton<IMusicPlayerService, KugouMusicService>();
+                services.AddSingleton<IMusicAudioPlayer, ConsoleMusicAudioPlayer>();                
+                // Register MCP services (new architecture based on xiaozhi-esp32)
+                services.AddSingleton<McpServer>();
+                services.AddSingleton<McpDeviceManager>(provider =>
+                {
+                    var logger = provider.GetRequiredService<ILogger<McpDeviceManager>>();
+                    var mcpServer = provider.GetRequiredService<McpServer>();
+                    var musicService = provider.GetService<IMusicPlayerService>();
+                    return new McpDeviceManager(logger, mcpServer, musicService);
                 });
+                services.AddSingleton<McpIntegrationService>();
 
-            });
-
-    static VerdureConfig LoadConfiguration()
+            });static VerdureConfig LoadConfiguration()
     {
         var configuration = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
@@ -106,6 +132,104 @@ class Program
         configuration.Bind(config);
         
         return config;
+    }    
+    
+    /// <summary>
+    /// Initialize MCP IoT devices and setup integration (based on xiaozhi-esp32's MCP architecture)
+    /// </summary>
+    static async Task InitializeMcpDevicesAsync(IServiceProvider services)
+    {
+        try
+        {
+            var logger = services.GetService<ILogger<Program>>();
+            logger?.LogInformation("开始初始化MCP IoT设备...");
+
+            // Get required services
+            var mcpServer = services.GetService<McpServer>();
+            var mcpDeviceManager = services.GetService<McpDeviceManager>();
+            var mcpIntegrationService = services.GetService<McpIntegrationService>();
+            var voiceChatService = services.GetService<IVoiceChatService>();
+
+            if (mcpServer == null)
+            {
+                logger?.LogError("McpServer service not found");
+                return;
+            }
+            if (mcpDeviceManager == null)
+            {
+                logger?.LogError("McpDeviceManager service not found");
+                return;
+            }
+            if (mcpIntegrationService == null)
+            {
+                logger?.LogError("McpIntegrationService service not found");
+                return;
+            }
+            if (voiceChatService == null)
+            {
+                logger?.LogError("VoiceChatService not found");
+                return;
+            }
+
+            // Initialize MCP server and device manager (similar to xiaozhi-esp32 MCP initialization)
+            await mcpServer.InitializeAsync();
+            await mcpDeviceManager.InitializeAsync();
+            await mcpIntegrationService.InitializeAsync();
+
+            // Set MCP integration service on VoiceChatService (new MCP-based integration)
+            voiceChatService.SetMcpIntegrationService(mcpIntegrationService);
+
+            logger?.LogInformation("MCP IoT设备初始化完成，共注册了 {DeviceCount} 个设备", 
+                mcpDeviceManager.Devices.Count);
+                
+            System.Console.WriteLine($"MCP IoT设备初始化完成，注册了 {mcpDeviceManager.Devices.Count} 个设备");
+        }
+        catch (Exception ex)
+        {
+            var logger = services.GetService<ILogger<Program>>();
+            logger?.LogError(ex, "MCP IoT设备初始化失败");
+            System.Console.WriteLine($"MCP IoT设备初始化失败: {ex.Message}");
+        }
+    }/// <summary>
+    /// Initialize MCP services (new architecture based on xiaozhi-esp32)
+    /// </summary>
+    static async Task InitializeMcpServicesAsync(IServiceProvider services)
+    {
+        try
+        {
+            var logger = services.GetService<ILogger<Program>>();
+            logger?.LogInformation("开始初始化MCP服务...");
+
+            // Get MCP services
+            var mcpServer = services.GetService<McpServer>();
+            var mcpDeviceManager = services.GetService<McpDeviceManager>();
+            var mcpIntegrationService = services.GetService<McpIntegrationService>();
+
+            if (mcpServer == null || mcpDeviceManager == null || mcpIntegrationService == null)
+            {
+                logger?.LogWarning("MCP services not found, skipping MCP initialization");
+                return;
+            }
+
+            // Initialize MCP integration
+            await mcpIntegrationService.InitializeAsync();
+
+            // Wire MCP integration service to VoiceChatService
+            if (_voiceChatService != null)
+            {
+                _voiceChatService.SetMcpIntegrationService(mcpIntegrationService);
+                logger?.LogInformation("MCP集成服务已连接到VoiceChatService");
+            }
+
+            logger?.LogInformation("MCP服务初始化完成");
+            System.Console.WriteLine("MCP设备管理器已启用 (基于xiaozhi-esp32架构)");
+        }
+        catch (Exception ex)
+        {
+            var logger = services.GetService<ILogger<Program>>();
+            logger?.LogError(ex, "MCP服务初始化失败");
+            System.Console.WriteLine($"MCP服务初始化失败: {ex.Message}");
+        }
     }
 
     static async Task ShowMenu()

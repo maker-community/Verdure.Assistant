@@ -1,6 +1,8 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using Verdure.Assistant.Core.Constants;
 using Verdure.Assistant.Core.Models;
+using Verdure.Assistant.Core.Services.MCP;
 
 namespace Verdure.Assistant.Core.Services;
 
@@ -12,11 +14,14 @@ public static class WebSocketProtocol
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
+        WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = false
+        AllowTrailingCommas = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
-    #region Hello Messages
+    #region Hello Messages    
 
     /// <summary>
     /// 创建客户端Hello消息
@@ -25,14 +30,22 @@ public static class WebSocketProtocol
     /// <param name="sampleRate">采样率</param>
     /// <param name="channels">声道数</param>
     /// <param name="frameDuration">帧持续时间</param>
+    /// <param name="supportMcp">是否支持MCP协议</param>
     /// <returns>Hello消息JSON字符串</returns>
-    public static string CreateHelloMessage(string? sessionId = null, int sampleRate = 24000, int channels = 1, int frameDuration = 60)
+    public static string CreateHelloMessage(string? sessionId = null, int sampleRate = 24000, int channels = 1, int frameDuration = 60, bool supportMcp = true)
     {
+        var features = new Dictionary<string, object>();
+        if (supportMcp)
+        {
+            features["mcp"] = true;
+        }
+
         var message = new HelloMessage
         {
             SessionId = sessionId,
             Version = 1,
             Transport = "websocket",
+            Features = features.Count > 0 ? features : null,
             AudioParams = new AudioParams
             {
                 Format = "opus",
@@ -230,44 +243,6 @@ public static class WebSocketProtocol
 
     #endregion
 
-    #region IoT Messages
-
-    /// <summary>
-    /// 创建IoT设备描述消息
-    /// </summary>
-    /// <param name="descriptors">设备描述JSON对象</param>
-    /// <param name="sessionId">会话ID</param>
-    /// <returns>IoT设备描述消息JSON字符串</returns>
-    public static string CreateIotDescriptorsMessage(object descriptors, string? sessionId)
-    {
-        var message = new IotMessage
-        {
-            SessionId = sessionId,
-            Descriptors = descriptors
-        };
-
-        return JsonSerializer.Serialize(message, JsonOptions);
-    }
-
-    /// <summary>
-    /// 创建IoT设备状态消息
-    /// </summary>
-    /// <param name="states">状态JSON对象</param>
-    /// <param name="sessionId">会话ID</param>
-    /// <returns>IoT设备状态消息JSON字符串</returns>
-    public static string CreateIotStatesMessage(object states, string? sessionId)
-    {
-        var message = new IotMessage
-        {
-            SessionId = sessionId,
-            States = states
-        };
-
-        return JsonSerializer.Serialize(message, JsonOptions);
-    }
-
-    #endregion
-
     #region LLM Messages
 
     /// <summary>
@@ -331,11 +306,11 @@ public static class WebSocketProtocol
                 "tts" => JsonSerializer.Deserialize<TtsMessage>(json, JsonOptions),
                 "stt" => JsonSerializer.Deserialize<SttMessage>(json, JsonOptions),
                 "abort" => JsonSerializer.Deserialize<AbortMessage>(json, JsonOptions),
-                "iot" => JsonSerializer.Deserialize<IotMessage>(json, JsonOptions),
                 "llm" => JsonSerializer.Deserialize<LlmMessage>(json, JsonOptions),
                 "goodbye" => JsonSerializer.Deserialize<GoodbyeMessage>(json, JsonOptions),
                 "music" => JsonSerializer.Deserialize<MusicMessage>(json, JsonOptions),
                 "system_status" => JsonSerializer.Deserialize<SystemStatusMessage>(json, JsonOptions),
+                "mcp" => JsonSerializer.Deserialize<McpMessage>(json, JsonOptions),
                 _ => null
             };
         }
@@ -355,8 +330,8 @@ public static class WebSocketProtocol
         try
         {
             using var document = JsonDocument.Parse(json);
-            return document.RootElement.TryGetProperty("type", out var typeElement) 
-                ? typeElement.GetString() 
+            return document.RootElement.TryGetProperty("type", out var typeElement)
+                ? typeElement.GetString()
                 : null;
         }
         catch
@@ -365,5 +340,81 @@ public static class WebSocketProtocol
         }
     }
 
+    #endregion
+
+    #region MCP Messages
+
+    /// <summary>
+    /// 创建MCP消息
+    /// 对应xiaozhi-esp32的SendMcpMessage方法
+    /// </summary>
+    /// <param name="sessionId">会话ID</param>
+    /// <param name="payload">MCP JSON-RPC负载</param>
+    /// <returns>MCP消息JSON字符串</returns>
+    public static string CreateMcpMessage(string? sessionId, JsonDocument payload)
+    {
+        var message = new McpMessage
+        {
+            SessionId = sessionId,
+            Payload = payload
+        };
+
+        return JsonSerializer.Serialize(message, JsonOptions);
+    }
+
+    /// <summary>
+    /// 创建MCP初始化请求消息
+    /// </summary>
+    /// <param name="sessionId">会话ID</param>
+    /// <param name="id">请求ID</param>
+    /// <param name="capabilities">客户端能力</param>
+    /// <returns>MCP初始化消息JSON字符串</returns>
+    public static string CreateMcpInitializeMessage(string? sessionId, int id, object? capabilities = null)
+    {
+        var payload = new
+        {
+            jsonrpc = "2.0",
+            method = "initialize",
+            @params = new
+            {
+                protocolVersion = "2024-11-05",
+                capabilities = capabilities ?? new { },
+                clientInfo = new
+                {
+                    name = "Verdure Assistant MCP Client",
+                    version = "1.0.0"
+                }
+            },
+            id = id
+        };
+
+        var jsonString = JsonSerializer.Serialize(payload, JsonOptions);
+
+        return CreateMcpMessage(sessionId, JsonDocument.Parse(jsonString));
+    }
+
+    /// <summary>
+    /// 创建MCP工具列表响应消息
+    /// </summary>
+    /// <param name="sessionId">会话ID</param>
+    /// <param name="id">请求ID</param>
+    /// <param name="cursor">分页游标</param>
+    /// <returns>MCP工具列表请求消息JSON字符串</returns>
+    public static string CreateMcpToolsListResponseMessage(string? sessionId, int id, List<SimpleMcpTool> mcpTools, string? nextCursor = null)
+    {
+        var payload = new
+        {
+            jsonrpc = "2.0",
+            result = new
+            {
+                tools = mcpTools,
+                nextCursor = nextCursor
+            },
+            id = id
+        };
+
+        var jsonString = JsonSerializer.Serialize(payload, JsonOptions);
+        return CreateMcpMessage(sessionId, JsonDocument.Parse(jsonString));
+    }
     #endregion
 }

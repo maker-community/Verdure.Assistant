@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using System.Collections.ObjectModel;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 
@@ -29,7 +30,9 @@ public partial class SettingsPageViewModel : ViewModelBase
     private int _audioSampleRate = 16000;
 
     [ObservableProperty]
-    private int _audioChannels = 1;    [ObservableProperty]
+    private int _audioChannels = 1;
+
+    [ObservableProperty]
     private string _audioFormat = "opus";
 
     [ObservableProperty]
@@ -125,6 +128,22 @@ public partial class SettingsPageViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isDirty = false;
 
+    /// <summary>
+    /// 主题列表模型
+    /// </summary>
+    private ObservableCollection<ComboxItemModel> _themeComboxModels = new();
+    public ObservableCollection<ComboxItemModel> ThemeComboxModels
+    {
+        get => _themeComboxModels;
+        set => SetProperty(ref _themeComboxModels, value);
+    }
+
+    /// <summary>
+    /// 选中的主题
+    /// </summary>
+    [ObservableProperty]
+    private ComboxItemModel _themeSelect;
+
     #endregion
 
     public SettingsPageViewModel(ILogger<SettingsPageViewModel> logger,
@@ -136,6 +155,16 @@ public partial class SettingsPageViewModel : ViewModelBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
+
+
+        // 初始化主题下拉列表
+        ThemeComboxModels.Clear();
+        ThemeComboxModels.Add(new ComboxItemModel("Default", "默认主题"));
+        ThemeComboxModels.Add(new ComboxItemModel("Dark", "暗黑主题"));
+        ThemeComboxModels.Add(new ComboxItemModel("Light", "亮色主题"));
+
+        ThemeSelect = ThemeComboxModels.FirstOrDefault(m => m.DataKey == Theme) ?? ThemeComboxModels[0];
+
         await LoadSettingsAsync();
     }
 
@@ -157,6 +186,7 @@ public partial class SettingsPageViewModel : ViewModelBase
 
             // 更新UI属性
             UpdatePropertiesFromSettings(_currentSettings);
+
             IsDirty = false;
 
             _logger?.LogInformation("Settings loaded successfully");
@@ -195,7 +225,9 @@ public partial class SettingsPageViewModel : ViewModelBase
             _logger?.LogError(ex, "Failed to save settings");
             SettingsError?.Invoke(this, $"保存设置失败: {ex.Message}");
         }
-    }    [RelayCommand]
+    }
+
+    [RelayCommand]
     private void ResetSettings()
     {
         try
@@ -237,7 +269,8 @@ public partial class SettingsPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Failed to test audio");            SettingsError?.Invoke(this, $"音频测试失败: {ex.Message}");
+            _logger?.LogError(ex, "Failed to test audio");
+            SettingsError?.Invoke(this, $"音频测试失败: {ex.Message}");
         }
     }
 
@@ -254,7 +287,9 @@ public partial class SettingsPageViewModel : ViewModelBase
             _logger?.LogError(ex, "Failed to export settings");
             SettingsError?.Invoke(this, $"导出设置失败: {ex.Message}");
         }
-    }    [RelayCommand]
+    }
+
+    [RelayCommand]
     private void ImportSettings()
     {
         try
@@ -267,7 +302,9 @@ public partial class SettingsPageViewModel : ViewModelBase
             _logger?.LogError(ex, "Failed to import settings");
             SettingsError?.Invoke(this, $"导入设置失败: {ex.Message}");
         }
-    }    [RelayCommand]
+    }
+
+    [RelayCommand]
     private void RefreshAudioDevices()
     {
         try
@@ -283,20 +320,22 @@ public partial class SettingsPageViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void ChangeTheme(string theme)
+    private void ChangeTheme()
     {
         try
         {
-            Theme = theme;
-            ThemeChangeRequested?.Invoke(this, theme);
-            _logger?.LogInformation($"Theme changed to: {theme}");
+            Theme = ThemeSelect?.DataKey ?? "Default";
+            ThemeChangeRequested?.Invoke(this, ThemeSelect?.DataKey ?? "Default");
+            _logger?.LogInformation($"Theme changed to: {ThemeSelect?.DataKey ?? "Default"}");
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to change theme");
             SettingsError?.Invoke(this, $"主题切换失败: {ex.Message}");
         }
-    }    [RelayCommand]
+    }
+
+    [RelayCommand]
     private void VolumeChanged(double volume)
     {
         try
@@ -327,64 +366,55 @@ public partial class SettingsPageViewModel : ViewModelBase
 
     #endregion
 
-    #region 辅助方法    
+    #region 辅助方法      
+
     private void UpdatePropertiesFromSettings(AppSettings settings)
     {
-        //ServerUrl = settings.ServerUrl;
-        //UseWebSocket = settings.UseWebSocket;
-        //EnableVoice = settings.EnableVoice;
-        //AudioSampleRate = settings.AudioSampleRate;
-        //AudioChannels = settings.AudioChannels;
-        //AudioFormat = settings.AudioFormat;
-        //WakeWordEnabled = settings.EnableWakeWord;
-        //WakeWords = settings.WakeWord;
-        //WakeWordSensitivity = settings.WakeWordSensitivity;
-        //EnableVoiceActivityDetection = settings.EnableVoiceActivityDetection;
-        //VadSensitivity = settings.VadSensitivity;
-        //VadSilenceTimeout = settings.VadSilenceTimeout;
-        //EnableEchoCancellation = settings.EnableEchoCancellation;
-        //EnableNoiseSuppression = settings.EnableNoiseSuppression;
-        //OutputVolume = settings.OutputVolume;
-        //InputGain = settings.InputGain;
-        //Theme = settings.Theme;
-        //Language = settings.Language;
-        //AutoConnect = settings.AutoConnect;
-        //MinimizeToTray = settings.MinimizeToTray;
-        //StartWithWindows = settings.StartWithWindows;
-        //LogLevel = settings.LogLevel;
-        
-        // Additional properties - may need default values if not in settings
-        DefaultVolume = OutputVolume * 100; // Convert to percentage
-        AutoAdjustVolume = true; // Default value
-        AutoStart = StartWithWindows;
-        EnableLogging = !string.IsNullOrEmpty(LogLevel) && LogLevel != "None";
-        ConnectionTimeout = 30; // Default value
-        AudioCodec = AudioFormat ?? "Opus";
-    }    
+        ServerUrl = settings.WsAddress;
+        UseWebSocket = !string.IsNullOrEmpty(settings.WsProtocol) && settings.WsProtocol.Contains("ws");
+        WakeWordEnabled = settings.WakeWordEnabled;
+        WakeWords = settings.WakeWords;
+        DeviceId = settings.DeviceId;
+        OtaProtocol = settings.OtaProtocol;
+        OtaAddress = settings.OtaAddress;
+        WsProtocol = settings.WsProtocol;
+        WsToken = settings.WsToken;
+        DefaultVolume = settings.DefaultVolume;
+        AutoAdjustVolume = settings.AutoAdjustVolume;
+        AudioInputDevice = settings.AudioInputDevice;
+        AudioOutputDevice = settings.AudioOutputDevice;
+        AutoStart = settings.AutoStart;
+        MinimizeToTray = settings.MinimizeToTray;
+        EnableLogging = settings.EnableLogging;
+        Theme = settings.Theme;
+        ConnectionTimeout = (int)settings.ConnectionTimeout;
+        AudioSampleRate = (int)settings.AudioSampleRate;
+        AudioChannels = (int)settings.AudioChannels;
+        AudioCodec = settings.AudioCodec;
+    }
+
     private void UpdateSettingsFromProperties(AppSettings settings)
     {
-        //settings.ServerUrl = ServerUrl;
-        //settings.UseWebSocket = UseWebSocket;
-        //settings.EnableVoice = EnableVoice;
-        //settings.AudioSampleRate = AudioSampleRate;
-        //settings.AudioChannels = AudioChannels;
-        //settings.AudioFormat = AudioFormat;
-        //settings.EnableWakeWord = WakeWordEnabled;
-        //settings.WakeWord = WakeWords;
-        //settings.WakeWordSensitivity = WakeWordSensitivity;
-        //settings.EnableVoiceActivityDetection = EnableVoiceActivityDetection;
-        //settings.VadSensitivity = VadSensitivity;
-        //settings.VadSilenceTimeout = VadSilenceTimeout;
-        //settings.EnableEchoCancellation = EnableEchoCancellation;
-        //settings.EnableNoiseSuppression = EnableNoiseSuppression;
-        //settings.OutputVolume = DefaultVolume / 100.0; // Convert from percentage
-        //settings.InputGain = InputGain;
-        //settings.Theme = Theme;
-        //settings.Language = Language;
-        //settings.AutoConnect = AutoConnect;
-        //settings.MinimizeToTray = MinimizeToTray;
-        //settings.StartWithWindows = AutoStart;
-        //settings.LogLevel = EnableLogging ? LogLevel : "None";
+        settings.WsAddress = ServerUrl;
+        settings.WakeWordEnabled = WakeWordEnabled;
+        settings.WakeWords = WakeWords;
+        settings.DeviceId = DeviceId;
+        settings.OtaProtocol = OtaProtocol;
+        settings.OtaAddress = OtaAddress;
+        settings.WsProtocol = WsProtocol;
+        settings.WsToken = WsToken;
+        settings.DefaultVolume = DefaultVolume;
+        settings.AutoAdjustVolume = AutoAdjustVolume;
+        settings.AudioInputDevice = AudioInputDevice;
+        settings.AudioOutputDevice = AudioOutputDevice;
+        settings.AutoStart = AutoStart;
+        settings.MinimizeToTray = MinimizeToTray;
+        settings.EnableLogging = EnableLogging;
+        settings.Theme = Theme;
+        settings.ConnectionTimeout = ConnectionTimeout;
+        settings.AudioSampleRate = AudioSampleRate;
+        settings.AudioChannels = AudioChannels;
+        settings.AudioCodec = AudioCodec;
     }
 
     private void MarkDirty()
@@ -432,8 +462,8 @@ public partial class SettingsPageViewModel : ViewModelBase
     partial void OnConnectionTimeoutChanged(int value) => MarkDirty();
     partial void OnAudioCodecChanged(string value) => MarkDirty();
 
-    #endregion  
-    
+    #endregion
+
     #region 事件
 
     public event EventHandler? SettingsSaved;

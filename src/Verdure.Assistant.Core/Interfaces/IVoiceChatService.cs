@@ -13,7 +13,6 @@ public interface IVoiceChatService : IDisposable
     // Protocol message events
     event EventHandler<MusicMessage>? MusicMessageReceived;
     event EventHandler<SystemStatusMessage>? SystemStatusMessageReceived;
-    event EventHandler<IotMessage>? IotMessageReceived;
     event EventHandler<LlmMessage>? LlmMessageReceived;
     event EventHandler<TtsMessage>? TtsStateChanged;
     /// <summary>
@@ -114,13 +113,26 @@ public interface IVoiceChatService : IDisposable
     /// 启动关键词唤醒检测
     /// 对应py-xiaozhi的_start_wake_word_detector方法
     /// </summary>
-    Task<bool> StartKeywordDetectionAsync();    /// <summary>
+    Task<bool> StartKeywordDetectionAsync();    
+    
+    /// <summary>
     /// 停止关键词唤醒检测
     /// </summary>
-    Task StopKeywordDetectionAsync();
-
+    Task StopKeywordDetectionAsync();    
+    
     /// <summary>
     /// 关键词唤醒是否启用
     /// </summary>
-    bool IsKeywordDetectionEnabled { get; }
+    bool IsKeywordDetectionEnabled { get; }    
+    
+    /// <summary>
+    /// 设置MCP集成服务（新架构，基于xiaozhi-esp32的MCP实现）
+    /// </summary>
+    void SetMcpIntegrationService(Services.MCP.McpIntegrationService mcpIntegrationService);
+    
+    /// <summary>
+    /// 设置音乐语音协调服务
+    /// 实现音乐播放时自动暂停语音识别的同步机制
+    /// </summary>
+    void SetMusicVoiceCoordinationService(Services.MusicVoiceCoordinationService musicVoiceCoordinationService);
 }

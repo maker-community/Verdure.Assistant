@@ -1,26 +1,46 @@
+using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
-using Microsoft.Extensions.Logging;
 using Verdure.Assistant.Core.Constants;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
+using Verdure.Assistant.Core.Services.MCP;
 
 namespace Verdure.Assistant.Core.Services;
 
 /// <summary>
 /// WebSocket通信客户端实现
-/// 支持完整的WebSocket协议消息处理
+/// 支持完整的WebSocket协议消息处理和MCP协议集成
+/// 基于xiaozhi-esp32的MCP协议实现，提供统一的WebSocket+MCP通信能力
 /// </summary>
 public class WebSocketClient : ICommunicationClient, IDisposable
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        AllowTrailingCommas = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
     private ClientWebSocket? _webSocket;
     private CancellationTokenSource? _cancellationTokenSource;
     private readonly IConfigurationService _configurationService;
     private readonly ILogger? _logger;
     private bool _isConnected;
     private string? _sessionId;
-    private readonly TaskCompletionSource<bool> _helloReceived = new();    
+    private readonly TaskCompletionSource<bool> _helloReceived = new();
+
+    // MCP相关字段
+    private readonly ConcurrentDictionary<int, TaskCompletionSource<string>> _mcpPendingRequests = new();
+    private int _mcpNextRequestId = 1;
+    private bool _mcpInitialized = false;
+    private McpIntegrationService? _mcpIntegrationService;
+
     public event EventHandler<ChatMessage>? MessageReceived;
     public event EventHandler<bool>? ConnectionStateChanged;
     public event EventHandler<ProtocolMessage>? ProtocolMessageReceived;
@@ -28,16 +48,31 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     public event EventHandler<TtsMessage>? TtsStateChanged;
     public event EventHandler<MusicMessage>? MusicMessageReceived;
     public event EventHandler<SystemStatusMessage>? SystemStatusMessageReceived;
-    public event EventHandler<IotMessage>? IotMessageReceived;
     public event EventHandler<LlmMessage>? LlmMessageReceived;
+    public event EventHandler<McpMessage>? McpMessageReceived;
+    public event EventHandler<EventArgs>? McpReadyForInitialization;
 
+    // MCP事件
+    public event EventHandler<string>? McpResponseReceived;
+    public event EventHandler<Exception>? McpErrorOccurred;
     public bool IsConnected => _isConnected;
     public string? SessionId => _sessionId;
+
+    // MCP属性
+    public bool IsMcpInitialized => _mcpInitialized;
 
     public WebSocketClient(IConfigurationService configurationService, ILogger? logger = null)
     {
         _configurationService = configurationService;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// 设置MCP集成服务（可选，用于高级MCP功能）
+    /// </summary>
+    public void SetMcpIntegrationService(McpIntegrationService mcpIntegrationService)
+    {
+        _mcpIntegrationService = mcpIntegrationService;
     }
 
     public async Task ConnectAsync()
@@ -47,14 +82,14 @@ public class WebSocketClient : ICommunicationClient, IDisposable
         try
         {
             _webSocket = new ClientWebSocket();
-            
+
             // 设置WebSocket头部，参考Python实现
             var accessToken = "test"; // TODO: 从配置获取真实的访问令牌
             _webSocket.Options.SetRequestHeader("Authorization", $"Bearer {accessToken}");
             _webSocket.Options.SetRequestHeader("Protocol-Version", "1");
             _webSocket.Options.SetRequestHeader("Device-Id", _configurationService.DeviceId);
             _webSocket.Options.SetRequestHeader("Client-Id", _configurationService.ClientId);
-            
+
             _cancellationTokenSource = new CancellationTokenSource();
 
             // 连接WebSocket
@@ -73,26 +108,13 @@ public class WebSocketClient : ICommunicationClient, IDisposable
                 sessionId: null,
                 sampleRate: 16000,
                 channels: 1,
-                frameDuration: 60
+                frameDuration: 60,
+                supportMcp: true  // 声明支持MCP协议
             );
-            
+
             await SendTextAsync(helloMessage);
 
             _logger?.LogDebug("已发送Hello消息: {Message}", helloMessage);
-
-            // 等待服务器Hello响应
-            //try
-            //{
-            //    await _helloReceived.Task.WaitAsync(TimeSpan.FromSeconds(10), _cancellationTokenSource.Token);
- 
-            //    _logger?.LogInformation("WebSocket连接成功建立，会话ID: {SessionId}", _sessionId);
-            //}
-            //catch (TimeoutException)
-            //{
-            //    _logger?.LogError("等待服务器Hello响应超时");
-            //    await DisconnectAsync();
-            //    throw new TimeoutException("等待服务器Hello响应超时");
-            //}
         }
         catch (Exception ex)
         {
@@ -118,7 +140,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
             }
 
             _cancellationTokenSource?.Cancel();
-            
+
             if (_webSocket?.State == WebSocketState.Open)
             {
                 await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Client disconnect", CancellationToken.None);
@@ -152,7 +174,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     {
         if (!_isConnected || _webSocket?.State != WebSocketState.Open)
             throw new InvalidOperationException("WebSocket未连接");
-   
+
         await SendAudioAsync(voiceMessage.Data);
     }
 
@@ -245,28 +267,121 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     }
 
     /// <summary>
-    /// 发送IoT设备描述消息
+    /// 发送MCP消息
+    /// 对应xiaozhi-esp32的SendMcpMessage方法
     /// </summary>
-    /// <param name="descriptors">设备描述</param>
-    public async Task SendIotDescriptorsAsync(object descriptors)
+    /// <param name="payload">MCP JSON-RPC负载</param>
+    public async Task SendMcpMessageAsync(JsonDocument payload)
     {
-        var message = WebSocketProtocol.CreateIotDescriptorsMessage(descriptors, _sessionId);
+        var message = WebSocketProtocol.CreateMcpMessage(_sessionId, payload);
         await SendTextAsync(message);
-        _logger?.LogDebug("已发送IoT设备描述消息");
+        _logger?.LogDebug("已发送MCP消息");
     }
 
     /// <summary>
-    /// 发送IoT设备状态消息
+    /// 发送MCP初始化请求
     /// </summary>
-    /// <param name="states">设备状态</param>
-    public async Task SendIotStatesAsync(object states)
+    /// <param name="id">请求ID</param>
+    /// <param name="capabilities">客户端能力</param>
+    public async Task SendMcpInitializeAsync(int id, object? capabilities = null)
     {
-        var message = WebSocketProtocol.CreateIotStatesMessage(states, _sessionId);
+        var message = WebSocketProtocol.CreateMcpInitializeMessage(_sessionId, id, capabilities);
         await SendTextAsync(message);
-        _logger?.LogDebug("已发送IoT设备状态消息");
+        _logger?.LogDebug("已发送MCP初始化请求，ID: {Id}", id);
+    }
+
+    /// <summary>
+    /// 发送MCP工具列表响应
+    /// </summary>
+    /// <param name="id">请求ID</param>
+    /// <param name="cursor">分页游标</param>
+    public async Task SendMcpToolsListResponseAsync(int id, List<SimpleMcpTool> mcpTools, string? nextCursor = "")
+    {
+        var message = WebSocketProtocol.CreateMcpToolsListResponseMessage(_sessionId, id, mcpTools, nextCursor);
+        await SendTextAsync(message);
+        _logger?.LogDebug("已发送MCP工具列表请求，ID: {Id}, nextCursor: {nextCursor}", id, nextCursor);
     }
 
     #endregion
+
+    #region MCP Methods
+
+    /// <summary>
+    /// 初始化MCP客户端
+    /// 对应xiaozhi-esp32的MCP初始化流程
+    /// </summary>
+    public async Task InitializeMcpAsync()
+    {
+        if (_mcpInitialized)
+            return;
+
+        try
+        {
+            _logger?.LogInformation("Initializing MCP client");
+
+            // 确保WebSocket已连接
+            if (!_isConnected)
+            {
+                throw new InvalidOperationException("WebSocket must be connected before initializing MCP client");
+            }
+
+            // 初始化MCP集成服务（如果有）
+            if (_mcpIntegrationService != null)
+            {
+                await _mcpIntegrationService.InitializeAsync();
+            }
+
+            // 发送MCP初始化请求并等待响应
+            var initRequestId = 1;
+            var tcs = new TaskCompletionSource<string>();
+            _mcpPendingRequests[initRequestId] = tcs;
+
+            var capabilities = new
+            {
+                tools = new { },
+                logging = new { }
+            };
+
+            try
+            {
+                await SendMcpInitializeAsync(initRequestId, capabilities);
+                _logger?.LogDebug("Sent MCP initialize request with ID: {RequestId}", initRequestId);
+
+                // 等待服务端初始化响应（设置超时）
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                cts.Token.Register(() => tcs.TrySetCanceled());
+
+                var initResponse = await tcs.Task;
+                _logger?.LogDebug("Received MCP initialize response: {Response}", initResponse);
+
+                // 验证初始化响应
+                var responseElement = JsonSerializer.Deserialize<JsonElement>(initResponse);
+                if (responseElement.TryGetProperty("result", out var resultElement))
+                {
+                    _logger?.LogInformation("MCP initialization confirmed by server");
+
+                    _mcpInitialized = true;
+                    _logger?.LogInformation("MCP WebSocket client initialized successfully");
+                }
+                else
+                {
+                    throw new InvalidOperationException("Server did not confirm MCP initialization");
+                }
+            }
+            catch (Exception)
+            {
+                _mcpPendingRequests.TryRemove(initRequestId, out _);
+                throw;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to initialize MCP WebSocket client");
+            throw;
+        }
+    }
+
+
 
     private async Task ReceiveMessagesAsync()
     {
@@ -282,7 +397,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
                 {
                     var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
                     _logger?.LogDebug("收到WebSocket文本消息: {Message}", json);
-                    
+
                     await HandleTextMessageAsync(json);
                 }
                 else if (result.MessageType == WebSocketMessageType.Binary)
@@ -290,7 +405,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
                     var audioData = new byte[result.Count];
                     Array.Copy(buffer, audioData, result.Count);
                     _logger?.LogDebug("收到WebSocket音频数据，长度: {Length}", audioData.Length);
-                    
+
                     AudioDataReceived?.Invoke(this, audioData);
                 }
                 else if (result.MessageType == WebSocketMessageType.Close)
@@ -371,19 +486,19 @@ public class WebSocketClient : ICommunicationClient, IDisposable
             case "hello":
                 await HandleHelloMessageAsync((HelloMessage)message);
                 break;
-                
+
             case "goodbye":
                 await HandleGoodbyeMessageAsync((GoodbyeMessage)message);
                 break;
-                
+
             case "tts":
                 await HandleTtsMessageAsync((TtsMessage)message);
                 break;
-                
+
             case "listen":
                 await HandleListenMessageAsync((ListenMessage)message);
                 break;
-                
+
             case "llm":
                 await HandleLlmMessageAsync((LlmMessage)message);
                 break;
@@ -395,11 +510,9 @@ public class WebSocketClient : ICommunicationClient, IDisposable
             case "system_status":
                 await HandleSystemStatusMessageAsync((SystemStatusMessage)message);
                 break;
-
-            case "iot":
-                await HandleIotMessageAsync((IotMessage)message);
+            case "mcp":
+                await HandleMcpMessageAsync((McpMessage)message);
                 break;
-                
             default:
                 _logger?.LogDebug("收到未知类型的协议消息: {Type}", message.Type);
                 break;
@@ -412,7 +525,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     private async Task HandleHelloMessageAsync(HelloMessage message)
     {
         _logger?.LogInformation("收到服务器Hello消息，传输方式: {Transport}", message.Transport);
-        
+
         // 验证传输方式
         if (message.Transport != "websocket")
         {
@@ -422,11 +535,26 @@ public class WebSocketClient : ICommunicationClient, IDisposable
 
         // 设置会话ID
         _sessionId = message.SessionId;
-        
+
+        // 检查设备是否支持MCP协议
+        bool deviceSupportsMcp = false;
+        if (message.Features != null && message.Features.TryGetValue("mcp", out var mcpValue))
+        {
+            deviceSupportsMcp = mcpValue is bool mcpBool && mcpBool;
+        }
+
+        _logger?.LogInformation("设备MCP支持状态: {McpSupported}", deviceSupportsMcp);
+
         // 设置Hello接收事件
         if (!_helloReceived.Task.IsCompleted)
         {
             _helloReceived.SetResult(true);
+        }
+
+        // 如果设备支持MCP，触发MCP准备就绪事件以便外部组件开始MCP初始化
+        if (deviceSupportsMcp)
+        {
+            McpReadyForInitialization?.Invoke(this, EventArgs.Empty);
         }
 
         _logger?.LogInformation("Hello握手完成，会话ID: {SessionId}", _sessionId);
@@ -441,15 +569,15 @@ public class WebSocketClient : ICommunicationClient, IDisposable
         _logger?.LogInformation("收到服务器Goodbye消息，准备断开连接");
         await DisconnectAsync();
     }    /// <summary>
-    /// 处理TTS消息
-    /// </summary>
+         /// 处理TTS消息
+         /// </summary>
     private async Task HandleTtsMessageAsync(TtsMessage message)
     {
         _logger?.LogDebug("收到TTS消息，状态: {State}，文本: {Text}", message.State, message.Text);
-        
+
         // 触发TTS状态变化事件
         TtsStateChanged?.Invoke(this, message);
-        
+
         // 可以在这里添加TTS状态处理逻辑
         switch (message.State?.ToLowerInvariant())
         {
@@ -466,7 +594,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
                 _logger?.LogDebug("TTS句子结束");
                 break;
         }
-        
+
         await Task.CompletedTask;
     }
 
@@ -475,24 +603,24 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     /// </summary>
     private async Task HandleListenMessageAsync(ListenMessage message)
     {
-        _logger?.LogDebug("收到Listen消息，状态: {State}，模式: {Mode}，文本: {Text}", 
+        _logger?.LogDebug("收到Listen消息，状态: {State}，模式: {Mode}，文本: {Text}",
             message.State, message.Mode, message.Text);
         await Task.CompletedTask;
     }    /// <summary>
-    /// 处理LLM消息
-    /// </summary>
+         /// 处理LLM消息
+         /// </summary>
     private async Task HandleLlmMessageAsync(LlmMessage message)
     {
         _logger?.LogDebug("收到LLM消息，情感: {Emotion}", message.Emotion);
         LlmMessageReceived?.Invoke(this, message);
         await Task.CompletedTask;
     }    /// <summary>
-    /// 处理音乐播放器消息
-    /// </summary>
+         /// 处理音乐播放器消息
+         /// </summary>
     private async Task HandleMusicMessageAsync(MusicMessage message)
     {
         _logger?.LogDebug("收到音乐消息，动作: {Action}，歌曲: {Song}", message.Action, message.SongName);
-        
+
         // 根据不同的音乐动作进行处理
         switch (message.Action?.ToLowerInvariant())
         {
@@ -512,28 +640,45 @@ public class WebSocketClient : ICommunicationClient, IDisposable
                 _logger?.LogDebug("音乐跳转到: {Position}/{Duration}", message.Position, message.Duration);
                 break;
         }
-        
+
         MusicMessageReceived?.Invoke(this, message);
         await Task.CompletedTask;
-    }    /// <summary>
+    }
+
+    /// <summary>
     /// 处理系统状态消息
     /// </summary>
     private async Task HandleSystemStatusMessageAsync(SystemStatusMessage message)
     {
-        _logger?.LogDebug("收到系统状态消息，组件: {Component}，状态: {Status}，消息: {Message}", 
+        _logger?.LogDebug("收到系统状态消息，组件: {Component}，状态: {Status}，消息: {Message}",
             message.Component, message.Status, message.Message);
         SystemStatusMessageReceived?.Invoke(this, message);
         await Task.CompletedTask;
-    }    /// <summary>
-    /// 处理IoT设备消息
+    }
+    /// <summary>
+    /// 处理MCP消息
     /// </summary>
-    private async Task HandleIotMessageAsync(IotMessage message)
+    private async Task HandleMcpMessageAsync(McpMessage message)
     {
-        _logger?.LogDebug("收到IoT消息，描述符: {Descriptors}，状态: {States}", 
-            message.Descriptors, message.States);
-        IotMessageReceived?.Invoke(this, message);
+        _logger?.LogDebug("收到MCP消息，会话ID: {SessionId}", message.SessionId);
+
+        try
+        {
+            // 成功响应
+            var responseJson = JsonSerializer.Serialize(message.Payload, JsonOptions);
+
+            // 触发响应事件
+            McpResponseReceived?.Invoke(this, responseJson);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error processing MCP message");
+            McpErrorOccurred?.Invoke(this, ex);
+        }
         await Task.CompletedTask;
     }
+
+    #endregion
 
     public void Dispose()
     {

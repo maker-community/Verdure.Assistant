@@ -11,571 +11,911 @@
         <!--  Converters  -->
         <converters:BoolNegationConverter x:Key="BoolNegationConverter" />
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
-    </Page.Resources>    
-    <Grid>        
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
 
-        <!--  Status Card  -->
-        <Border
-            Grid.Row="0"
-            Margin="20,10,20,10"
-            Padding="16"
-            Background="{ThemeResource LayerFillColorDefaultBrush}"
-            CornerRadius="8">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+        <!--  Styles  -->        
+        <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{ThemeResource SystemAccentColor}" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
 
-                <StackPanel
-                    Grid.Column="0"
-                    Orientation="Horizontal"
-                    Spacing="12">
-                    <FontIcon
-                        x:Name="StatusIcon"
-                        FontSize="20"
-                        Foreground="{ThemeResource SystemAccentColor}"
-                        Glyph="&#xE916;" />
-                    <TextBlock
-                        x:Name="StatusText"
-                        VerticalAlignment="Center"
-                        FontSize="14"
-                        FontWeight="SemiBold"
-                        Text="{x:Bind ViewModel.StatusText, Mode=OneWay}" />
-                </StackPanel>
+        <Style x:Key="CardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource LayerFillColorDefaultBrush}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="14" />
+            <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
 
-                <StackPanel
-                    Grid.Column="1"
-                    Orientation="Horizontal"
-                    Spacing="8">
-                    <Border
-                        x:Name="ConnectionIndicator"
-                        Width="16"
-                        Height="16"
-                        Background="{ThemeResource SystemFillColorCriticalBrush}"
-                        CornerRadius="8" />
-                    <TextBlock
-                        x:Name="ConnectionStatusText"
-                        VerticalAlignment="Center"
-                        FontSize="12"
-                        Text="{x:Bind ViewModel.ConnectionStatusText, Mode=OneWay}" />
-                </StackPanel>
-            </Grid>
-        </Border>        <!--  Verification Code Panel  -->
-        <Border
-            Grid.Row="1"
-            Margin="20,0,20,10"
-            Padding="20"
-            Background="{ThemeResource SystemFillColorCautionBrush}"
-            CornerRadius="12"
-            Visibility="{x:Bind ViewModel.IsVerificationCodeVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
-            <Grid>
+        <Style x:Key="AccentCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource SystemAccentColorLight2}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="14" />
+            <Setter Property="BorderBrush" Value="{ThemeResource SystemAccentColor}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+        <!--  Responsive Layout Templates  -->
+        <DataTemplate x:Key="CompactMusicTemplate">
+            <StackPanel Spacing="12">
+                <!--  Compact Music Search  -->
+                <TextBox
+                    x:Name="CompactMusicSearchTextBox"
+                    Height="44"
+                    FontSize="14"
+                    PlaceholderText="搜索音乐..." />
+                <Button
+                    x:Name="CompactSearchMusicButton"
+                    Height="44"
+                    HorizontalAlignment="Stretch"
+                    Style="{ThemeResource AccentButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontSize="16" Glyph="&#xE721;" />
+                        <TextBlock FontWeight="SemiBold" Text="搜索音乐" />
+                    </StackPanel>
+                </Button>
+
+                <!--  Compact Player Info  -->
+                <Border
+                    Padding="12"
+                    Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                    CornerRadius="8">
+                    <StackPanel Spacing="8">
+                        <TextBlock
+                            FontSize="14"
+                            FontWeight="SemiBold"
+                            MaxLines="1"
+                            Text="当前播放"
+                            TextTrimming="CharacterEllipsis" />
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            MaxLines="1"
+                            Text="歌曲信息"
+                            TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </DataTemplate>        <!--  Compact Card Style for smaller screens  -->
+        <Style x:Key="CompactCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource LayerFillColorDefaultBrush}" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+    </Page.Resources>
+    <Grid>
+        <ScrollViewer
+            x:Name="MainScrollViewer"
+            VerticalScrollBarVisibility="Auto"
+            VerticalScrollMode="Auto">
+            <Grid Margin="16">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                
-                <!--  Header with dismiss button  -->
-                <Grid Grid.Row="0" Margin="0,0,0,12">
+
+                <!--  Header Section: Status & Connection  -->
+                <Grid
+                    x:Name="HeaderSection"
+                    Grid.Row="0"
+                    Margin="0,0,0,12">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="1*" />
                     </Grid.ColumnDefinitions>
-                    
-                    <FontIcon
-                        Grid.Column="0"
-                        FontSize="20"
-                        Glyph="&#xE72E;" />
-                    
-                    <TextBlock
-                        Grid.Column="1"
-                        Margin="12,0,0,0"
-                        VerticalAlignment="Center"
-                        FontSize="16"
-                        FontWeight="SemiBold"
-                        Text="OTA验证码" />
-                    
-                    <Button
-                        Grid.Column="2"
-                        Width="32"
-                        Height="32"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Command="{x:Bind ViewModel.DismissVerificationCodeCommand}"
-                        CornerRadius="16">
-                        <FontIcon
-                            FontSize="12"
-                            Glyph="&#xE711;" />
-                    </Button>
-                </Grid>
-                
-                <!--  Verification Code Message  -->
-                <TextBlock
-                    Grid.Row="1"
-                    Margin="0,0,0,16"
-                    FontSize="14"
-                    Text="{x:Bind ViewModel.VerificationCodeMessage, Mode=OneWay}"
-                    TextWrapping="Wrap" />
-                
-                <!--  Verification Code Display and Actions  -->
-                <Grid Grid.Row="2">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    
-                    <!--  Verification Code Display  -->
-                    <Border
-                        Grid.Column="0"
-                        Padding="16,12"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        CornerRadius="8">
-                        <TextBlock
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            FontFamily="Consolas"
-                            FontSize="18"
-                            FontWeight="Bold"
-                            Foreground="{ThemeResource SystemAccentColor}"
-                            Text="{x:Bind ViewModel.VerificationCode, Mode=OneWay}" />
-                    </Border>
-                    
-                    <!--  Copy Button  -->
-                    <Button
-                        Grid.Column="1"
-                        Margin="12,0,0,0"
-                        Command="{x:Bind ViewModel.CopyVerificationCodeCommand}"
-                        Style="{ThemeResource AccentButtonStyle}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon FontSize="16" Glyph="&#xE8C8;" />
-                            <TextBlock Text="复制" />
-                        </StackPanel>
-                    </Button>
-                    
-                    <!--  Open Login Page Button  -->
-                    <Button
-                        Grid.Column="2"
-                        Margin="8,0,0,0"
-                        Command="{x:Bind ViewModel.OpenLoginPageCommand}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon FontSize="16" Glyph="&#xE774;" />
-                            <TextBlock Text="打开登录页" />
-                        </StackPanel>
-                    </Button>
-                </Grid>
-            </Grid>
-        </Border>        
-        <!-- Protocol Information Panel -->
-        <Border
-            Grid.Row="2"
-            Margin="20,0,20,10"
-            Padding="16"
-            Background="{ThemeResource LayerFillColorDefaultBrush}"
-            CornerRadius="8">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
 
-                <!-- Music Player Info -->
-                <StackPanel Grid.Column="0" Spacing="8">
-                    <TextBlock
-                        FontSize="12"
-                        FontWeight="SemiBold"
-                        Foreground="{ThemeResource SystemAccentColor}"
-                        Text="🎵 音乐播放器" />
-                    
-                    <StackPanel Spacing="4">
-                        <TextBlock
-                            FontSize="11"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}">
-                            <Run Text="歌曲: " />
-                            <Run Text="{x:Bind ViewModel.CurrentSongName, Mode=OneWay}" />
-                        </TextBlock>
-                        
-                        <TextBlock
-                            FontSize="11"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}">
-                            <Run Text="艺术家: " />
-                            <Run Text="{x:Bind ViewModel.CurrentArtist, Mode=OneWay}" />
-                        </TextBlock>
-                        
-                        <TextBlock
-                            FontSize="11"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}">
-                            <Run Text="状态: " />
-                            <Run Text="{x:Bind ViewModel.MusicStatus, Mode=OneWay}" />
-                        </TextBlock>
-                        
-                        <TextBlock
-                            FontSize="10"
-                            FontFamily="Consolas"
-                            Text="{x:Bind ViewModel.CurrentLyric, Mode=OneWay}"
-                            TextWrapping="Wrap"
-                            MaxLines="2" />
-                    </StackPanel>
-                </StackPanel>
+                    <!--  Status Card  -->
+                    <Border Grid.Column="0" Style="{StaticResource AccentCardStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>                            
+                            <StackPanel
+                                Grid.Column="0"
+                                Orientation="Horizontal"
+                                Spacing="12">
+                                <Border
+                                    Width="40"
+                                    Height="40"
+                                    Background="{ThemeResource SystemAccentColor}"
+                                    CornerRadius="20">
+                                    <FontIcon
+                                        x:Name="StatusIcon"
+                                        FontSize="20"
+                                        Foreground="White"
+                                        Glyph="&#xE916;" />
+                                </Border>
+                                <StackPanel VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock
+                                        FontSize="14"
+                                        FontWeight="SemiBold"
+                                        Foreground="{ThemeResource SystemAccentColorDark1}"
+                                        Text="语音助手状态" />
+                                    <TextBlock
+                                        x:Name="StatusText"
+                                        FontSize="16"
+                                        FontWeight="Bold"
+                                        Foreground="{ThemeResource SystemAccentColorDark2}"
+                                        Text="{x:Bind ViewModel.StatusText, Mode=OneWay}" />
+                                </StackPanel>
+                            </StackPanel>
 
-                <!-- System Status Info -->
-                <StackPanel Grid.Column="1" Spacing="8">
-                    <TextBlock
-                        FontSize="12"
-                        FontWeight="SemiBold"
-                        Foreground="{ThemeResource SystemAccentColor}"
-                        Text="📊 系统状态" />
-                    
-                    <StackPanel Spacing="4">
-                        <TextBlock
-                            FontSize="11"
-                            Text="{x:Bind ViewModel.SystemStatusText, Mode=OneWay}"
-                            TextWrapping="Wrap"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        
-                        <TextBlock
-                            FontSize="11"
-                            Text="{x:Bind ViewModel.IotStatusText, Mode=OneWay}"
-                            TextWrapping="Wrap"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    </StackPanel>
-                </StackPanel>                
-                <!-- Emotion & LLM Info -->
-                <StackPanel Grid.Column="2" Spacing="8">
-                    <TextBlock
-                        FontSize="12"
-                        FontWeight="SemiBold"
-                        Foreground="{ThemeResource SystemAccentColor}"
-                        Text="😊 情感状态" />
-                    
-                    <StackPanel Spacing="4">
-                        <TextBlock
-                            FontSize="56"
-                            Visibility="Visible"
-                            HorizontalAlignment="Center"
-                            Text="{x:Bind ViewModel.CurrentEmotion, Mode=OneWay}" />
-                    </StackPanel>
-                </StackPanel>
-            </Grid>
-        </Border>        
-        
-        <!--  Main Content Grid  -->
-        <Grid Grid.Row="3" Margin="20,0,20,20">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="1*" MinWidth="350" />
-                <ColumnDefinition Width="15" />
-                <ColumnDefinition Width="1*" MinWidth="350" />
-            </Grid.ColumnDefinitions>
-
-            <!--  Left Panel: Emotion & Controls  -->
-            <Border
-                Grid.Column="0"
-                Padding="20"
-                Background="{ThemeResource LayerFillColorDefaultBrush}"
-                CornerRadius="12">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-
-                    <!--  Emotion Display  -->
-                    <!--<Viewbox
-                        Grid.Row="0"
-                        MaxWidth="280"
-                        MaxHeight="280"
-                        Margin="10"
-                        Stretch="Uniform">
-                        <Border
-                            Width="280"
-                            Height="280"
-                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            CornerRadius="140">
-                            <Grid>
-                                --><!--  Default Emotion  --><!--
-                                <TextBlock
-                                    x:Name="DefaultEmotionText"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    FontSize="100"
-                                    Visibility="Collapsed"
-                                    Text="{x:Bind ViewModel.DefaultEmotionText, Mode=OneWay}" />
-
-                                --><!--  Animated Emotion  --><!--
-                                <Image
-                                    x:Name="EmotionImage"
-                                    Stretch="Uniform"
-                                    Visibility="Collapsed" />
-                            </Grid>
-                        </Border>
-                    </Viewbox>-->
-
-                    <!--  TTS Text Display  -->
-                    <Border
-                        Grid.Row="0"
-                        MinHeight="60"
-                        Margin="0,15,0,0"
-                        Padding="16"
-                        Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
-                        CornerRadius="8">
-                        <ScrollViewer MaxHeight="80" VerticalScrollBarVisibility="Auto">
-                            <TextBlock
-                                x:Name="TtsText"
-                                HorizontalAlignment="Center"
+                            <StackPanel
+                                Grid.Column="2"
                                 VerticalAlignment="Center"
-                                FontSize="13"
-                                Text="{x:Bind ViewModel.TtsText, Mode=OneWay}"
-                                TextWrapping="Wrap" />
-                        </ScrollViewer>
-                    </Border>
-
-                    <!--  Audio Controls Stack  -->
-                    <Grid Grid.Row="1" Margin="0,15,0,0">
-                        <!--  Volume Control  -->
-                        <StackPanel x:Name="VolumeControlPanel" Spacing="8">
+                                Spacing="6">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Border
+                                        x:Name="ConnectionIndicator"
+                                        Width="10"
+                                        Height="10"
+                                        Background="{ThemeResource SystemFillColorCriticalBrush}"
+                                        CornerRadius="5" />
+                                    <TextBlock
+                                        x:Name="ConnectionStatusText"
+                                        FontSize="12"
+                                        FontWeight="SemiBold"
+                                        Foreground="{ThemeResource SystemAccentColorDark1}"
+                                        Text="{x:Bind ViewModel.ConnectionStatusText, Mode=OneWay}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+                    </Border>                    <!--  Quick Actions  -->
+                    <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+                        <StackPanel Spacing="8">
                             <TextBlock
-                                x:Uid="VolumeControl_Header"
-                                FontSize="12"
-                                FontWeight="SemiBold"
-                                Opacity="0.8" />
+                                Margin="0,0,0,4"
+                                FontSize="14"
+                                Style="{StaticResource SectionHeaderStyle}"
+                                Text="快速操作" />
+
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="6" />
+                                    <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <ToggleButton
-                                    x:Name="MuteButton"
+
+                                <Button
+                                    x:Name="ConnectButton"
                                     Grid.Column="0"
-                                    Width="32"
-                                    Height="32"
-                                    Margin="0,0,8,0"
-                                    Command="{x:Bind ViewModel.ToggleMuteCommand}">
-                                    <FontIcon
-                                        x:Name="MuteIcon"
-                                        FontSize="14"
-                                        Glyph="&#xE767;" />
-                                </ToggleButton>
-                                <Slider
-                                    x:Name="VolumeSlider"
-                                    Grid.Column="1"
-                                    VerticalAlignment="Center"
-                                    Maximum="100"
-                                    Minimum="0"
-                                    Value="{x:Bind ViewModel.VolumeValue, Mode=TwoWay}" />
-                                <TextBlock
-                                    x:Name="VolumeText"
+                                    Height="36"
+                                    Command="{x:Bind ViewModel.ConnectCommand}"
+                                    IsEnabled="{x:Bind ViewModel.IsConnected, Mode=OneWay, Converter={StaticResource BoolNegationConverter}}"
+                                    Style="{ThemeResource AccentButtonStyle}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon FontSize="14" Glyph="&#xE703;" />
+                                        <TextBlock FontSize="12" x:Uid="ConnectText" Text="连接" />
+                                    </StackPanel>
+                                </Button>
+
+                                <Button
+                                    x:Name="DisconnectButton"
                                     Grid.Column="2"
-                                    MinWidth="30"
-                                    Margin="8,0,0,0"
-                                    VerticalAlignment="Center"
-                                    FontSize="11"
-                                    Text="{x:Bind ViewModel.VolumeText, Mode=OneWay}" />
+                                    Height="36"
+                                    Command="{x:Bind ViewModel.DisconnectCommand}"
+                                    IsEnabled="{x:Bind ViewModel.IsConnected, Mode=OneWay}"
+                                    Style="{ThemeResource DefaultButtonStyle}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon FontSize="14" Glyph="&#xE711;" />
+                                        <TextBlock FontSize="12" x:Uid="DisconnectButton_Content" Text="断开" />
+                                    </StackPanel>
+                                </Button>
                             </Grid>
                         </StackPanel>
-
-                        <!--  Microphone Visualizer (Hidden by default)  -->
-                        <StackPanel
-                            x:Name="MicVisualizerPanel"
-                            Spacing="8"
-                            Visibility="Collapsed">
-                            <TextBlock
-                                x:Uid="MicrophoneMonitor_Header"
-                                FontSize="12"
-                                FontWeight="SemiBold"
-                                Opacity="0.8" />
-                            <Border
-                                Height="50"
-                                Padding="10"
-                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                CornerRadius="8">
-                                <Canvas x:Name="MicVisualizerCanvas">
-                                    <!--  Microphone level bars will be added here programmatically  -->
-                                </Canvas>
-                            </Border>
-                        </StackPanel>
-                    </Grid>
-
-                    <!--  Control Buttons  -->
-                    <Grid Grid.Row="2" Margin="0,20,0,0">
+                    </Border>
+                </Grid>                
+                <!--  Verification Code Section  -->
+                <Border
+                    Grid.Row="1"
+                    Margin="0,0,0,12"
+                    Background="{ThemeResource SystemFillColorCautionBrush}"
+                    BorderBrush="{ThemeResource SystemAccentColor}"
+                    Style="{StaticResource CardStyle}"
+                    Visibility="{x:Bind ViewModel.IsVerificationCodeVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <!--  Manual Mode Button  -->
-                        <Button
-                            x:Name="ManualButton"
-                            Grid.Row="0"
-                            Height="40"
-                            Margin="0,0,0,8"
-                            HorizontalAlignment="Stretch"
-                            IsEnabled="{x:Bind ViewModel.IsManualButtonEnabled, Mode=OneWay}"
-                            PointerCaptureLost="ManualButton_PointerCaptureLost"
-                            PointerPressed="ManualButton_PointerPressed"
-                            PointerReleased="ManualButton_PointerReleased"
-                            Style="{ThemeResource AccentButtonStyle}"
-                            Visibility="{x:Bind ViewModel.IsAutoMode, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=True}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon FontSize="16" Glyph="&#xE720;" />
-                                <TextBlock x:Name="ManualButtonText" Text="{x:Bind ViewModel.ManualButtonText, Mode=OneWay}" />
-                            </StackPanel>
-                        </Button>
 
-                        <!--  Auto Mode Button  -->
-                        <Button
-                            x:Name="AutoButton"
-                            Grid.Row="0"
-                            Height="40"
-                            Margin="0,0,0,8"
-                            HorizontalAlignment="Stretch"
-                            Command="{x:Bind ViewModel.ToggleAutoModeCommand}"
-                            IsEnabled="{x:Bind ViewModel.IsConnected, Mode=OneWay}"
-                            Style="{ThemeResource AccentButtonStyle}"
-                            Visibility="{x:Bind ViewModel.IsAutoMode, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon FontSize="16" Glyph="&#xE768;" />
-                                <TextBlock x:Name="AutoButtonText" Text="{x:Bind ViewModel.AutoButtonText, Mode=OneWay}" />
+                        <!--  Header  -->
+                        <Grid Grid.Row="0" Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Border
+                                Grid.Column="0"
+                                Width="40"
+                                Height="40"
+                                Background="{ThemeResource SystemAccentColor}"
+                                CornerRadius="20">
+                                <FontIcon
+                                    FontSize="20"
+                                    Foreground="White"
+                                    Glyph="&#xE72E;" />
+                            </Border>
+
+                            <StackPanel
+                                Grid.Column="1"
+                                Margin="16,0,0,0"
+                                VerticalAlignment="Center">
+                                <TextBlock
+                                    FontSize="18"
+                                    FontWeight="SemiBold"
+                                    Text="身份验证" />
+                                <TextBlock
+                                    FontSize="14"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="需要验证身份以继续使用服务" />
                             </StackPanel>
-                        </Button>
-                        <!--  Abort Button  -->
-                        <Button
-                            x:Name="AbortButton"
+
+                            <Button
+                                Grid.Column="2"
+                                Width="36"
+                                Height="36"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Command="{x:Bind ViewModel.DismissVerificationCodeCommand}"
+                                CornerRadius="18">
+                                <FontIcon FontSize="14" Glyph="&#xE711;" />
+                            </Button>
+                        </Grid>
+
+                        <!--  Message  -->
+                        <TextBlock
                             Grid.Row="1"
-                            Height="36"
-                            Margin="0,0,0,8"
-                            HorizontalAlignment="Stretch"
-                            Command="{x:Bind ViewModel.AbortCommand}"
-                            IsEnabled="{x:Bind ViewModel.IsListening, Mode=OneWay}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon FontSize="14" Glyph="&#xE71A;" />
-                                <TextBlock x:Uid="AbortButton_Content" />
-                            </StackPanel>
-                        </Button>
-                        <!--  Mode Toggle Button  -->
-                        <Button
-                            x:Name="ModeToggleButton"
-                            Grid.Row="2"
-                            Height="36"
-                            HorizontalAlignment="Stretch"
-                            Command="{x:Bind ViewModel.ToggleModeCommand}"
-                            Style="{ThemeResource DefaultButtonStyle}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon FontSize="14" Glyph="&#xE8AB;" />
-                                <TextBlock x:Name="ModeToggleText" Text="{x:Bind ViewModel.ModeToggleText, Mode=OneWay}" />
-                            </StackPanel>
-                        </Button>
-                    </Grid>
-                </Grid>
-            </Border>
+                            Margin="0,0,0,20"
+                            FontSize="14"
+                            Text="{x:Bind ViewModel.VerificationCodeMessage, Mode=OneWay}"
+                            TextWrapping="Wrap" />
 
-            <!--  Right Panel: Input & Text  -->
-            <Border
-                Grid.Column="2"
-                Padding="20"
-                Background="{ThemeResource LayerFillColorDefaultBrush}"
-                CornerRadius="12">
-                <Grid>
+                        <!--  Code Display and Actions  -->
+                        <Grid Grid.Row="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border
+                                Grid.Column="0"
+                                Padding="20,16"
+                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                CornerRadius="8">
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    FontFamily="Consolas"
+                                    FontSize="24"
+                                    FontWeight="Bold"
+                                    Foreground="{ThemeResource SystemAccentColor}"
+                                    Text="{x:Bind ViewModel.VerificationCode, Mode=OneWay}" />
+                            </Border>
+
+                            <Button
+                                Grid.Column="2"
+                                Height="48"
+                                Command="{x:Bind ViewModel.CopyVerificationCodeCommand}"
+                                Style="{ThemeResource AccentButtonStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon FontSize="16" Glyph="&#xE8C8;" />
+                                    <TextBlock Text="复制" />
+                                </StackPanel>
+                            </Button>
+
+                            <Button
+                                Grid.Column="4"
+                                Height="48"
+                                Command="{x:Bind ViewModel.OpenLoginPageCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon FontSize="16" Glyph="&#xE774;" />
+                                    <TextBlock Text="打开登录页" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </Border>                
+                <!--  Main Dashboard Section  -->
+                <Grid
+                    x:Name="DashboardGrid"
+                    Grid.Row="2"
+                    Margin="0,0,0,12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-
-                    <!--  Connection Controls  -->
-                    <Grid Grid.Row="0" Margin="0,0,0,15">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Button
-                            x:Name="ConnectButton"
-                            Grid.Column="0"
-                            Height="36"
-                            Margin="0,0,5,0"
-                            Command="{x:Bind ViewModel.ConnectCommand}"
-                            IsEnabled="{x:Bind ViewModel.IsConnected, Mode=OneWay, Converter={StaticResource BoolNegationConverter}}"
-                            Style="{ThemeResource AccentButtonStyle}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon
-                                    x:Name="ConnectIcon"
-                                    FontSize="16"
-                                    Glyph="&#xE703;" />
-                                <TextBlock x:Name="ConnectText" x:Uid="ConnectText" />
-                            </StackPanel>
-                        </Button>
-                        <Button
-                            x:Name="DisconnectButton"
-                            Grid.Column="1"
-                            Height="36"
-                            Margin="5,0,0,0"
-                            Command="{x:Bind ViewModel.DisconnectCommand}"
-                            IsEnabled="{x:Bind ViewModel.IsConnected, Mode=OneWay}"
-                            Style="{ThemeResource DefaultButtonStyle}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon FontSize="16" Glyph="&#xE711;" />
-                                <TextBlock x:Uid="DisconnectButton_Content" />
-                            </StackPanel>
-                        </Button>
-                    </Grid>
-
-                    <!--  Text Input  -->
-                    <Grid Grid.Row="1" Margin="0,0,0,15">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBox
-                            x:Name="MessageTextBox"
-                            Grid.Column="0"
-                            Height="36"
-                            Margin="0,0,10,0"
-                            KeyDown="MessageTextBox_KeyDown"
-                            Text="{x:Bind ViewModel.CurrentMessage, Mode=TwoWay}" />
-                        <Button
-                            x:Name="SendButton"
-                            Grid.Column="1"
-                            Height="36"
-                            MinWidth="60"
-                            Command="{x:Bind ViewModel.SendMessageCommand}"
-                            Style="{ThemeResource AccentButtonStyle}">
-                            <TextBlock x:Uid="SendButton_Content" />
-                        </Button>
-                    </Grid>
-
-                    <!--  Messages Display  -->
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.5*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="1*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>                    
+                    <!--  Integrated Music Center  -->
                     <Border
-                        Grid.Row="2"
-                        Padding="12"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        CornerRadius="8">
-                        <ScrollViewer
-                            x:Name="MessagesScrollViewer"
-                            VerticalScrollBarVisibility="Auto"
-                            ZoomMode="Disabled">
-                            <StackPanel x:Name="MessagesPanel" Spacing="8">
-                                <!--  Messages will be added here programmatically  -->
+                        x:Name="MusicCenter"
+                        Grid.Column="0"
+                        Style="{StaticResource CardStyle}">
+                        <StackPanel Spacing="12">
+                            <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="🎵 音乐中心" />
+
+                            <!--  Music Search Section  -->
+                            <StackPanel Spacing="8">
                                 <TextBlock
-                                    x:Uid="MessagesPanel_WaitingText"
-                                    Margin="0,20"
-                                    HorizontalAlignment="Center"
-                                    FontSize="13"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    FontSize="12"
+                                    FontWeight="SemiBold"
+                                    Foreground="{ThemeResource SystemAccentColor}"
+                                    Text="音乐搜索" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBox
+                                        x:Name="MusicSearchTextBox"
+                                        Grid.Column="0"
+                                        Height="32"
+                                        FontSize="12"
+                                        KeyDown="MusicSearchTextBox_KeyDown"
+                                        PlaceholderText="搜索音乐..." />                                    
+                                    <Button
+                                        x:Name="SearchMusicButton"
+                                        Grid.Column="2"
+                                        Height="32"
+                                        MinWidth="50"
+                                        MaxWidth="80"
+                                        Click="SearchMusicButton_Click"
+                                        Style="{ThemeResource AccentButtonStyle}">
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <FontIcon FontSize="12" Glyph="&#xE721;" />
+                                            <TextBlock FontSize="12" FontWeight="SemiBold" Text="搜索" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
                             </StackPanel>
-                        </ScrollViewer>
+
+                            <!--  Music Player Section  -->
+                            <StackPanel Spacing="10">
+                                <TextBlock
+                                    FontSize="12"
+                                    FontWeight="SemiBold"
+                                    Foreground="{ThemeResource SystemAccentColor}"
+                                    Text="正在播放" />
+
+                                <!--  Song Info  -->
+                                <StackPanel Spacing="4">
+                                    <TextBlock
+                                        FontSize="14"
+                                        FontWeight="SemiBold"
+                                        MaxLines="1"
+                                        Text="{x:Bind ViewModel.CurrentSongName, Mode=OneWay}"
+                                        TextTrimming="CharacterEllipsis" />
+                                    <TextBlock
+                                        FontSize="12"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        MaxLines="1"
+                                        Text="{x:Bind ViewModel.CurrentArtist, Mode=OneWay}"
+                                        TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+
+                                <!--  Progress Slider  -->
+                                <Slider
+                                    x:Name="MusicProgressSlider"
+                                    IsThumbToolTipEnabled="False"
+                                    Maximum="{x:Bind ViewModel.MusicDuration, Mode=OneWay}"
+                                    Minimum="0"
+                                    PointerReleased="MusicProgressSlider_PointerReleased"
+                                    Value="{x:Bind ViewModel.MusicPosition, Mode=OneWay}" />
+                                  <!--  Playback Controls  -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Button
+                                        x:Name="PlayPauseButton"
+                                        Grid.Column="0"
+                                        MinWidth="32"
+                                        MinHeight="32"
+                                        Width="40"
+                                        Height="40"
+                                        Margin="0,0,6,0"
+                                        Click="PlayPauseButton_Click"
+                                        Style="{ThemeResource AccentButtonStyle}">
+                                        <FontIcon
+                                            x:Name="PlayPauseIcon"
+                                            FontSize="12"
+                                            Glyph="&#xE768;" />
+                                    </Button>                                    
+                                    <Button
+                                        x:Name="StopMusicButton"
+                                        Grid.Column="1"
+                                        MinWidth="32"
+                                        MinHeight="32"
+                                        Width="40"
+                                        Height="40"
+                                        Margin="0,0,6,0"
+                                        Command="{x:Bind ViewModel.StopMusicCommand}">
+                                        <FontIcon x:Name="StopMusicIcon" FontSize="12" Glyph="&#xE71A;" />
+                                    </Button>                                    
+                                    <StackPanel
+                                        x:Name="MusicStatusPanel"
+                                        Grid.Column="2"
+                                        Margin="4,0"
+                                        VerticalAlignment="Center">
+                                        <TextBlock
+                                            x:Name="MusicStatusText"
+                                            FontSize="11"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Text="{x:Bind ViewModel.MusicStatus, Mode=OneWay}" />
+                                    </StackPanel>
+
+                                    <StackPanel
+                                        Grid.Column="3"
+                                        VerticalAlignment="Center"
+                                        Orientation="Horizontal"
+                                        Spacing="4">
+                                        <FontIcon
+                                            VerticalAlignment="Center"
+                                            FontSize="12"
+                                            Glyph="&#xE767;" />
+                                        <Slider
+                                            x:Name="VolumeSlider1"
+                                            MinWidth="40"
+                                            Width="60"
+                                            MaxWidth="80"
+                                            VerticalAlignment="Center"
+                                            Maximum="100"
+                                            Minimum="0"
+                                            ValueChanged="VolumeSlider_ValueChanged"
+                                            Value="50" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <!--  Current Lyric  -->
+                                <Border
+                                    Padding="8,6"
+                                    Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                    CornerRadius="6">
+                                    <TextBlock
+                                        FontSize="11"
+                                        Foreground="{ThemeResource SystemAccentColor}"
+                                        Text="{x:Bind ViewModel.CurrentLyric, Mode=OneWay}"
+                                        TextAlignment="Center"
+                                        TextWrapping="Wrap" />
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>                    
+                    <!--  System Status Card  -->
+                    <Border
+                        x:Name="SystemStatusCard"
+                        Grid.Column="2"
+                        Style="{StaticResource CardStyle}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="📊 系统状态" />
+
+                            <StackPanel Spacing="8">
+                                <Border
+                                    Padding="8,6"
+                                    Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                    CornerRadius="6">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock
+                                            FontSize="12"
+                                            FontWeight="SemiBold"
+                                            Text="系统运行状态" />
+                                        <TextBlock
+                                            FontSize="11"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Text="{x:Bind ViewModel.SystemStatusText, Mode=OneWay}"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border
+                                    Padding="8,6"
+                                    Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                    CornerRadius="6">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock
+                                            FontSize="12"
+                                            FontWeight="SemiBold"
+                                            Text="物联网设备" />
+                                        <TextBlock
+                                            FontSize="11"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Text="{x:Bind ViewModel.IotStatusText, Mode=OneWay}"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>                    
+                    <!--  Emotion Status Card  -->
+                    <Border
+                        x:Name="EmotionStatusCard"
+                        Grid.Column="4"
+                        Style="{StaticResource CardStyle}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="😊 情感状态" />
+
+                            <Border
+                                Padding="12"
+                                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                CornerRadius="8">
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    FontSize="48"
+                                    Text="{x:Bind ViewModel.CurrentEmotion, Mode=OneWay}" />
+                            </Border>
+
+                            <!--  TTS Text Display  -->
+                            <Border
+                                Padding="8,6"
+                                Background="{ThemeResource SystemAccentColorLight3}"
+                                CornerRadius="6">
+                                <ScrollViewer MaxHeight="60" VerticalScrollBarVisibility="Auto">
+                                    <TextBlock
+                                        x:Name="TtsText"
+                                        FontSize="11"
+                                        Foreground="{ThemeResource SystemAccentColorDark1}"
+                                        Text="{x:Bind ViewModel.TtsText, Mode=OneWay}"
+                                        TextAlignment="Center"
+                                        TextWrapping="Wrap" />
+                                </ScrollViewer>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </Grid>                
+                <!--  Voice Control & Chat Section  -->
+                <Grid x:Name="VoiceControlGrid" Grid.Row="3">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1*" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="1.5*" />
+                    </Grid.ColumnDefinitions>
+                    <!--  Voice Control Panel  -->
+                    <Border
+                        x:Name="VoiceControlPanel"
+                        Grid.Column="0"
+                        Style="{StaticResource CardStyle}">
+                        <StackPanel Spacing="12">
+                            <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="🎤 语音控制" />
+
+                            <!--  Volume Control  -->
+                            <StackPanel Spacing="8">
+                                <TextBlock
+                                    FontSize="12"
+                                    FontWeight="SemiBold"
+                                    Text="音量控制" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>                                    
+                                    <ToggleButton
+                                        x:Name="MuteButton"
+                                        Grid.Column="0"
+                                        MinWidth="28"
+                                        MinHeight="28"
+                                        Width="36"
+                                        Height="36"
+                                        Margin="0,0,8,0"
+                                        Command="{x:Bind ViewModel.ToggleMuteCommand}">
+                                        <FontIcon
+                                            x:Name="MuteIcon"
+                                            FontSize="14"
+                                            Glyph="&#xE767;" />
+                                    </ToggleButton>
+
+                                    <Slider
+                                        x:Name="VolumeSlider"
+                                        Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        Maximum="100"
+                                        Minimum="0"
+                                        Value="{x:Bind ViewModel.VolumeValue, Mode=TwoWay}" />
+
+                                    <TextBlock
+                                        x:Name="VolumeText"
+                                        Grid.Column="2"
+                                        MinWidth="32"
+                                        Margin="8,0,0,0"
+                                        VerticalAlignment="Center"
+                                        FontSize="12"
+                                        FontWeight="SemiBold"
+                                        Text="{x:Bind ViewModel.VolumeText, Mode=OneWay}" />
+                                </Grid>
+                            </StackPanel>                            
+                            <!--  Control Buttons  -->
+                            <StackPanel Spacing="8">                                
+                                <!--  Mode Toggle  -->
+                                <Button
+                                    x:Name="ModeToggleButton"
+                                    Height="44"
+                                    HorizontalAlignment="Stretch"
+                                    Command="{x:Bind ViewModel.ToggleModeCommand}"
+                                    Style="{ThemeResource DefaultButtonStyle}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon x:Name="ModeToggleIcon" FontSize="16" Glyph="&#xE8AB;" />
+                                        <StackPanel>
+                                            <TextBlock x:Name="ModeToggleMainText" FontSize="12" FontWeight="SemiBold" Text="{x:Bind ViewModel.ModeToggleText, Mode=OneWay}" />
+                                            <TextBlock
+                                                x:Name="ModeToggleSubText"
+                                                FontSize="10"
+                                                Opacity="0.8"
+                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                Text="切换控制模式" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Button>                                
+                                <!--  Manual Mode Button  -->
+                                <Button
+                                    x:Name="ManualButton"
+                                    Height="44"
+                                    HorizontalAlignment="Stretch"
+                                    IsEnabled="{x:Bind ViewModel.IsManualButtonEnabled, Mode=OneWay}"
+                                    PointerCaptureLost="ManualButton_PointerCaptureLost"
+                                    PointerPressed="ManualButton_PointerPressed"
+                                    PointerReleased="ManualButton_PointerReleased"
+                                    Style="{ThemeResource AccentButtonStyle}"
+                                    Visibility="{x:Bind ViewModel.IsAutoMode, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=True}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon x:Name="ManualButtonIcon" FontSize="16" Glyph="&#xE720;" />
+                                        <StackPanel>
+                                            <TextBlock
+                                                x:Name="ManualButtonMainText"
+                                                FontSize="12"
+                                                FontWeight="SemiBold"
+                                                Text="{x:Bind ViewModel.ManualButtonText, Mode=OneWay}" />
+                                            <TextBlock
+                                                x:Name="ManualButtonSubText"
+                                                FontSize="10"
+                                                Foreground="White"
+                                                Opacity="0.8"
+                                                Text="按住说话，松开发送" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Button>                                
+                                <!--  Auto Mode Button  -->
+                                <Button
+                                    x:Name="AutoButton"
+                                    Height="44"
+                                    HorizontalAlignment="Stretch"
+                                    Command="{x:Bind ViewModel.ToggleAutoModeCommand}"
+                                    IsEnabled="{x:Bind ViewModel.IsConnected, Mode=OneWay}"
+                                    Style="{ThemeResource AccentButtonStyle}"
+                                    Visibility="{x:Bind ViewModel.IsAutoMode, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon x:Name="AutoButtonIcon" FontSize="16" Glyph="&#xE768;" />
+                                        <StackPanel>
+                                            <TextBlock
+                                                x:Name="AutoButtonMainText"
+                                                FontSize="12"
+                                                FontWeight="SemiBold"
+                                                Text="{x:Bind ViewModel.AutoButtonText, Mode=OneWay}" />
+                                            <TextBlock
+                                                x:Name="AutoButtonSubText"
+                                                FontSize="10"
+                                                Foreground="White"
+                                                Opacity="0.8"
+                                                Text="自动语音识别模式" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Button>                                
+                                <!--  Abort Button  -->
+                                <Button
+                                    x:Name="AbortButton"
+                                    Height="36"
+                                    HorizontalAlignment="Stretch"
+                                    Command="{x:Bind ViewModel.AbortCommand}"
+                                    IsEnabled="{x:Bind ViewModel.IsListening, Mode=OneWay}"
+                                    Style="{ThemeResource DefaultButtonStyle}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon x:Name="AbortButtonIcon" FontSize="14" Glyph="&#xE71A;" />
+                                        <TextBlock x:Name="AbortButtonText" FontSize="12" FontWeight="SemiBold" Text="中断对话" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>                            
+                            <!--  Microphone Visualizer  -->
+                            <Border
+                                x:Name="MicVisualizerPanel"
+                                Height="48"
+                                Padding="8"
+                                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                CornerRadius="6"
+                                Visibility="Collapsed">
+                                <Canvas x:Name="MicVisualizerCanvas">
+                                    <!--  Microphone level bars will be added here programmatically  -->
+                                </Canvas>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                    <!--  Chat & Input Panel  -->
+                    <Border
+                        x:Name="ChatPanel"
+                        Grid.Column="2"
+                        Style="{StaticResource CardStyle}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock
+                                Grid.Row="0"
+                                Style="{StaticResource SectionHeaderStyle}"
+                                Text="💬 对话交流" />                            
+                            <!--  Text Input  -->
+                            <Grid Grid.Row="1" Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBox
+                                    x:Name="MessageTextBox"
+                                    Grid.Column="0"
+                                    Height="36"
+                                    FontSize="12"
+                                    KeyDown="MessageTextBox_KeyDown"
+                                    PlaceholderText="输入消息..."
+                                    Text="{x:Bind ViewModel.CurrentMessage, Mode=TwoWay}" />
+
+                                <Button
+                                    x:Name="SendButton"
+                                    Grid.Column="2"
+                                    Height="36"
+                                    MinWidth="64"
+                                    Command="{x:Bind ViewModel.SendMessageCommand}"
+                                    Style="{ThemeResource AccentButtonStyle}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon FontSize="14" Glyph="&#xE724;" />
+                                        <TextBlock FontSize="12" FontWeight="SemiBold" Text="发送" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>                            
+                            <!--  Messages Display  -->
+                            <Border
+                                Grid.Row="2"
+                                MinHeight="240"
+                                Padding="12"
+                                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                CornerRadius="6">
+                                <ScrollViewer
+                                    x:Name="MessagesScrollViewer"
+                                    VerticalScrollBarVisibility="Auto"
+                                    ZoomMode="Disabled">
+                                    <StackPanel x:Name="MessagesPanel" Spacing="8">
+                                        <!--  Messages will be added here programmatically  -->
+                                        <Border
+                                            Padding="16"
+                                            Background="{ThemeResource LayerFillColorDefaultBrush}"
+                                            CornerRadius="6">
+                                            <StackPanel HorizontalAlignment="Center" Spacing="6">
+                                                <FontIcon
+                                                    FontSize="24"
+                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                    Glyph="&#xE8F2;" />
+                                                <TextBlock
+                                                    HorizontalAlignment="Center"
+                                                    FontSize="12"
+                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                    Text="等待开始对话..." />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </Border>
+                        </Grid>
                     </Border>
                 </Grid>
-            </Border>
-        </Grid>
+            </Grid>
+        </ScrollViewer>
+        <VisualStateManager.VisualStateGroups>            
+            <VisualStateGroup x:Name="AdaptiveStates">
+                <VisualState x:Name="WideState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="1000" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <!--  Use full layout for wide screens  -->
+                        <Setter Target="MainScrollViewer.Padding" Value="20" />
+                    </VisualState.Setters>
+                </VisualState>
+
+                <VisualState x:Name="MediumState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="700" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <!--  Adjust dashboard column layout for medium screens  -->
+                        <Setter Target="DashboardGrid.ColumnDefinitions[0].Width" Value="1.2*" />
+                        <Setter Target="DashboardGrid.ColumnDefinitions[2].Width" Value="1*" />
+                        <Setter Target="DashboardGrid.ColumnDefinitions[4].Width" Value="0.8*" />
+                        <Setter Target="MainScrollViewer.Padding" Value="16" />
+                        <!--  Reduce margins for medium screens  -->
+                        <Setter Target="HeaderSection.Margin" Value="0,0,0,12" />
+                        <Setter Target="DashboardGrid.Margin" Value="0,0,0,12" />
+                        <!--  Adjust voice control spacing  -->
+                        <Setter Target="VoiceControlGrid.ColumnDefinitions[1].Width" Value="12" />
+                    </VisualState.Setters>
+                </VisualState>                <VisualState x:Name="NarrowState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <!--  Stack cards vertically on narrow screens  -->
+                        <Setter Target="DashboardGrid.RowDefinitions[0].Height" Value="Auto" />
+                        <Setter Target="DashboardGrid.RowDefinitions[1].Height" Value="Auto" />
+                        <Setter Target="DashboardGrid.RowDefinitions[2].Height" Value="Auto" />
+                        <Setter Target="DashboardGrid.ColumnDefinitions[0].Width" Value="*" />
+                        <Setter Target="DashboardGrid.ColumnDefinitions[1].Width" Value="0" />
+                        <Setter Target="DashboardGrid.ColumnDefinitions[2].Width" Value="0" />
+                        <Setter Target="DashboardGrid.ColumnDefinitions[3].Width" Value="0" />
+                        <Setter Target="DashboardGrid.ColumnDefinitions[4].Width" Value="0" />
+
+                        <!--  Reposition cards for narrow layout  -->
+                        <Setter Target="MusicCenter.(Grid.Column)" Value="0" />
+                        <Setter Target="MusicCenter.(Grid.Row)" Value="0" />
+                        <Setter Target="SystemStatusCard.(Grid.Column)" Value="0" />
+                        <Setter Target="SystemStatusCard.(Grid.Row)" Value="1" />
+                        <Setter Target="EmotionStatusCard.(Grid.Column)" Value="0" />
+                        <Setter Target="EmotionStatusCard.(Grid.Row)" Value="2" />
+
+                        <!--  Adjust voice control layout  -->
+                        <Setter Target="VoiceControlGrid.RowDefinitions[0].Height" Value="Auto" />
+                        <Setter Target="VoiceControlGrid.RowDefinitions[1].Height" Value="Auto" />
+                        <Setter Target="VoiceControlGrid.ColumnDefinitions[0].Width" Value="*" />
+                        <Setter Target="VoiceControlGrid.ColumnDefinitions[1].Width" Value="0" />
+                        <Setter Target="VoiceControlGrid.ColumnDefinitions[2].Width" Value="0" />
+                        <Setter Target="VoiceControlPanel.(Grid.Column)" Value="0" />
+                        <Setter Target="VoiceControlPanel.(Grid.Row)" Value="0" />
+                        <Setter Target="ChatPanel.(Grid.Column)" Value="0" />
+                        <Setter Target="ChatPanel.(Grid.Row)" Value="1" />
+
+                        <!--  Compact styling for narrow screens  -->
+                        <Setter Target="MainScrollViewer.Padding" Value="12" />
+                        <Setter Target="HeaderSection.Margin" Value="0,0,0,8" />
+                        <Setter Target="DashboardGrid.Margin" Value="0,0,0,8" />
+                        <Setter Target="MusicCenter.Style" Value="{StaticResource CompactCardStyle}" />
+                        <Setter Target="SystemStatusCard.Style" Value="{StaticResource CompactCardStyle}" />
+                        <Setter Target="EmotionStatusCard.Style" Value="{StaticResource CompactCardStyle}" />
+                        <Setter Target="VoiceControlPanel.Style" Value="{StaticResource CompactCardStyle}" />
+                        <Setter Target="ChatPanel.Style" Value="{StaticResource CompactCardStyle}" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
     </Grid>
 </Page>
