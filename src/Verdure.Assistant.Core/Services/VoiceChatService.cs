@@ -809,40 +809,6 @@ public class VoiceChatService : IVoiceChatService
         if (isConnected)
         {
             CurrentState = DeviceState.Idle;
-            // Send IoT device descriptors and initial states when connection is established
-            // This matches the py-xiaozhi behavior in _on_audio_channel_opened
-            //_ = Task.Run(async () =>
-            //{
-            //    try
-            //    {
-            //        if (_iotDeviceManager != null && _communicationClient is WebSocketClient webSocketClient)
-            //        {
-            //            _logger?.LogInformation("发送IoT设备描述符和初始状态");
-
-            //            // Send IoT device descriptors (similar to py-xiaozhi's send_iot_descriptors)
-            //            var descriptorsJson = _iotDeviceManager.GetDescriptorsJson();
-            //            var descriptors = JsonSerializer.Deserialize<object>(descriptorsJson);
-            //            if (descriptors != null)
-            //            {
-            //                await webSocketClient.SendIotDescriptorsAsync(descriptors);
-            //            }
-
-            //            // Send initial IoT device states (similar to py-xiaozhi's _update_iot_states(False))
-            //            var statesJson = _iotDeviceManager.GetStatesJson();
-            //            var states = JsonSerializer.Deserialize<object>(statesJson);
-            //            if (states != null)
-            //            {
-            //                await webSocketClient.SendIotStatesAsync(states);
-            //            }
-
-            //            _logger?.LogInformation("IoT设备描述符和状态发送完成");
-            //        }
-            //    }
-            //    catch (Exception ex)
-            //    {
-            //        _logger?.LogError(ex, "发送IoT设备信息失败");
-            //    }
-            //});
         }
         else
         {
@@ -1090,31 +1056,6 @@ public class VoiceChatService : IVoiceChatService
     {
         try
         {
-            if (resultElement.TryGetProperty("protocolVersion", out var versionElement))
-            {
-                var protocolVersion = versionElement.GetString();
-                _logger?.LogInformation("MCP协议初始化成功，版本: {Version}", protocolVersion);
-            }
-
-            if (resultElement.TryGetProperty("serverInfo", out var serverInfoElement))
-            {
-                if (serverInfoElement.TryGetProperty("name", out var nameElement))
-                {
-                    var serverName = nameElement.GetString();
-                    _logger?.LogInformation("连接到MCP服务器: {ServerName}", serverName);
-                }
-            }
-
-            // 初始化成功后，MCP客户端应该会自动获取工具列表
-            _logger?.LogDebug("MCP初始化响应处理完成，等待工具列表");
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "处理MCP初始化响应失败");
-        }
-
-        try
-        {
             _logger?.LogInformation("设备已准备好MCP初始化，开始自动初始化MCP协议");
 
             if (_communicationClient is WebSocketClient wsClient && _mcpIntegrationService != null)
@@ -1190,21 +1131,31 @@ public class VoiceChatService : IVoiceChatService
     /// <summary>
     /// 处理MCP工具调用响应
     /// </summary>
-    private async Task HandleMcpToolCallResponse(string resultJson)
+    private void HandleMcpToolCallResponse(string resultJson)
     {
         try
         {
             if (_communicationClient is WebSocketClient wsClient && _mcpIntegrationService != null)
             {
-                // 如果有MCP集成服务，注册工具调用结果
-                _logger?.LogInformation("响应mcp 工具调用结果");
-                var content = await _mcpIntegrationService.HandleMcpRequestAsync(resultJson);
-                await wsClient.SendMcpMessageAsync(JsonDocument.Parse(content));
+                // 在后台线程执行MCP初始化
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        // 如果有MCP集成服务，注册工具调用结果
+                        _logger?.LogInformation("响应mcp 工具调用结果");
+                        var content = await _mcpIntegrationService.HandleMcpRequestAsync(resultJson);
+                        await wsClient.SendMcpMessageAsync(JsonDocument.Parse(content));
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "mcp 工具列表发生错误");
+                    }
+                });
             }
             else
             {
-                _logger?.LogWarning("没有配置MCP集成服务，无法处理工具调用结果");
-
+                _logger?.LogWarning("处理MCP工具调用响应失败：WebSocketClient或MCP集成服务未设置");
             }
         }
         catch (Exception ex)

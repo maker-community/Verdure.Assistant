@@ -664,27 +664,11 @@ public class WebSocketClient : ICommunicationClient, IDisposable
 
         try
         {
-            // 尝试解析为JSON-RPC响应
-            if (message?.Payload?.RootElement is JsonElement payloadElement)
-            {
-                // 成功响应
-                if (payloadElement.TryGetProperty("id", out var idElement))
-                {
-                    // 成功响应
-                    var responseJson = JsonSerializer.Serialize(message.Payload, JsonOptions);
-                    _logger?.LogDebug("Resolved pending MCP request {RequestId}", idElement);
+            // 成功响应
+            var responseJson = JsonSerializer.Serialize(message.Payload, JsonOptions);
 
-                    // 触发响应事件
-                    McpResponseReceived?.Invoke(this, responseJson);
-                }
-                else
-                {
-                    // 这是一个通知消息
-                    var notificationJson = JsonSerializer.Serialize(message.Payload, JsonOptions);
-                    McpResponseReceived?.Invoke(this, notificationJson);
-                    _logger?.LogDebug("Received MCP notification");
-                }
-            }
+            // 触发响应事件
+            McpResponseReceived?.Invoke(this, responseJson);
         }
         catch (Exception ex)
         {
