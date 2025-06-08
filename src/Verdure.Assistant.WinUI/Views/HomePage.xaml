@@ -87,7 +87,7 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Margin" Value="0,0,0,6" />
         </Style>
-    </Page.Resources>    
+    </Page.Resources>
     <Grid>
         <ScrollViewer
             x:Name="MainScrollViewer"
@@ -376,13 +376,13 @@
                                         Height="32"
                                         FontSize="12"
                                         KeyDown="MusicSearchTextBox_KeyDown"
-                                        PlaceholderText="搜索音乐..." />
-
+                                        PlaceholderText="搜索音乐..." />                                    
                                     <Button
                                         x:Name="SearchMusicButton"
                                         Grid.Column="2"
                                         Height="32"
-                                        MinWidth="60"
+                                        MinWidth="50"
+                                        MaxWidth="80"
                                         Click="SearchMusicButton_Click"
                                         Style="{ThemeResource AccentButtonStyle}">
                                         <StackPanel Orientation="Horizontal" Spacing="4">
@@ -425,8 +425,7 @@
                                     Minimum="0"
                                     PointerReleased="MusicProgressSlider_PointerReleased"
                                     Value="{x:Bind ViewModel.MusicPosition, Mode=OneWay}" />
-                                
-                                <!--  Playback Controls  -->
+                                  <!--  Playback Controls  -->
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
@@ -438,31 +437,36 @@
                                     <Button
                                         x:Name="PlayPauseButton"
                                         Grid.Column="0"
-                                        Width="36"
-                                        Height="36"
-                                        Margin="0,0,8,0"
+                                        MinWidth="32"
+                                        MinHeight="32"
+                                        Width="40"
+                                        Height="40"
+                                        Margin="0,0,6,0"
                                         Click="PlayPauseButton_Click"
                                         Style="{ThemeResource AccentButtonStyle}">
                                         <FontIcon
                                             x:Name="PlayPauseIcon"
                                             FontSize="16"
                                             Glyph="&#xE768;" />
-                                    </Button>
-
+                                    </Button>                                    
                                     <Button
+                                        x:Name="StopMusicButton"
                                         Grid.Column="1"
-                                        Width="36"
-                                        Height="36"
-                                        Margin="0,0,8,0"
+                                        MinWidth="32"
+                                        MinHeight="32"
+                                        Width="40"
+                                        Height="40"
+                                        Margin="0,0,6,0"
                                         Command="{x:Bind ViewModel.StopMusicCommand}">
-                                        <FontIcon FontSize="16" Glyph="&#xE71A;" />
-                                    </Button>
-
+                                        <FontIcon x:Name="StopMusicIcon" FontSize="16" Glyph="&#xE71A;" />
+                                    </Button>                                    
                                     <StackPanel
+                                        x:Name="MusicStatusPanel"
                                         Grid.Column="2"
                                         Margin="4,0"
                                         VerticalAlignment="Center">
                                         <TextBlock
+                                            x:Name="MusicStatusText"
                                             FontSize="11"
                                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                             Text="{x:Bind ViewModel.MusicStatus, Mode=OneWay}" />
@@ -472,14 +476,16 @@
                                         Grid.Column="3"
                                         VerticalAlignment="Center"
                                         Orientation="Horizontal"
-                                        Spacing="6">
+                                        Spacing="4">
                                         <FontIcon
                                             VerticalAlignment="Center"
                                             FontSize="12"
                                             Glyph="&#xE767;" />
                                         <Slider
                                             x:Name="VolumeSlider1"
+                                            MinWidth="40"
                                             Width="60"
+                                            MaxWidth="80"
                                             VerticalAlignment="Center"
                                             Maximum="100"
                                             Minimum="0"
@@ -614,13 +620,14 @@
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-
+                                    </Grid.ColumnDefinitions>                                    
                                     <ToggleButton
                                         x:Name="MuteButton"
                                         Grid.Column="0"
-                                        Width="32"
-                                        Height="32"
+                                        MinWidth="28"
+                                        MinHeight="28"
+                                        Width="36"
+                                        Height="36"
                                         Margin="0,0,8,0"
                                         Command="{x:Bind ViewModel.ToggleMuteCommand}">
                                         <FontIcon
@@ -649,7 +656,7 @@
                                 </Grid>
                             </StackPanel>                            
                             <!--  Control Buttons  -->
-                            <StackPanel Spacing="8">
+                            <StackPanel Spacing="8">                                
                                 <!--  Mode Toggle  -->
                                 <Button
                                     x:Name="ModeToggleButton"
@@ -658,17 +665,17 @@
                                     Command="{x:Bind ViewModel.ToggleModeCommand}"
                                     Style="{ThemeResource DefaultButtonStyle}">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <FontIcon FontSize="14" Glyph="&#xE8AB;" />
+                                        <FontIcon x:Name="ModeToggleIcon" FontSize="14" Glyph="&#xE8AB;" />
                                         <StackPanel>
-                                            <TextBlock FontSize="12" FontWeight="SemiBold" Text="{x:Bind ViewModel.ModeToggleText, Mode=OneWay}" />
+                                            <TextBlock x:Name="ModeToggleMainText" FontSize="12" FontWeight="SemiBold" Text="{x:Bind ViewModel.ModeToggleText, Mode=OneWay}" />
                                             <TextBlock
+                                                x:Name="ModeToggleSubText"
                                                 FontSize="10"
                                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                 Text="切换控制模式" />
                                         </StackPanel>
                                     </StackPanel>
-                                </Button>
-
+                                </Button>                                
                                 <!--  Manual Mode Button  -->
                                 <Button
                                     x:Name="ManualButton"
@@ -681,21 +688,22 @@
                                     Style="{ThemeResource AccentButtonStyle}"
                                     Visibility="{x:Bind ViewModel.IsAutoMode, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=True}">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <FontIcon FontSize="16" Glyph="&#xE720;" />
+                                        <FontIcon x:Name="ManualButtonIcon" FontSize="16" Glyph="&#xE720;" />
                                         <StackPanel>
                                             <TextBlock
+                                                x:Name="ManualButtonMainText"
                                                 FontSize="12"
                                                 FontWeight="SemiBold"
                                                 Text="{x:Bind ViewModel.ManualButtonText, Mode=OneWay}" />
                                             <TextBlock
+                                                x:Name="ManualButtonSubText"
                                                 FontSize="10"
                                                 Foreground="White"
                                                 Opacity="0.8"
                                                 Text="按住说话，松开发送" />
                                         </StackPanel>
                                     </StackPanel>
-                                </Button>
-
+                                </Button>                                
                                 <!--  Auto Mode Button  -->
                                 <Button
                                     x:Name="AutoButton"
@@ -706,21 +714,22 @@
                                     Style="{ThemeResource AccentButtonStyle}"
                                     Visibility="{x:Bind ViewModel.IsAutoMode, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <FontIcon FontSize="16" Glyph="&#xE768;" />
+                                        <FontIcon x:Name="AutoButtonIcon" FontSize="16" Glyph="&#xE768;" />
                                         <StackPanel>
                                             <TextBlock
+                                                x:Name="AutoButtonMainText"
                                                 FontSize="12"
                                                 FontWeight="SemiBold"
                                                 Text="{x:Bind ViewModel.AutoButtonText, Mode=OneWay}" />
                                             <TextBlock
+                                                x:Name="AutoButtonSubText"
                                                 FontSize="10"
                                                 Foreground="White"
                                                 Opacity="0.8"
                                                 Text="自动语音识别模式" />
                                         </StackPanel>
                                     </StackPanel>
-                                </Button>
-
+                                </Button>                                
                                 <!--  Abort Button  -->
                                 <Button
                                     x:Name="AbortButton"
@@ -730,8 +739,8 @@
                                     IsEnabled="{x:Bind ViewModel.IsListening, Mode=OneWay}"
                                     Style="{ThemeResource DefaultButtonStyle}">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <FontIcon FontSize="14" Glyph="&#xE71A;" />
-                                        <TextBlock FontSize="12" FontWeight="SemiBold" Text="中断对话" />
+                                        <FontIcon x:Name="AbortButtonIcon" FontSize="14" Glyph="&#xE71A;" />
+                                        <TextBlock x:Name="AbortButtonText" FontSize="12" FontWeight="SemiBold" Text="中断对话" />
                                     </StackPanel>
                                 </Button>
                             </StackPanel>                            
