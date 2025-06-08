@@ -168,7 +168,7 @@ namespace Verdure.Assistant.Core.Services
                     await _verificationService.CopyToClipboardAsync(verificationCode);
                     
                     // 构建登录URL并打开浏览器
-                    var loginUrl = $"https://api.tenclass.net/xiaozhi/login?code={verificationCode}";
+                    var loginUrl = $"https://xiaozhi.me/";
                     await _verificationService.OpenBrowserAsync(loginUrl);
                     
                     // 触发验证码接收事件

@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
-using System.Text.RegularExpressions;
-using System.Text;
+using System.Text.Json;
 
 namespace Verdure.Assistant.Core.Services
 {
@@ -22,34 +21,29 @@ namespace Verdure.Assistant.Core.Services
         public VerificationService(ILogger<VerificationService>? logger = null)
         {
             _logger = logger;
-        }        /// <summary>
+        }
+
+        /// <summary>
         /// 从服务器响应中提取验证码
         /// </summary>
         public Task<string?> ExtractVerificationCodeAsync(string responseText)
         {
             try
             {
-                // 正则表达式匹配验证码模式，支持多种格式
-                var patterns = new[]
-                {
-                    @"验证码[：:\s]*([A-Za-z0-9]{4,8})",
-                    @"verification[_\s]*code[：:\s]*([A-Za-z0-9]{4,8})",
-                    @"code[：:\s]*([A-Za-z0-9]{4,8})",
-                    @"授权码[：:\s]*([A-Za-z0-9]{4,8})"
-                };
+                _logger?.LogWarning("responseText: {Response}", responseText);
+                var jsonDocument = JsonDocument.Parse(responseText);
 
-                foreach (var pattern in patterns)
+                // 使用TryGetProperty进行安全的属性访问
+                if (jsonDocument.RootElement.TryGetProperty("activation", out var activationProperty) &&
+                    activationProperty.TryGetProperty("code", out var codeProperty))
                 {
-                    var match = Regex.Match(responseText, pattern, RegexOptions.IgnoreCase);
-                    if (match.Success && match.Groups.Count > 1)
+                    var activationCode = codeProperty.GetString();
+                    if (!string.IsNullOrEmpty(activationCode))
                     {
-                        var code = match.Groups[1].Value.Trim();
-                        _logger?.LogInformation("提取到验证码: {Code}", code);
-                        return Task.FromResult<string?>(code);
+                        _logger?.LogInformation("提取到验证码: {Code}", activationCode);
+                        return Task.FromResult<string?>(activationCode);
                     }
                 }
-
-                _logger?.LogWarning("未能从响应中提取验证码: {Response}", responseText);
                 return Task.FromResult<string?>(null);
             }
             catch (Exception ex)
@@ -135,7 +129,8 @@ namespace Verdure.Assistant.Core.Services
             {
                 StartInfo = new ProcessStartInfo
                 {
-                    FileName = "powershell",                    Arguments = $"-Command \"Set-Clipboard -Value '{text.Replace("'", "''")}'\"",
+                    FileName = "powershell",
+                    Arguments = $"-Command \"Set-Clipboard -Value '{text.Replace("'", "''")}'\"",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
