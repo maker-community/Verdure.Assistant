@@ -43,10 +43,18 @@ class Program
 
             // Set up wake word detector coordination (matches py-xiaozhi behavior)
             _voiceChatService.SetInterruptManager(interruptManager);
-            await interruptManager.InitializeAsync();
-              // Set up Microsoft Cognitive Services keyword spotting (matches py-xiaozhi wake word detector)
+            await interruptManager.InitializeAsync();            
+            
+            // Set up Microsoft Cognitive Services keyword spotting (matches py-xiaozhi wake word detector)
             _voiceChatService.SetKeywordSpottingService(keywordSpottingService);
-            System.Console.WriteLine("关键词唤醒功能已启用（基于Microsoft认知服务）");              // Initialize MCP IoT devices (new architecture based on xiaozhi-esp32)
+            System.Console.WriteLine("关键词唤醒功能已启用（基于Microsoft认知服务）");
+            
+            // Set up Music-Voice Coordination Service for automatic synchronization
+            var musicVoiceCoordinationService = host.Services.GetRequiredService<MusicVoiceCoordinationService>();
+            _voiceChatService.SetMusicVoiceCoordinationService(musicVoiceCoordinationService);
+            System.Console.WriteLine("音乐语音协调服务已启用（自动暂停/恢复语音识别）");
+
+            // Initialize MCP IoT devices (new architecture based on xiaozhi-esp32)
             await InitializeMcpDevicesAsync(host.Services);
 
             // Initialize MCP services (new architecture based on xiaozhi-esp32)
@@ -84,9 +92,11 @@ class Program
                 services.AddSingleton<IVoiceChatService, VoiceChatService>();
                 
                 // Add InterruptManager for wake word detector coordination
-                services.AddSingleton<InterruptManager>();
-                  // Add Microsoft Cognitive Services keyword spotting service
+                services.AddSingleton<InterruptManager>();                // Add Microsoft Cognitive Services keyword spotting service
                 services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
+                
+                // Add Music-Voice Coordination Service for automatic pause/resume synchronization
+                services.AddSingleton<MusicVoiceCoordinationService>();
 
                 // 注册 AudioStreamManager 单例（使用正确的方式）
                 services.AddSingleton<AudioStreamManager>(provider =>

@@ -34,6 +34,9 @@ public class VoiceChatService : IVoiceChatService
     private IKeywordSpottingService? _keywordSpottingService;
     private bool _keywordDetectionEnabled = false;    // MCP integration service (new architecture based on xiaozhi-esp32)
     private McpIntegrationService? _mcpIntegrationService;
+    
+    // Music voice coordination service
+    private MusicVoiceCoordinationService? _musicVoiceCoordinationService;
 
 
     public event EventHandler<bool>? VoiceChatStateChanged;
@@ -198,8 +201,7 @@ public class VoiceChatService : IVoiceChatService
         _keywordSpottingService.ErrorOccurred += OnKeywordDetectionError;
 
         _logger?.LogInformation("关键词唤醒服务已设置");
-    }
-    /// <summary>
+    }    /// <summary>
     /// 设置MCP集成服务（新架构，基于xiaozhi-esp32的MCP实现）
     /// </summary>
     public void SetMcpIntegrationService(McpIntegrationService mcpIntegrationService)
@@ -214,6 +216,15 @@ public class VoiceChatService : IVoiceChatService
             wsClient.SetMcpIntegrationService(mcpIntegrationService);
             _logger?.LogInformation("MCP集成服务已配置到现有WebSocketClient");
         }
+    }
+
+    /// <summary>
+    /// 设置音乐语音协调服务（用于音乐播放时暂停语音识别）
+    /// </summary>
+    public void SetMusicVoiceCoordinationService(MusicVoiceCoordinationService musicVoiceCoordinationService)
+    {
+        _musicVoiceCoordinationService = musicVoiceCoordinationService;
+        _logger?.LogInformation("音乐语音协调服务已设置");
     }
 
     /// <summary>
@@ -1364,9 +1375,7 @@ public class VoiceChatService : IVoiceChatService
                 {
                     _logger?.LogWarning(ex, "释放关键词检测服务时出错");
                 }
-            }
-
-            // 7. 释放MCP集成服务
+            }            // 7. 释放MCP集成服务
             if (_mcpIntegrationService != null)
             {
                 try
@@ -1380,7 +1389,21 @@ public class VoiceChatService : IVoiceChatService
                 }
             }
 
-            // 8. 重置状态
+            // 8. 释放音乐语音协调服务
+            if (_musicVoiceCoordinationService != null)
+            {
+                try
+                {
+                    _musicVoiceCoordinationService.Dispose();
+                    _musicVoiceCoordinationService = null;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "释放音乐语音协调服务时出错");
+                }
+            }
+
+            // 9. 重置状态
             _isVoiceChatActive = false;
             CurrentState = DeviceState.Idle;
             _lastAbortReason = AbortReason.None;

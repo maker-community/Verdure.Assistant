@@ -310,9 +310,12 @@ public class MockVoiceChatService : IVoiceChatService
     }    public void SetKeywordSpottingService(IKeywordSpottingService keywordSpottingService)
     {
         // 模拟实现
+    }    public void SetMcpIntegrationService(McpIntegrationService mcpIntegrationService)
+    {
+        // 模拟实现
     }
 
-    public void SetMcpIntegrationService(McpIntegrationService mcpIntegrationService)
+    public void SetMusicVoiceCoordinationService(MusicVoiceCoordinationService musicVoiceCoordinationService)
     {
         // 模拟实现
     }

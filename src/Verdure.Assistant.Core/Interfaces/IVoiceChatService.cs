@@ -123,10 +123,14 @@ public interface IVoiceChatService : IDisposable
     /// <summary>
     /// 关键词唤醒是否启用
     /// </summary>
-    bool IsKeywordDetectionEnabled { get; }
-
-    /// <summary>
+    bool IsKeywordDetectionEnabled { get; }    /// <summary>
     /// 设置MCP集成服务（新架构，基于xiaozhi-esp32的MCP实现）
     /// </summary>
     void SetMcpIntegrationService(Services.MCP.McpIntegrationService mcpIntegrationService);
+    
+    /// <summary>
+    /// 设置音乐语音协调服务
+    /// 实现音乐播放时自动暂停语音识别的同步机制
+    /// </summary>
+    void SetMusicVoiceCoordinationService(Services.MusicVoiceCoordinationService musicVoiceCoordinationService);
 }
