@@ -416,57 +416,5 @@ public static class WebSocketProtocol
         var jsonString = JsonSerializer.Serialize(payload, JsonOptions);
         return CreateMcpMessage(sessionId, JsonDocument.Parse(jsonString));
     }
-
-    /// <summary>
-    /// 创建MCP工具列表请求消息
-    /// </summary>
-    /// <param name="sessionId">会话ID</param>
-    /// <param name="id">请求ID</param>
-    /// <param name="cursor">分页游标</param>
-    /// <returns>MCP工具列表请求消息JSON字符串</returns>
-    public static string CreateMcpToolsListMessage(string? sessionId, int id, string cursor = "")
-    {
-        var payload = new
-        {
-            jsonrpc = "2.0",
-            method = "tools/list",
-            @params = new
-            {
-                cursor = cursor
-            },
-            id = id
-        };
-
-        var jsonString = JsonSerializer.Serialize(payload, JsonOptions);
-        return CreateMcpMessage(sessionId, JsonDocument.Parse(jsonString));
-    }
-
-    /// <summary>
-    /// 创建MCP工具调用请求消息
-    /// </summary>
-    /// <param name="sessionId">会话ID</param>
-    /// <param name="id">请求ID</param>
-    /// <param name="toolName">工具名称</param>
-    /// <param name="arguments">工具参数</param>
-    /// <returns>MCP工具调用请求消息JSON字符串</returns>
-    public static string CreateMcpToolCallMessage(string? sessionId, int id, string toolName, Dictionary<string, object>? arguments = null)
-    {
-        var payload = new
-        {
-            jsonrpc = "2.0",
-            method = "tools/call",
-            @params = new
-            {
-                name = toolName,
-                arguments = arguments ?? new Dictionary<string, object>()
-            },
-            id = id
-        };
-
-        var jsonString = JsonSerializer.Serialize(payload, JsonOptions);
-
-        return CreateMcpMessage(sessionId, JsonDocument.Parse(jsonString));
-    }
-
     #endregion
 }
