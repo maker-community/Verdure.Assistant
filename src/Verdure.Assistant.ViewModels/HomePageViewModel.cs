@@ -18,6 +18,7 @@ public partial class HomePageViewModel : ViewModelBase
     private readonly IKeywordSpottingService? _keywordSpottingService;
     private readonly IVerificationService? _verificationService;
     private readonly IMusicPlayerService? _musicPlayerService;
+    private readonly IConfigurationService? _configurationService;
 
     // UI thread dispatcher for cross-platform thread marshaling
     private IUIDispatcher _uiDispatcher;
@@ -127,14 +128,14 @@ public partial class HomePageViewModel : ViewModelBase
     public ObservableCollection<ChatMessageViewModel> Messages { get; } = new();
 
     #endregion        
-    
-    public HomePageViewModel(ILogger<HomePageViewModel> logger,
+      public HomePageViewModel(ILogger<HomePageViewModel> logger,
         IVoiceChatService? voiceChatService = null,
         IEmotionManager? emotionManager = null,
         InterruptManager? interruptManager = null,
         IKeywordSpottingService? keywordSpottingService = null,
         IVerificationService? verificationService = null,
         IMusicPlayerService? musicPlayerService = null,
+        IConfigurationService? configurationService = null,
         IUIDispatcher? uiDispatcher = null) : base(logger)
     {
         _voiceChatService = voiceChatService;
@@ -143,6 +144,7 @@ public partial class HomePageViewModel : ViewModelBase
         _keywordSpottingService = keywordSpottingService;
         _verificationService = verificationService;
         _musicPlayerService = musicPlayerService;
+        _configurationService = configurationService;
 
         // 设置初始状态
         InitializeDefaultState();
@@ -197,15 +199,18 @@ public partial class HomePageViewModel : ViewModelBase
             _voiceChatService.SystemStatusMessageReceived += OnSystemStatusMessageReceived;
             _voiceChatService.LlmMessageReceived += OnLlmMessageReceived;
             _voiceChatService.TtsStateChanged += OnTtsStateChanged;
-        }
-
-        // 绑定音乐播放服务事件
+        }        // 绑定音乐播放服务事件
         if (_musicPlayerService != null)
         {
             _musicPlayerService.PlaybackStateChanged += OnMusicPlaybackStateChanged;
             _musicPlayerService.LyricUpdated += OnMusicLyricUpdated;
             _musicPlayerService.ProgressUpdated += OnMusicProgressUpdated;
             _logger?.LogInformation("音乐播放服务事件已绑定");
+        }        // 绑定配置服务事件 - 验证码接收事件
+        if (_configurationService != null)
+        {
+            _configurationService.VerificationCodeReceived += OnConfigurationVerificationCodeReceived;
+            _logger?.LogInformation("配置服务验证码事件已绑定");
         }
 
         // 初始化和绑定InterruptManager事件
@@ -240,6 +245,26 @@ public partial class HomePageViewModel : ViewModelBase
     }
 
     #region 事件处理
+
+    /// <summary>
+    /// 处理配置服务的验证码接收事件
+    /// </summary>
+    private void OnConfigurationVerificationCodeReceived(object? sender, string verificationCode)
+    {
+        // 使用UI调度器确保线程安全的事件处理
+        _ = _uiDispatcher.InvokeAsync(async () =>
+        {
+            try
+            {
+                _logger?.LogInformation("从配置服务接收到验证码事件: {Code}", verificationCode);
+                await HandleVerificationCodeFromConfigurationAsync(verificationCode);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "处理配置服务验证码事件时发生错误");
+            }
+        });
+    }
 
     private void OnDeviceStateChanged(object? sender, DeviceState state)
     {
@@ -1166,7 +1191,57 @@ public partial class HomePageViewModel : ViewModelBase
         ManualButtonStateChanged?.Invoke(this, new ManualButtonStateEventArgs
         {
             State = ManualButtonState.Processing        
-        });
+        });    }
+
+    /// <summary>
+    /// 处理从配置服务接收到的验证码事件
+    /// </summary>
+    private async Task HandleVerificationCodeFromConfigurationAsync(string verificationCode)
+    {
+        if (_verificationService == null)
+        {
+            _logger?.LogWarning("验证码服务未设置，无法处理验证码");
+            return;
+        }
+
+        try
+        {
+            // 直接使用配置服务提供的验证码
+            VerificationCode = verificationCode;
+            VerificationCodeMessage = $"您的验证码是: {verificationCode}。已从配置服务自动获取。";
+            IsVerificationCodeVisible = true;
+
+            // 自动复制到剪贴板
+            try
+            {
+                await _verificationService.CopyToClipboardAsync(verificationCode);
+                AddMessage($"🔑 验证码 {verificationCode} 已通过配置服务自动获取并复制到剪贴板");
+                _logger?.LogInformation("验证码已通过配置服务获取并复制到剪贴板: {Code}", verificationCode);
+            }
+            catch (Exception copyEx)
+            {
+                _logger?.LogWarning(copyEx, "复制验证码到剪贴板失败");
+                AddMessage($"🔑 验证码 {verificationCode} 已获取，但复制到剪贴板失败");
+            }
+
+            // 尝试打开浏览器（可选）
+            try
+            {
+                await _verificationService.OpenBrowserAsync("https://xiaozhi.me/login");
+                AddMessage("🌐 已自动打开登录页面");
+                _logger?.LogInformation("已自动打开登录页面");
+            }
+            catch (Exception browserEx)
+            {
+                _logger?.LogWarning(browserEx, "打开浏览器失败");
+                // 不显示错误消息，因为这是可选操作
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "处理配置服务验证码时发生错误: {Code}", verificationCode);
+            AddMessage($"❌ 处理验证码时发生错误: {ex.Message}");
+        }
     }
 
     /// <summary>

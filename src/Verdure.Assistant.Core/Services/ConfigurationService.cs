@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
-using System.Net.Http;
-using System.Text.Json;
 using System.Net.NetworkInformation;
+using System.Text.Json;
 
 namespace Verdure.Assistant.Core.Services
 {
@@ -48,7 +47,7 @@ namespace Verdure.Assistant.Core.Services
             _verificationService = verificationService;
             _logger = logger;
             _httpClient = new HttpClient();
-            
+
             // 初始化客户端ID和设备ID
             ClientId = GenerateClientId();
             DeviceId = GetMacAddress();
@@ -100,7 +99,7 @@ namespace Verdure.Assistant.Core.Services
 
                 var json = JsonSerializer.Serialize(payload);
                 var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-                
+
                 // 设置请求头
                 content.Headers.Clear();
                 content.Headers.Add("Content-Type", "application/json");
@@ -108,15 +107,15 @@ namespace Verdure.Assistant.Core.Services
                 _httpClient.DefaultRequestHeaders.Add("Device-Id", DeviceId);
 
                 var response = await _httpClient.PostAsync(OtaVersionUrl, content);
-                
+
                 if (response.IsSuccessStatusCode)
                 {
                     var responseText = await response.Content.ReadAsStringAsync();
                     var responseData = JsonSerializer.Deserialize<JsonElement>(responseText);
-                    
+
                     // Handle verification code if present
                     await HandleVerificationCodeAsync(responseText);
-                    
+
                     if (responseData.TryGetProperty("mqtt", out var mqttElement))
                     {
                         MqttInfo = new MqttConfiguration
@@ -159,21 +158,21 @@ namespace Verdure.Assistant.Core.Services
             try
             {
                 var verificationCode = await _verificationService.ExtractVerificationCodeAsync(responseText);
-                
+
                 if (!string.IsNullOrEmpty(verificationCode))
                 {
-                    _logger?.LogInformation("检测到验证码: {Code}", verificationCode);
-                    
+                    _logger?.LogInformation("请先登录xiaozhi.me,绑定Code: {Code}", verificationCode);
+
                     // 复制到剪贴板
                     await _verificationService.CopyToClipboardAsync(verificationCode);
-                    
+
                     // 构建登录URL并打开浏览器
                     var loginUrl = $"https://xiaozhi.me/";
-                    await _verificationService.OpenBrowserAsync(loginUrl);
-                    
+                    //await _verificationService.OpenBrowserAsync(loginUrl);
+
                     // 触发验证码接收事件
                     VerificationCodeReceived?.Invoke(this, verificationCode);
-                    
+
                     _logger?.LogInformation("验证码已复制到剪贴板并打开浏览器登录页面");
                 }
             }
