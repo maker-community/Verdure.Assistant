@@ -445,7 +445,9 @@ public class KeywordSpottingService : IKeywordSpottingService
                 }
             });
         }
-    }/// <summary>
+    }
+    
+    /// <summary>
     /// 重启连续关键词识别（实现持续检测功能）
     /// Microsoft Cognitive Services的KeywordRecognizer在检测到关键词后会停止，需要手动重启以实现连续检测
     /// </summary>
