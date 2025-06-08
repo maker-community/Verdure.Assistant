@@ -70,13 +70,15 @@ namespace Verdure.Assistant.Core.Services.MCP
             var lamp = new McpLampDevice(_mcpServer, null);
             var speaker = new McpSpeakerDevice(_mcpServer, null);
             var musicPlayer = new McpMusicPlayerDevice(_mcpServer, _musicPlayerService, null);
+            var camera = new McpCameraDevice(_mcpServer, null);
 
             // Add devices
             //await AddDeviceAsync(lamp);
             //await AddDeviceAsync(speaker);
             await AddDeviceAsync(musicPlayer);
+            await AddDeviceAsync(camera);
 
-            _logger.LogInformation("Default MCP devices initialized - Music service available: {HasMusicService}", 
+            _logger.LogInformation("Default MCP devices initialized - Music service available: {HasMusicService}, Camera device added", 
                 _musicPlayerService != null);
         }
 
