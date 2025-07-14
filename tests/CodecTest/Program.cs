@@ -2,7 +2,7 @@
 using System.IO;
 using Verdure.Assistant.Core.Services;
 
-// Test program to compare Concentus vs OpusSharp codec implementations
+// Test program to test OpusSharp codec implementation
 class Program
 {
     static void Main()
@@ -22,8 +22,7 @@ class Program
             Console.WriteLine($"Generated test audio: {testPcmData.Length} bytes");
             Console.WriteLine($"Sample rate: {sampleRate}Hz, Channels: {channels}, Frame size: {frameSize} samples");
             
-            // Test both codecs
-            TestCodec("Concentus (OpusAudioCodec)", new OpusAudioCodec(), testPcmData, sampleRate, channels);
+            // Test OpusSharp codec
             TestCodec("OpusSharp (OpusSharpAudioCodec)", new OpusSharpAudioCodec(), testPcmData, sampleRate, channels);
             
             Console.WriteLine("\n=== Test completed successfully! ===");

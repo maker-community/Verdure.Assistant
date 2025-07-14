@@ -36,7 +36,7 @@ tests/
 ### 现有测试项目（已迁移）
 - **ApiCheck** - API接口检查工具
 - **CodecTest** - 音频编解码测试
-- **ConcentusApiTest** - Concentus库API测试
+- **ApiCheck** - OpusSharp库API测试
 - **DecodeTest** - 音频解码测试
 - **OpusTest** - Opus编解码测试
 - **OpusApiTest** - Opus API测试

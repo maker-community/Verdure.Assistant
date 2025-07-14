@@ -1,50 +1,46 @@
 ﻿using System;
 using System.Linq;
 using System.Reflection;
-using Concentus;
-using Concentus.Enums;
-using Concentus.Structs;
+using OpusSharp.Core;
 
 class ApiCheck 
 {
     static void Main()
     {
-        // Use OpusCodecFactory to create decoder (recommended approach)
-        var decoder = (OpusDecoder)OpusCodecFactory.CreateDecoder(48000, 1);
+        // Use OpusSharp to create decoder
+        var decoder = new OpusDecoder(48000, 1);
         
-        // Test the Span-based method signatures
+        // Test the array-based method signatures
         byte[] encoded = new byte[100];
         short[] output = new short[1000];
         
-        ReadOnlySpan<byte> encodedSpan = new ReadOnlySpan<byte>(encoded);
-        Span<short> outputSpan = new Span<short>(output);
+        Console.WriteLine("Testing OpusSharp OpusDecoder API...");
         
-        Console.WriteLine("Testing Concentus OpusDecoder API...");
-        
-        // Use the modern Span-based method
+        // Use the OpusSharp array-based method
         try 
         {
-            int result = decoder.Decode(encodedSpan, outputSpan, 1440);
-            Console.WriteLine($"Modern 3-parameter Span-based Decode works, result: {result}");
-            Console.WriteLine("Signature: Decode(ReadOnlySpan<byte>, Span<short>, int)");
+            int result = decoder.Decode(encoded, encoded.Length, output, 1440, false);
+            Console.WriteLine($"OpusSharp array-based Decode works, result: {result}");
+            Console.WriteLine("Signature: Decode(byte[], int, short[], int, bool)");
         }
         catch (Exception e)
         {
-            Console.WriteLine($"Span-based method failed: {e.Message}");
+            Console.WriteLine($"Array-based method failed: {e.Message}");
         }
         
-        // Now let's use reflection to see what Span methods are available
+        // Now let's use reflection to see what methods are available
         var methods = typeof(OpusDecoder).GetMethods()
-            .Where(m => m.Name == "Decode" && 
-                       m.GetParameters().Any(p => p.ParameterType.Name.Contains("Span")))
+            .Where(m => m.Name == "Decode")
             .ToArray();
         
-        Console.WriteLine($"\nFound {methods.Length} Span-based Decode methods:");
+        Console.WriteLine($"\nFound {methods.Length} Decode methods:");
         foreach (var method in methods)
         {
             var parameters = method.GetParameters();
             var paramTypes = string.Join(", ", parameters.Select(p => p.ParameterType.Name));
             Console.WriteLine($"  Decode({paramTypes})");
         }
+        
+        decoder?.Dispose();
     }
 }

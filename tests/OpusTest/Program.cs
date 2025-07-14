@@ -1,17 +1,15 @@
 using System;
-using Concentus.Structs;
-using Concentus.Enums;
-using Concentus;
+using OpusSharp.Core;
 
 class Program
 {
     static void Main()
     {
-        // Simple test for Opus encode/decode functionality
-        var encoder = (OpusEncoder)OpusCodecFactory.CreateEncoder(24000, 1, OpusApplication.OPUS_APPLICATION_AUDIO);
-        var decoder = (OpusDecoder)OpusCodecFactory.CreateDecoder(24000, 1);
+        // Simple test for OpusSharp encode/decode functionality
+        var encoder = new OpusEncoder(24000, 1, OpusPredefinedValues.OPUS_APPLICATION_AUDIO);
+        var decoder = new OpusDecoder(24000, 1);
 
-        Console.WriteLine("Testing Opus encode/decode for 24kHz mono audio...");
+        Console.WriteLine("Testing OpusSharp encode/decode for 24kHz mono audio...");
 
         // Create test data - 60ms at 24kHz = 1440 samples
         short[] pcmData = new short[1440];
@@ -22,12 +20,10 @@ class Program
 
         // Test encoding
         byte[] outputBuffer = new byte[4000];
-        ReadOnlySpan<short> pcmSpan = new ReadOnlySpan<short>(pcmData);
-        Span<byte> outputSpan = new Span<byte>(outputBuffer);
 
         try
         {
-            int encodedLength = encoder.Encode(pcmSpan, 1440, outputSpan, outputBuffer.Length);
+            int encodedLength = encoder.Encode(pcmData, 1440, outputBuffer, outputBuffer.Length);
             Console.WriteLine($"✓ Encoded {encodedLength} bytes successfully");
 
             // Test decoding
@@ -35,10 +31,8 @@ class Program
             Array.Copy(outputBuffer, encodedData, encodedLength);
             
             short[] decodedData = new short[1440];
-            ReadOnlySpan<byte> encodedSpan = new ReadOnlySpan<byte>(encodedData);
-            Span<short> decodedSpan = new Span<short>(decodedData);
             
-            int decodedSamples = decoder.Decode(encodedSpan, decodedSpan, 1440);
+            int decodedSamples = decoder.Decode(encodedData, encodedLength, decodedData, 1440, false);
             Console.WriteLine($"✓ Decoded {decodedSamples} samples successfully");
             
             // Verify the data is reasonable
@@ -64,6 +58,11 @@ class Program
         catch (Exception ex)
         {
             Console.WriteLine($"✗ Test failed: {ex.Message}");
+        }
+        finally
+        {
+            encoder?.Dispose();
+            decoder?.Dispose();
         }
 
         Console.WriteLine("Test completed.");

@@ -4,7 +4,7 @@ using Verdure.Assistant.Core.Interfaces;
 namespace Verdure.Assistant.Core.Services;
 
 /// <summary>
-/// OpusSharp音频编解码器实现 - 作为Concentus的替代方案进行对比测试
+/// OpusSharp音频编解码器实现
 /// </summary>
 public class OpusSharpAudioCodec : IAudioCodec
 {

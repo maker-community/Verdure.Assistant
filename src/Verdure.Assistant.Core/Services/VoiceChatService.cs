@@ -372,7 +372,7 @@ public class VoiceChatService : IVoiceChatService
             {
                 throw new InvalidOperationException("Failed to initialize MQTT configuration from OTA server");
             }
-            // 初始化音频编解码器 - 暂时使用Concentus进行测试
+            // 初始化音频编解码器 - 使用OpusSharp
             _audioCodec = new OpusSharpAudioCodec();
             // 初始化音频录制和播放
             if (config.EnableVoice)

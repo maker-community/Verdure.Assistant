@@ -1,13 +1,12 @@
 ﻿using System;
-using Concentus;
-using Concentus.Enums;
-using Concentus.Structs;
+using System.Reflection;
+using OpusSharp.Core;
 
-// Test Decode method signatures
-var encoder = (OpusEncoder)OpusCodecFactory.CreateEncoder(24000, 1, OpusApplication.OPUS_APPLICATION_AUDIO);
-var decoder = (OpusDecoder)OpusCodecFactory.CreateDecoder(24000, 1);
+// Test OpusSharp Decode method signatures
+var encoder = new OpusEncoder(24000, 1, OpusPredefinedValues.OPUS_APPLICATION_AUDIO);
+var decoder = new OpusDecoder(24000, 1);
 
-Console.WriteLine("Testing Opus Decode API signatures...");
+Console.WriteLine("Testing OpusSharp Decode API signatures...");
 
 // Create test data
 short[] pcmData = new short[1440]; // 60ms at 24kHz = 24000 * 0.06 = 1440 samples
@@ -18,14 +17,12 @@ for (int i = 0; i < pcmData.Length; i++)
 
 // Encode first
 byte[] outputBuffer = new byte[4000];
-ReadOnlySpan<short> pcmSpan = new ReadOnlySpan<short>(pcmData);
-Span<byte> outputSpan = new Span<byte>(outputBuffer);
-int encodedLength = encoder.Encode(pcmSpan, 1440, outputSpan, outputBuffer.Length);
+int encodedLength = encoder.Encode(pcmData, 1440, outputBuffer, outputBuffer.Length);
 
 Console.WriteLine($"Encoded {encodedLength} bytes");
 
 // Now test decode methods
-var decodeMethods = typeof(IOpusDecoder).GetMethods();
+var decodeMethods = typeof(OpusDecoder).GetMethods();
 Console.WriteLine("\nAvailable Decode methods:");
 foreach (var method in decodeMethods)
 {
@@ -48,16 +45,16 @@ try
     Array.Copy(outputBuffer, encodedData, encodedLength);
     
     short[] decodedData = new short[1440];
-    ReadOnlySpan<byte> encodedSpan = new ReadOnlySpan<byte>(encodedData);
-    Span<short> decodedSpan = new Span<short>(decodedData);
-      // Try different decode method signatures - use the correct 3-parameter Span method
-    int decodedSamples = decoder.Decode(encodedSpan, decodedSpan, 1440);
+    
+    int decodedSamples = decoder.Decode(encodedData, encodedLength, decodedData, 1440, false);
     Console.WriteLine($"Decoded {decodedSamples} samples successfully!");
 }
 catch (Exception ex)
 {
     Console.WriteLine($"Decode failed: {ex.Message}");
 }
-
-encoder.Dispose();
-decoder.Dispose();
+finally
+{
+    encoder?.Dispose();
+    decoder?.Dispose();
+}
