@@ -126,7 +126,9 @@ public class KeywordSpottingService : IKeywordSpottingService
             {
                 _logger?.LogError("加载关键词模型失败");
                 return false;
-            }            // 配置音频输入 - 使用共享音频流管理器
+            }
+
+            // 配置音频输入 - 使用共享音频流管理器
             var audioConfig = await ConfigureSharedAudioInput();
             if (audioConfig == null)
             {
@@ -134,11 +136,13 @@ public class KeywordSpottingService : IKeywordSpottingService
                 return false;
             }
 
-            // 创建关键词识别器
-            _keywordRecognizer = new KeywordRecognizer(audioConfig);            // 订阅事件
-            SubscribeToRecognizerEvents();            
+            // 创建关键词识别器 - 确保每次启动都是全新实例
+            _keywordRecognizer = new KeywordRecognizer(audioConfig);
 
-            // 开始关键词识别 - KeywordRecognizer只支持RecognizeOnceAsync，但它会持续运行直到检测到关键词
+            // 订阅事件
+            SubscribeToRecognizerEvents();
+
+            // 开始关键词识别
             await _keywordRecognizer.RecognizeOnceAsync(_keywordModel);
             _logger?.LogInformation("关键词识别已启动");
 
@@ -161,11 +165,29 @@ public class KeywordSpottingService : IKeywordSpottingService
 
     /// <summary>
     /// 加载关键词模型（使用Assets目录中的.table文件）
+    /// 每次调用都创建新的模型实例以避免句柄错误
     /// </summary>
     private bool LoadKeywordModels()
     {
         try
         {
+            // 先清理现有模型
+            if (_keywordModel != null)
+            {
+                try
+                {
+                    _keywordModel.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogDebug(ex, "清理现有关键词模型时出现警告（这是正常的）");
+                }
+                finally
+                {
+                    _keywordModel = null;
+                }
+            }
+
             // 获取Assets目录路径
             var assetsPath = GetAssetsPath();
             var keywordsPath = Path.Combine(assetsPath, "keywords");
@@ -177,10 +199,7 @@ public class KeywordSpottingService : IKeywordSpottingService
             }
 
             // 优先使用xiaodian模型（对应py-xiaozhi的主要唤醒词）
-            // With the correct method call based on the provided type signatures:  
-
             var primaryModelPath = Path.Combine(keywordsPath, "keyword_xiaodian.table");
-
 
             if (!File.Exists(primaryModelPath))
             {
@@ -188,10 +207,8 @@ public class KeywordSpottingService : IKeywordSpottingService
                 return false;
             }
 
-            // 从.table文件创建关键词模型
+            // 从.table文件创建关键词模型 - 每次都创建新实例
             _keywordModel = KeywordRecognitionModel.FromFile(primaryModelPath);
-
-            //_keywordRecognizer?.RecognizeOnceAsync(_keywordModel);
 
             _logger?.LogInformation($"成功加载关键词模型: {primaryModelPath}");
             return true;
@@ -420,24 +437,16 @@ public class KeywordSpottingService : IKeywordSpottingService
 
         if (e.Reason == CancellationReason.Error)
         {
-            // 检查是否是已知的Microsoft Speech SDK错误
-            if (e.ErrorDetails.Contains("SPXERR_INVALID_HANDLE"))
-            {
-                _logger?.LogWarning("检测到Microsoft Speech SDK句柄错误，这是快速重启时的已知问题");
-                // 对于句柄错误，我们不触发错误事件，因为这不是真正的错误
-            }
-            else
-            {
-                OnErrorOccurred($"识别错误: {e.ErrorDetails}");
-            }
+            _logger?.LogWarning($"识别错误: {e.ErrorDetails}");
+            OnErrorOccurred($"识别错误: {e.ErrorDetails}");
         }
         
         // 如果是因为错误被取消且服务仍在运行，尝试重启识别
         if (e.Reason == CancellationReason.Error && _isRunning && !_isPaused)
         {
             _logger?.LogInformation("检测到识别错误，尝试重启关键词识别");
-            // 为了避免快速重启导致的句柄问题，添加延迟
-            Task.Delay(200).ContinueWith(_ =>
+            // 延迟重启以确保资源完全释放
+            Task.Delay(500).ContinueWith(_ =>
             {
                 if (_isRunning && !_isPaused)
                 {
@@ -449,11 +458,11 @@ public class KeywordSpottingService : IKeywordSpottingService
     
     /// <summary>
     /// 重启连续关键词识别（实现持续检测功能）
-    /// Microsoft Cognitive Services的KeywordRecognizer在检测到关键词后会停止，需要手动重启以实现连续检测
+    /// 为了避免 SPXERR_INVALID_HANDLE 错误，每次重启都创建全新的识别器实例
     /// </summary>
     private void RestartContinuousRecognition()
     {
-        if (!_isRunning || _isPaused || _keywordRecognizer == null || _keywordModel == null)
+        if (!_isRunning || _isPaused)
         {
             return;
         }
@@ -464,10 +473,10 @@ public class KeywordSpottingService : IKeywordSpottingService
             try
             {
                 // 增加延迟时间以确保SDK完全释放资源
-                await Task.Delay(300);
+                await Task.Delay(500);
                 
                 // 再次检查状态，防止在延迟期间服务被停止
-                if (!_isRunning || _isPaused || _keywordRecognizer == null || _keywordModel == null)
+                if (!_isRunning || _isPaused)
                 {
                     _logger?.LogDebug("服务状态已变更，跳过重启识别");
                     return;
@@ -478,11 +487,14 @@ public class KeywordSpottingService : IKeywordSpottingService
                 try
                 {
                     // 最终状态检查
-                    if (_isRunning && !_isPaused && _keywordRecognizer != null && _keywordModel != null)
+                    if (_isRunning && !_isPaused)
                     {
-                        _logger?.LogDebug("尝试重新启动关键词识别...");
-                        await _keywordRecognizer.RecognizeOnceAsync(_keywordModel);
-                        _logger?.LogDebug("关键词识别已重新启动，继续监听");
+                        _logger?.LogDebug("开始重新创建关键词识别器...");
+                        
+                        // 完全重建识别器以避免句柄错误
+                        await RecreateKeywordRecognizer();
+                        
+                        _logger?.LogDebug("关键词识别器已重新创建并启动，继续监听");
                     }
                 }
                 finally
@@ -492,37 +504,39 @@ public class KeywordSpottingService : IKeywordSpottingService
             }
             catch (Exception ex)
             {
-                // 详细记录错误信息，特别是Microsoft Speech SDK错误
-                if (ex.Message.Contains("SPXERR_INVALID_HANDLE") || ex.Message.Contains("0x21"))
+                _logger?.LogError(ex, "重启连续关键词识别时发生错误");
+                
+                // 如果重建失败，尝试再次重建
+                if (_isRunning && !_isPaused)
                 {
-                    _logger?.LogWarning(ex, "检测到Microsoft Speech SDK句柄错误 (SPXERR_INVALID_HANDLE)，这是SDK在快速重启时的已知问题，不影响功能");
-                    
-                    // 对于句柄错误，尝试延迟后再次重启
+                    _logger?.LogInformation("重建失败，1秒后尝试再次重建...");
                     await Task.Delay(1000);
-                    if (_isRunning && !_isPaused && _keywordRecognizer != null && _keywordModel != null)
+                    
+                    if (_isRunning && !_isPaused)
                     {
                         try
                         {
-                            _logger?.LogDebug("延迟后重试启动关键词识别...");
-                            await _keywordRecognizer.RecognizeOnceAsync(_keywordModel);
-                            _logger?.LogDebug("延迟重试成功，关键词识别已启动");
+                            await _semaphore.WaitAsync();
+                            try
+                            {
+                                await RecreateKeywordRecognizer();
+                                _logger?.LogInformation("延迟重建成功");
+                            }
+                            finally
+                            {
+                                _semaphore.Release();
+                            }
                         }
                         catch (Exception retryEx)
                         {
-                            _logger?.LogError(retryEx, "延迟重试仍然失败");
+                            _logger?.LogError(retryEx, "延迟重建仍然失败");
+                            OnErrorOccurred($"重启关键词识别失败: {retryEx.Message}");
                         }
                     }
-                }
-                else
-                {
-                    _logger?.LogError(ex, "重启连续关键词识别时发生未知错误");
-                    // 对于其他错误，触发错误事件
-                    OnErrorOccurred($"重启关键词识别失败: {ex.Message}");
                 }
             }
         });
     }
-    
     
     
     /// <summary>
@@ -536,34 +550,10 @@ public class KeywordSpottingService : IKeywordSpottingService
 
             if (!_isRunning) return;
 
-            _cancellationTokenSource?.Cancel();            if (_keywordRecognizer != null)
-            {
-                try
-                {
-                    // 停止关键词识别 - KeywordRecognizer只有StopRecognitionAsync方法
-                    await _keywordRecognizer.StopRecognitionAsync();
-                    _logger?.LogDebug("关键词识别已停止");
-                    
-                    // 给SDK一些时间来完全停止异步操作
-                    await Task.Delay(100);
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogWarning(ex, "停止关键词识别时发生警告");
-                }
-                
-                try
-                {
-                    _keywordRecognizer.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogWarning(ex, "释放关键词识别器时发生警告");
-                }
-                finally
-                {
-                    _keywordRecognizer = null;
-                }            }
+            _cancellationTokenSource?.Cancel();
+
+            // 使用新的清理方法
+            await CleanupKeywordRecognizer();
 
             // 等待音频推送任务完成
             if (_audioPushTask != null)
@@ -581,9 +571,6 @@ public class KeywordSpottingService : IKeywordSpottingService
                     _audioPushTask = null;
                 }
             }
-
-            _pushStream?.Close();
-            _pushStream = null;
 
             _isRunning = false;
             _isPaused = false;
@@ -610,35 +597,34 @@ public class KeywordSpottingService : IKeywordSpottingService
             _isPaused = true;
             
             // 停止Microsoft认知服务的关键词识别器
-            try
+            _ = Task.Run(async () =>
             {
-                if (_keywordRecognizer != null)
+                try
                 {
-                    // 停止当前识别会话
-                    _ = Task.Run(async () =>
+                    await _semaphore.WaitAsync();
+                    try
                     {
-                        try
+                        if (_keywordRecognizer != null)
                         {
                             await _keywordRecognizer.StopRecognitionAsync();
                             _logger?.LogDebug("关键词识别器已停止");
                         }
-                        catch (Exception ex)
-                        {
-                            _logger?.LogWarning(ex, "停止关键词识别器时出现警告");
-                        }
-                    });
+                    }
+                    finally
+                    {
+                        _semaphore.Release();
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "暂停关键词检测时发生错误");
-            }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "暂停关键词检测时发生错误");
+                }
+            });
             
             _logger?.LogInformation("关键词检测已暂停");
         }
-    }    
-    
-    
+    }
+
     /// <summary>
     /// 恢复检测（对应py-xiaozhi的resume方法）
     /// </summary>
@@ -649,20 +635,9 @@ public class KeywordSpottingService : IKeywordSpottingService
             _isPaused = false;
             
             // 重新启动Microsoft认知服务的关键词识别器
-            try
-            {
-                if (_keywordRecognizer != null && _keywordModel != null)
-                {
-                    // 使用RestartContinuousRecognition方法重启关键词识别
-                    // 这确保了正确的连续识别逻辑
-                    RestartContinuousRecognition();
-                    _logger?.LogDebug("关键词识别器已通过RestartContinuousRecognition重新启动");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "恢复关键词检测时发生错误");
-            }
+            // 使用RestartContinuousRecognition方法重启关键词识别
+            // 这确保了正确的连续识别逻辑并避免句柄错误
+            RestartContinuousRecognition();
             
             _logger?.LogInformation("关键词检测已恢复");
         }
@@ -767,20 +742,60 @@ public class KeywordSpottingService : IKeywordSpottingService
     
     /// <summary>
     /// 配置共享音频输入（类似 py-xiaozhi 的 AudioCodec 共享流模式）
+    /// 每次调用都创建新的音频流实例以避免句柄错误
     /// </summary>
     private async Task<AudioConfig?> ConfigureSharedAudioInput()
     {
         try
         {
+            // 清理现有的推送流
+            if (_pushStream != null)
+            {
+                try
+                {
+                    _pushStream.Close();
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogDebug(ex, "关闭现有推送流时出现警告（这是正常的）");
+                }
+                finally
+                {
+                    _pushStream = null;
+                }
+            }
+
+            // 停止现有的音频推送任务
+            if (_audioPushTask != null)
+            {
+                _cancellationTokenSource?.Cancel();
+                try
+                {
+                    await _audioPushTask;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogDebug(ex, "停止现有音频推送任务时出现警告（这是正常的）");
+                }
+                finally
+                {
+                    _audioPushTask = null;
+                }
+            }
+
+            // 重新创建取消令牌
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = new CancellationTokenSource();
+
             // 启动共享音频流管理器
             await _audioStreamManager.StartRecordingAsync();
 
-            // 创建推送音频流用于关键词检测
+            // 创建新的推送音频流用于关键词检测
             var format = AudioStreamFormat.GetWaveFormatPCM(16000, 16, 1); // 16kHz, 16-bit, mono
             _pushStream = AudioInputStream.CreatePushStream(format);
 
-            // 启动音频数据推送任务，从共享流获取数据，使用取消令牌保持任务存活
-            _audioPushTask = Task.Run(() => PushSharedAudioDataAsync(_audioStreamManager, _cancellationTokenSource!.Token));
+            // 启动音频数据推送任务，从共享流获取数据
+            _audioPushTask = Task.Run(() => PushSharedAudioDataAsync(_audioStreamManager, _cancellationTokenSource.Token));
 
             return AudioConfig.FromStreamInput(_pushStream);
         }
@@ -788,6 +803,117 @@ public class KeywordSpottingService : IKeywordSpottingService
         {
             _logger?.LogError(ex, "配置共享音频输入失败，回退到默认输入");
             return AudioConfig.FromDefaultMicrophoneInput();
+        }
+    }
+
+    /// <summary>
+    /// 重新创建关键词识别器以避免 SPXERR_INVALID_HANDLE 错误
+    /// 每次重启都创建全新的实例，确保资源完全重置
+    /// </summary>
+    private async Task RecreateKeywordRecognizer()
+    {
+        try
+        {
+            // 1. 完全清理现有资源
+            await CleanupKeywordRecognizer();
+
+            // 2. 重新加载关键词模型
+            if (!LoadKeywordModels())
+            {
+                throw new InvalidOperationException("重新加载关键词模型失败");
+            }
+
+            // 3. 重新配置音频输入
+            var audioConfig = await ConfigureSharedAudioInput();
+            if (audioConfig == null)
+            {
+                throw new InvalidOperationException("重新配置音频输入失败");
+            }
+
+            // 4. 创建全新的关键词识别器实例
+            _keywordRecognizer = new KeywordRecognizer(audioConfig);
+
+            // 5. 重新订阅事件
+            SubscribeToRecognizerEvents();
+
+            // 6. 启动新的识别会话
+            if (_keywordModel != null)
+            {
+                await _keywordRecognizer.RecognizeOnceAsync(_keywordModel);
+                _logger?.LogDebug("新的关键词识别器实例已创建并启动");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "重新创建关键词识别器失败");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 清理关键词识别器资源
+    /// </summary>
+    private async Task CleanupKeywordRecognizer()
+    {
+        // 停止现有识别器
+        if (_keywordRecognizer != null)
+        {
+            try
+            {
+                await _keywordRecognizer.StopRecognitionAsync();
+                await Task.Delay(200); // 给SDK时间完全停止
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "停止识别器时出现警告（这是正常的）");
+            }
+
+            try
+            {
+                _keywordRecognizer.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "释放识别器时出现警告（这是正常的）");
+            }
+            finally
+            {
+                _keywordRecognizer = null;
+            }
+        }
+
+        // 重新创建关键词模型（避免模型实例重用）
+        if (_keywordModel != null)
+        {
+            try
+            {
+                _keywordModel.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "释放关键词模型时出现警告（这是正常的）");
+            }
+            finally
+            {
+                _keywordModel = null;
+            }
+        }
+
+        // 清理音频流
+        if (_pushStream != null)
+        {
+            try
+            {
+                _pushStream.Close();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "关闭推送流时出现警告（这是正常的）");
+            }
+            finally
+            {
+                _pushStream = null;
+            }
         }
     }
 }
