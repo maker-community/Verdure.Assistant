@@ -271,15 +271,23 @@ public partial class HomePageViewModel : ViewModelBase
         // 使用UI调度器确保线程安全的事件处理
         _ = _uiDispatcher.InvokeAsync(() =>
         {
+            _logger?.LogDebug("Device state changed to: {State}", state);
+            
             switch (state)
             {
                 case DeviceState.Listening:
-                    StatusText = "正在聆听";
-                    SetEmotion("listening");
+                    if (IsConnected) // 确保只在连接状态下更新
+                    {
+                        StatusText = "正在聆听";
+                        SetEmotion("listening");
+                    }
                     break;
                 case DeviceState.Speaking:
-                    StatusText = "正在播放";
-                    SetEmotion("speaking");
+                    if (IsConnected)
+                    {
+                        StatusText = "正在播放";
+                        SetEmotion("speaking");
+                    }
                     break;
                 case DeviceState.Connecting:
                     StatusText = "连接中";
@@ -287,20 +295,28 @@ public partial class HomePageViewModel : ViewModelBase
                     break;
                 case DeviceState.Idle:
                 default:
-                    StatusText = "待命";
-                    SetEmotion("neutral");
-
-                    // Reset push-to-talk state when AI response completes
-                    if (IsWaitingForResponse)
+                    if (IsConnected)
                     {
-                        IsWaitingForResponse = false;
-                        IsPushToTalkActive = false;
-                        RestoreManualButtonState();
-                        AddMessage("✅ AI 回复完成，可以继续对话");
+                        StatusText = "待命";
+                        SetEmotion("neutral");
+
+                        // Reset push-to-talk state when AI response completes
+                        if (IsWaitingForResponse)
+                        {
+                            IsWaitingForResponse = false;
+                            IsPushToTalkActive = false;
+                            RestoreManualButtonState();
+                            AddMessage("✅ AI 回复完成，可以继续对话");
+                            _logger?.LogInformation("AI response completed, manual button restored");
+                        }
+                    }
+                    else
+                    {
+                        StatusText = "未连接";
+                        SetEmotion("neutral");
                     }
                     break;
             }
-
         });
     }
 
@@ -309,6 +325,16 @@ public partial class HomePageViewModel : ViewModelBase
         // 使用UI调度器确保线程安全的事件处理
         _ = _uiDispatcher.InvokeAsync(() =>
         {
+            _logger?.LogDebug("Voice chat state changed: IsActive={IsActive}, Connected={Connected}", isActive, IsConnected);
+            
+            // 只在连接状态下处理语音聊天状态变化
+            if (!IsConnected) 
+            {
+                IsListening = false;
+                ShowMicrophoneVisualizer = false;
+                return;
+            }
+            
             IsListening = isActive;
             ShowMicrophoneVisualizer = isActive;
 
@@ -547,11 +573,20 @@ public partial class HomePageViewModel : ViewModelBase
 
     #region 命令
 
+    private volatile bool _isConnecting = false;
+    private volatile bool _isDisconnecting = false;
+
     [RelayCommand]
     private async Task ConnectAsync()
     {
-        if (IsConnected || _voiceChatService == null) return;
+        if (IsConnected || _voiceChatService == null || _isConnecting || _isDisconnecting) 
+        {
+            _logger?.LogWarning("Connect request ignored: Connected={Connected}, Connecting={Connecting}, Disconnecting={Disconnecting}", 
+                IsConnected, _isConnecting, _isDisconnecting);
+            return;
+        }
 
+        _isConnecting = true;
         try
         {
             StatusText = "连接中";
@@ -584,14 +619,17 @@ public partial class HomePageViewModel : ViewModelBase
             if (isConnected)
             {
                 AddMessage("连接成功");
-                StatusText = "已连接";
-
+                _logger?.LogInformation("Successfully connected to voice chat service");
+                
                 // 启动关键词检测（对应py-xiaozhi的关键词唤醒功能）
                 await StartKeywordDetectionAsync();
             }
             else
             {
                 AddMessage("连接失败: 服务未连接", true);
+                StatusText = "连接失败";
+                ConnectionStatusText = "离线";
+                _logger?.LogWarning("Connection failed: Service not connected");
             }
         }
         catch (Exception ex)
@@ -600,26 +638,37 @@ public partial class HomePageViewModel : ViewModelBase
             AddMessage($"连接失败: {ex.Message}", true);
             UpdateConnectionState(false);
         }
+        finally
+        {
+            _isConnecting = false;
+        }
     }
 
     [RelayCommand]
     private async Task DisconnectAsync()
     {
-        if (!IsConnected || _voiceChatService == null) return;
+        if (!IsConnected || _voiceChatService == null || _isDisconnecting || _isConnecting) 
+        {
+            _logger?.LogWarning("Disconnect request ignored: Connected={Connected}, Connecting={Connecting}, Disconnecting={Disconnecting}", 
+                IsConnected, _isConnecting, _isDisconnecting);
+            return;
+        }
 
+        _isDisconnecting = true;
         try
         {
-            // Reset push-to-talk state before disconnecting
-            if (IsPushToTalkActive || IsWaitingForResponse)
-            {
-                IsPushToTalkActive = false;
-                IsWaitingForResponse = false;
-                RestoreManualButtonState();
-            }            // 停止当前语音对话
+            StatusText = "断开连接中";
+            ConnectionStatusText = "断开中";
+            _logger?.LogInformation("Starting disconnection process");
+            
+            // 停止当前语音对话
             if (IsListening)
             {
                 await _voiceChatService.StopVoiceChatAsync();
-            }            // 停止关键词检测
+                _logger?.LogInformation("Voice chat stopped");
+            }
+
+            // 停止关键词检测
             await StopKeywordDetectionAsync();
 
             // 清理事件订阅
@@ -629,15 +678,20 @@ public partial class HomePageViewModel : ViewModelBase
 
             // 重置所有状态
             UpdateConnectionState(false);
-            IsListening = false;
 
             AddMessage("已断开连接");
+            _logger?.LogInformation("Successfully disconnected from voice chat service");
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to disconnect from voice chat service");
             AddMessage($"断开连接失败: {ex.Message}", true);
+            // 即使出错也要重置状态，确保界面一致性
             UpdateConnectionState(false);
+        }
+        finally
+        {
+            _isDisconnecting = false;
         }
     }
 
@@ -645,7 +699,11 @@ public partial class HomePageViewModel : ViewModelBase
     private async Task StartManualRecordingAsync()
     {
         if (_voiceChatService == null || !IsConnected || IsPushToTalkActive || IsWaitingForResponse)
+        {
+            _logger?.LogWarning("Cannot start manual recording: Service={ServiceNull}, Connected={Connected}, PushToTalk={PushToTalk}, Waiting={Waiting}", 
+                _voiceChatService == null, IsConnected, IsPushToTalkActive, IsWaitingForResponse);
             return;
+        }
 
         try
         {
@@ -672,7 +730,11 @@ public partial class HomePageViewModel : ViewModelBase
     private async Task StopManualRecordingAsync()
     {
         if (_voiceChatService == null || !IsConnected || !IsPushToTalkActive)
+        {
+            _logger?.LogWarning("Cannot stop manual recording: Service={ServiceNull}, Connected={Connected}, PushToTalk={PushToTalk}", 
+                _voiceChatService == null, IsConnected, IsPushToTalkActive);
             return;
+        }
 
         try
         {
@@ -683,6 +745,14 @@ public partial class HomePageViewModel : ViewModelBase
                 IsWaitingForResponse = true;
                 SetManualButtonProcessingState();
                 AddMessage("录音结束，正在处理和等待回复...");
+                _logger?.LogInformation("Push-to-talk stopped, waiting for AI response");
+            }
+            else
+            {
+                // 如果没有在听，直接重置状态
+                IsPushToTalkActive = false;
+                RestoreManualButtonState();
+                _logger?.LogInformation("Push-to-talk stopped, but wasn't listening");
             }
         }
         catch (Exception ex)
@@ -1001,6 +1071,26 @@ public partial class HomePageViewModel : ViewModelBase
     {
         IsConnected = connected;
         ConnectionStatusText = connected ? "在线" : "离线";
+        StatusText = connected ? "已连接" : "未连接";
+        
+        // 确保在断开连接时重置所有相关状态
+        if (!connected)
+        {
+            IsListening = false;
+            IsPushToTalkActive = false;
+            IsWaitingForResponse = false;
+            IsAutoMode = false;
+            ShowMicrophoneVisualizer = false;
+            
+            // 重置按钮状态
+            RestoreManualButtonState();
+            AutoButtonText = "开始对话";
+            ModeToggleText = "手动";
+            
+            // 重置情感状态
+            SetEmotion("neutral");
+            TtsText = "待命";
+        }
     }
 
     /// <summary>

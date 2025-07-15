@@ -115,17 +115,30 @@ public sealed partial class HomePage : Page
     
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        // 更新连接状态指示器颜色
-        if (e.PropertyName == nameof(HomePageViewModel.IsConnected))
+        // 在UI线程上执行
+        this.DispatcherQueue.TryEnqueue(() =>
         {
-            UpdateConnectionIndicator();
-        }
-        
-        // 更新音乐播放按钮图标
-        if (e.PropertyName == nameof(HomePageViewModel.MusicStatus))
-        {
-            UpdatePlayPauseButtonIcon();
-        }
+            try
+            {
+                // 更新连接状态指示器颜色
+                if (e.PropertyName == nameof(HomePageViewModel.IsConnected) || 
+                    e.PropertyName == nameof(HomePageViewModel.ConnectionStatusText))
+                {
+                    UpdateConnectionIndicator();
+                    _logger?.LogDebug("Connection indicator updated for property: {PropertyName}", e.PropertyName);
+                }
+                
+                // 更新音乐播放按钮图标
+                if (e.PropertyName == nameof(HomePageViewModel.MusicStatus))
+                {
+                    UpdatePlayPauseButtonIcon();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error handling property change for: {PropertyName}", e.PropertyName);
+            }
+        });
     }
 
     #endregion 
