@@ -28,6 +28,10 @@ public class VoiceChatService : IVoiceChatService
     private ListeningMode _listeningMode = ListeningMode.Manual;
     private bool _keepListening = false;
     private AbortReason _lastAbortReason = AbortReason.None;
+    
+    // State machine for conversation logic
+    private ConversationStateMachine? _stateMachine;
+    private ConversationStateMachineContext? _stateMachineContext;
     // Wake word detector coordination (matches py-xiaozhi behavior)
     private InterruptManager? _interruptManager;
     // Keyword spotting service (Microsoft Cognitive Services based)
@@ -80,7 +84,7 @@ public class VoiceChatService : IVoiceChatService
     }
     public DeviceState CurrentState
     {
-        get => _currentState;
+        get => _stateMachine?.CurrentState ?? _currentState;
         private set
         {
             if (_currentState != value)
@@ -177,6 +181,71 @@ public class VoiceChatService : IVoiceChatService
         _configurationService = configurationService;
         _audioStreamManager = audioStreamManager;
         _logger = logger;
+        
+        // Initialize state machine
+        InitializeStateMachine();
+    }
+
+    /// <summary>
+    /// 初始化状态机
+    /// </summary>
+    private void InitializeStateMachine()
+    {
+        _stateMachine = new ConversationStateMachine();
+        _stateMachineContext = new ConversationStateMachineContext(_stateMachine);
+        
+        // Set up state machine actions
+        _stateMachineContext.OnEnterListening = async () =>
+        {
+            await StartListeningInternalAsync();
+        };
+        
+        _stateMachineContext.OnExitListening = async () =>
+        {
+            await StopListeningInternalAsync();
+        };
+        
+        _stateMachineContext.OnEnterSpeaking = async () =>
+        {
+            await StartSpeakingInternalAsync();
+        };
+        
+        _stateMachineContext.OnExitSpeaking = async () =>
+        {
+            await StopSpeakingInternalAsync();
+        };
+        
+        _stateMachineContext.OnEnterIdle = async () =>
+        {
+            await EnterIdleStateAsync();
+        };
+        
+        _stateMachineContext.OnEnterConnecting = async () =>
+        {
+            await EnterConnectingStateAsync();
+        };
+        
+        // Subscribe to state changes to sync with legacy state property
+        _stateMachine.StateChanged += OnStateMachineStateChanged;
+    }
+
+    /// <summary>
+    /// 处理状态机状态变化，同步到遗留的状态属性
+    /// </summary>
+    private void OnStateMachineStateChanged(object? sender, StateTransitionEventArgs e)
+    {
+        // Update the private field to sync with state machine
+        if (_currentState != e.ToState)
+        {
+            var previousState = _currentState;
+            _currentState = e.ToState;
+            
+            // Coordinate wake word detector
+            CoordinateWakeWordDetector(e.ToState);
+            
+            // Fire the legacy event
+            DeviceStateChanged?.Invoke(this, e.ToState);
+        }
     }
 
     /// <summary>
@@ -299,15 +368,16 @@ public class VoiceChatService : IVoiceChatService
                     // 添加小延迟确保keyword detection pause完成，避免音频流冲突
                     await Task.Delay(50);
                     KeepListening = true; // 启用持续监听模式
-                    await StartVoiceChatAsync();
+                    _stateMachine?.RequestTransition(ConversationTrigger.KeywordDetected, $"Keyword '{keyword}' detected in idle state");
                     break;
 
                 case DeviceState.Speaking:
                     // 在AI说话时检测到关键词，中断对话（对应py-xiaozhi的中断逻辑）
                     _logger?.LogInformation("在AI说话时检测到关键词，中断当前对话");
 
-                    // 立即停止对话，然后短暂延迟以确保音频流同步
-                    await StopVoiceChatAsync();
+                    // Use state machine to handle keyword interrupt
+                    _stateMachine?.RequestTransition(ConversationTrigger.KeywordDetected, $"Keyword '{keyword}' detected during speaking - interrupt");
+                    
                     await Task.Delay(50);
 
                     // 恢复关键词检测服务，准备下一次唤醒
@@ -364,7 +434,9 @@ public class VoiceChatService : IVoiceChatService
     public async Task InitializeAsync(VerdureConfig config)
     {
         _config = config;
-        CurrentState = DeviceState.Connecting;
+        
+        // Use state machine to transition to connecting state
+        _stateMachine?.RequestTransition(ConversationTrigger.ConnectToServer, "Service initialization");
 
         try
         {            // Initialize configuration service first
@@ -430,6 +502,9 @@ public class VoiceChatService : IVoiceChatService
             }// 连接到服务器
             await _communicationClient.ConnectAsync();
 
+            // Use state machine to transition to connected state
+            _stateMachine?.RequestTransition(ConversationTrigger.ServerConnected, "Successfully connected to server");
+
             // 启动关键词唤醒检测（对应py-xiaozhi的_start_wake_word_detector调用）
             if (_keywordSpottingService != null)
             {
@@ -437,13 +512,12 @@ public class VoiceChatService : IVoiceChatService
                 await StartKeywordDetectionAsync();
             }
 
-            CurrentState = DeviceState.Idle;
-
             _logger?.LogInformation("语音聊天服务初始化完成");
         }
         catch (Exception ex)
         {
-            CurrentState = DeviceState.Idle;
+            // Use state machine to handle connection failure
+            _stateMachine?.RequestTransition(ConversationTrigger.ConnectionFailed, $"Initialization failed: {ex.Message}");
             _logger?.LogError(ex, "初始化语音聊天服务失败");
             ErrorOccurred?.Invoke(this, $"初始化失败: {ex.Message}");
             throw;
@@ -452,7 +526,7 @@ public class VoiceChatService : IVoiceChatService
     /// <summary>
     /// Toggle chat state for auto conversation mode (equivalent to Python toggle_chat_state)
     /// </summary>
-    public async Task ToggleChatStateAsync()
+    public Task ToggleChatStateAsync()
     {
         try
         {
@@ -464,20 +538,18 @@ public class VoiceChatService : IVoiceChatService
                     if (KeepListening)
                     {
                         // When starting auto mode, set keep listening and start listening
-                        // This matches Python's behavior in toggle_chat_state_impl
-                        await StartListeningAsync();
+                        _stateMachine?.RequestTransition(ConversationTrigger.StartVoiceChat, "Toggle chat state from idle");
                     }
                     break;
 
                 case DeviceState.Listening:
                     // Stop current listening session
-                    await StopListeningAsync(AbortReason.UserInterruption);
+                    _stateMachine?.RequestTransition(ConversationTrigger.UserInterrupt, "Toggle chat state - stop listening");
                     break;
 
                 case DeviceState.Speaking:
-                    // Abort current speaking and potentially restart listening if in auto mode
-                    // This matches Python's abort_speaking behavior
-                    await StopSpeakingAsync();
+                    // Abort current speaking
+                    _stateMachine?.RequestTransition(ConversationTrigger.UserInterrupt, "Toggle chat state - stop speaking");
                     break;
 
                 case DeviceState.Connecting:
@@ -490,18 +562,18 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogError(ex, "Failed to toggle chat state");
             ErrorOccurred?.Invoke(this, $"Failed to toggle chat state: {ex.Message}");
         }
+        
+        return Task.CompletedTask;
     }
     /// <summary>
-    /// Start listening mode
+    /// Internal method to start listening (called by state machine)
     /// </summary>
-    private async Task StartListeningAsync()
+    private async Task StartListeningInternalAsync()
     {
-        if (CurrentState != DeviceState.Idle || !IsConnected) return;
+        if (!IsConnected) return;
 
         try
         {
-            CurrentState = DeviceState.Listening;
-
             // Send start listen message first before starting audio recording
             if (_communicationClient is WebSocketClient wsClient)
             {
@@ -521,22 +593,20 @@ public class VoiceChatService : IVoiceChatService
         }
         catch (Exception ex)
         {
-            CurrentState = DeviceState.Idle;
             _logger?.LogError(ex, "Failed to start listening");
             ErrorOccurred?.Invoke(this, $"Failed to start listening: {ex.Message}");
+            // Transition back to idle on error
+            _stateMachine?.RequestTransition(ConversationTrigger.ForceIdle, "Error in start listening");
         }
     }
-    /// <summary>
-    /// Stop listening with specific reason
-    /// </summary>
-    private async Task StopListeningAsync(AbortReason reason = AbortReason.None)
-    {
-        if (CurrentState != DeviceState.Listening) return;
 
+    /// <summary>
+    /// Internal method to stop listening (called by state machine)
+    /// </summary>
+    private async Task StopListeningInternalAsync()
+    {
         try
         {
-            _lastAbortReason = reason;
-
             // Send stop listen message first
             if (_communicationClient is WebSocketClient wsClient)
             {
@@ -551,41 +621,23 @@ public class VoiceChatService : IVoiceChatService
 
             _isVoiceChatActive = false;
             VoiceChatStateChanged?.Invoke(this, false);
-            CurrentState = DeviceState.Idle;
 
-            _logger?.LogInformation("Stopped listening, reason: {Reason}", reason);
-
-            // Auto restart listening if in always-on mode and not user interrupted
-            if (KeepListening && reason != AbortReason.UserInterruption)
-            {
-                await Task.Delay(500); // Brief pause before restarting
-                await StartListeningAsync();
-            }
+            _logger?.LogInformation("Stopped listening");
         }
         catch (Exception ex)
         {
-            CurrentState = DeviceState.Idle;
             _logger?.LogError(ex, "Failed to stop listening");
             ErrorOccurred?.Invoke(this, $"Failed to stop listening: {ex.Message}");
         }
     }
 
     /// <summary>
-    /// Start speaking mode
+    /// Internal method to start speaking (called by state machine)
     /// </summary>
-    private async Task StartSpeakingAsync()
+    private async Task StartSpeakingInternalAsync()
     {
-        if (CurrentState != DeviceState.Listening && CurrentState != DeviceState.Idle) return;
-
         try
         {
-            // Stop any ongoing recording first
-            if (CurrentState == DeviceState.Listening)
-            {
-                await StopListeningAsync(AbortReason.None);
-            }
-
-            CurrentState = DeviceState.Speaking;
             _logger?.LogInformation("Started speaking");
         }
         catch (Exception ex)
@@ -594,13 +646,12 @@ public class VoiceChatService : IVoiceChatService
             ErrorOccurred?.Invoke(this, $"Failed to start speaking: {ex.Message}");
         }
     }
-    /// <summary>
-    /// Stop speaking mode
-    /// </summary>
-    private async Task StopSpeakingAsync()
-    {
-        if (CurrentState != DeviceState.Speaking) return;
 
+    /// <summary>
+    /// Internal method to stop speaking (called by state machine)
+    /// </summary>
+    private async Task StopSpeakingInternalAsync()
+    {
         try
         {
             if (_audioPlayer != null)
@@ -608,24 +659,22 @@ public class VoiceChatService : IVoiceChatService
                 await _audioPlayer.StopAsync();
             }
 
-            CurrentState = DeviceState.Idle;
             _logger?.LogInformation("Stopped speaking");
 
-            // Auto restart listening if in keep listening mode - more sophisticated delay like Python
+            // Auto restart listening if in keep listening mode
             if (KeepListening)
             {
-                // Give audio system time to fully complete playback (similar to Python's delayed_state_change)
+                // Give audio system time to fully complete playback
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        // Wait a bit longer to ensure audio buffers are clear (like Python's audio queue wait)
                         await Task.Delay(500);
 
                         // Only restart if we're still in idle state and keep listening is still enabled
                         if (CurrentState == DeviceState.Idle && KeepListening)
                         {
-                            await StartListeningAsync();
+                            _stateMachine?.RequestTransition(ConversationTrigger.StartVoiceChat, "Auto-restart from keep listening mode");
                         }
                     }
                     catch (Exception ex)
@@ -638,10 +687,27 @@ public class VoiceChatService : IVoiceChatService
         }
         catch (Exception ex)
         {
-            CurrentState = DeviceState.Idle;
             _logger?.LogError(ex, "Failed to stop speaking");
             ErrorOccurred?.Invoke(this, $"Failed to stop speaking: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Internal method to enter idle state (called by state machine)
+    /// </summary>
+    private Task EnterIdleStateAsync()
+    {
+        // Nothing specific needed for entering idle state currently
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Internal method to enter connecting state (called by state machine)
+    /// </summary>
+    private Task EnterConnectingStateAsync()
+    {
+        // Nothing specific needed for entering connecting state currently
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -662,14 +728,16 @@ public class VoiceChatService : IVoiceChatService
         }
     }
 
-    public async Task StartVoiceChatAsync()
+    public Task StartVoiceChatAsync()
     {
-        await StartListeningAsync();
+        _stateMachine?.RequestTransition(ConversationTrigger.StartVoiceChat, "Manual start voice chat");
+        return Task.CompletedTask;
     }
 
-    public async Task StopVoiceChatAsync()
+    public Task StopVoiceChatAsync()
     {
-        await StopListeningAsync(AbortReason.UserInterruption);
+        _stateMachine?.RequestTransition(ConversationTrigger.StopVoiceChat, "Manual stop voice chat");
+        return Task.CompletedTask;
     }
 
     public async Task InterruptAsync(AbortReason reason = AbortReason.UserInterruption)
@@ -685,19 +753,8 @@ public class VoiceChatService : IVoiceChatService
                 _logger?.LogDebug("Sent abort message to server with reason: {Reason}", reason);
             }
 
-            // 根据当前状态执行相应的本地停止操作
-            switch (CurrentState)
-            {
-                case DeviceState.Listening:
-                    await StopListeningAsync(reason);
-                    break;
-                case DeviceState.Speaking:
-                    await StopSpeakingAsync();
-                    break;
-                default:
-                    _logger?.LogDebug("Interrupt called but device is in {State} state", CurrentState);
-                    break;
-            }
+            // Use state machine to handle interrupt
+            _stateMachine?.RequestTransition(ConversationTrigger.UserInterrupt, $"Manual interrupt: {reason}");
 
             _lastAbortReason = reason;
             _logger?.LogInformation("Conversation interrupted successfully");
@@ -769,10 +826,7 @@ public class VoiceChatService : IVoiceChatService
         try
         {
             // 当音频播放完成时，如果在说话状态，切换回空闲状态
-            if (CurrentState == DeviceState.Speaking)
-            {
-                await StopSpeakingAsync();
-            }
+            _stateMachine?.RequestTransition(ConversationTrigger.AudioPlaybackCompleted, "Audio playback completed");
         }
         catch (Exception ex)
         {
@@ -789,11 +843,9 @@ public class VoiceChatService : IVoiceChatService
             // Start speaking mode when receiving audio response
             if (message.AudioData != null)
             {
-                // 如果不在说话状态，切换到说话状态
-                if (CurrentState != DeviceState.Speaking)
-                {
-                    await StartSpeakingAsync();
-                }
+                // Use state machine to transition to speaking when audio is received
+                _stateMachine?.RequestTransition(ConversationTrigger.AudioReceived, "Audio response received");
+                
                 if (_audioPlayer != null && _audioCodec != null && _config != null)
                 {
                     var pcmData = _audioCodec.Decode(message.AudioData, _config.AudioOutputSampleRate, _config.AudioChannels);
@@ -819,11 +871,11 @@ public class VoiceChatService : IVoiceChatService
 
         if (isConnected)
         {
-            CurrentState = DeviceState.Idle;
+            _stateMachine?.RequestTransition(ConversationTrigger.ServerConnected, "Connection established");
         }
         else
         {
-            CurrentState = DeviceState.Connecting;
+            _stateMachine?.RequestTransition(ConversationTrigger.ServerDisconnected, "Connection lost");
 
             if (_isVoiceChatActive)
             {
@@ -846,18 +898,12 @@ public class VoiceChatService : IVoiceChatService
             {
                 case "start":
                     // TTS开始播放时，从监听状态切换到说话状态
-                    if (CurrentState == DeviceState.Listening)
-                    {
-                        await StartSpeakingAsync();
-                    }
+                    _stateMachine?.RequestTransition(ConversationTrigger.TtsStarted, $"TTS started: {message.Text}");
                     break;
 
                 case "stop":
                     // TTS停止播放时，从说话状态切换回空闲或监听状态
-                    if (CurrentState == DeviceState.Speaking)
-                    {
-                        await StopSpeakingAsync();
-                    }
+                    _stateMachine?.RequestTransition(ConversationTrigger.TtsCompleted, "TTS completed");
                     break;
 
                 case "sentence_start":
@@ -889,11 +935,9 @@ public class VoiceChatService : IVoiceChatService
 
             if (_audioPlayer != null && _audioCodec != null && _config != null)
             {
-                // 如果不在说话状态，切换到说话状态
-                if (CurrentState != DeviceState.Speaking)
-                {
-                    await StartSpeakingAsync();
-                }
+                // Use state machine to transition to speaking when audio is received
+                _stateMachine?.RequestTransition(ConversationTrigger.AudioReceived, $"WebSocket audio data received: {audioData.Length} bytes");
+                
                 // 解码并播放音频数据 - 使用输出采样率
                 var pcmData = _audioCodec.Decode(audioData, _config.AudioOutputSampleRate, _config.AudioChannels);
                 await _audioPlayer.PlayAsync(pcmData, _config.AudioOutputSampleRate, _config.AudioChannels);
@@ -1403,9 +1447,36 @@ public class VoiceChatService : IVoiceChatService
                 }
             }
 
-            // 9. 重置状态
+            // 9. 释放状态机
+            if (_stateMachineContext != null)
+            {
+                try
+                {
+                    _stateMachineContext.Dispose();
+                    _stateMachineContext = null;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "释放状态机上下文时出错");
+                }
+            }
+
+            if (_stateMachine != null)
+            {
+                try
+                {
+                    _stateMachine.StateChanged -= OnStateMachineStateChanged;
+                    _stateMachine = null;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "释放状态机时出错");
+                }
+            }
+
+            // 10. 重置状态
             _isVoiceChatActive = false;
-            CurrentState = DeviceState.Idle;
+            _currentState = DeviceState.Idle;
             _lastAbortReason = AbortReason.None;
 
             _logger?.LogInformation("VoiceChatService资源释放完成");
