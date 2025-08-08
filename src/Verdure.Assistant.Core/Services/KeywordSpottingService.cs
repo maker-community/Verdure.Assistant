@@ -359,7 +359,7 @@ public class KeywordSpottingService : IKeywordSpottingService
 
                 // 关键：重新启动关键词识别以实现连续检测
                 // KeywordRecognizer的RecognizeOnceAsync检测到关键词后会停止，需要手动重启
-                RestartContinuousRecognition();
+                //RestartContinuousRecognition();
             }
         }
         catch (Exception ex)
@@ -692,12 +692,12 @@ public class KeywordSpottingService : IKeywordSpottingService
 
             case DeviceState.Speaking:
                 // AI说话时保持检测，以便中断
-                Resume();
+                //Resume();
                 break;
 
             case DeviceState.Idle:
                 // 空闲时恢复检测，等待下次唤醒
-                Resume();
+                //Resume();
                 break;
 
             case DeviceState.Connecting:

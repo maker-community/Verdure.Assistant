@@ -17,4 +17,9 @@ public class VerdureConfig
     public string AudioFormat { get; set; } = "opus";
     public bool EnableTemperatureSensor { get; set; } = false;
     public string TemperatureSensorPin { get; set; } = "A0";
+    
+    /// <summary>
+    /// 启动时是否自动连接到语音助手服务
+    /// </summary>
+    public bool AutoConnect { get; set; } = false;
 }

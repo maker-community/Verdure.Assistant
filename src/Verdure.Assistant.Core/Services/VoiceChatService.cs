@@ -121,6 +121,21 @@ public class VoiceChatService : IVoiceChatService
                     break;
 
                 case DeviceState.Speaking:
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            // Brief delay to allow audio stream to stabilize
+                            await Task.Delay(100);
+
+                            _interruptManager?.PauseVAD();
+                            await StopKeywordDetectionAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                        }
+                    });
+                    break;
                 case DeviceState.Idle:
                     // Resume both VAD and keyword detection during Speaking/Idle states (matches py-xiaozhi behavior)
                     // This allows interrupt detection during AI speaking and auto-activation during idle
@@ -133,7 +148,8 @@ public class VoiceChatService : IVoiceChatService
                             await Task.Delay(100);
 
                             _interruptManager?.ResumeVAD();
-                            _keywordSpottingService?.Resume();
+                            await StartKeywordDetectionAsync();
+                            //_keywordSpottingService?.Resume();
                             _logger?.LogDebug("Wake word detector and keyword spotting resumed during {State} state", newState);
                         }
                         catch (Exception ex)
@@ -383,7 +399,7 @@ public class VoiceChatService : IVoiceChatService
                     // 恢复关键词检测服务，准备下一次唤醒
                     try
                     {
-                        _keywordSpottingService?.Resume();
+                        //_keywordSpottingService?.Resume();
                         _logger?.LogDebug("关键词检测服务已恢复");
                     }
                     catch (Exception ex)
@@ -506,11 +522,11 @@ public class VoiceChatService : IVoiceChatService
             _stateMachine?.RequestTransition(ConversationTrigger.ServerConnected, "Successfully connected to server");
 
             // 启动关键词唤醒检测（对应py-xiaozhi的_start_wake_word_detector调用）
-            if (_keywordSpottingService != null)
-            {
-                _logger?.LogInformation("正在启动关键词唤醒检测...");
-                await StartKeywordDetectionAsync();
-            }
+            //if (_keywordSpottingService != null)
+            //{
+            //    _logger?.LogInformation("正在启动关键词唤醒检测...");
+            //    await StartKeywordDetectionAsync();
+            //}
 
             _logger?.LogInformation("语音聊天服务初始化完成");
         }
