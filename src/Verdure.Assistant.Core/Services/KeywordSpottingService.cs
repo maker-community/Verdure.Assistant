@@ -632,14 +632,42 @@ public class KeywordSpottingService : IKeywordSpottingService
     {
         if (_isRunning && _isPaused)
         {
-            _isPaused = false;
-            
-            // 重新启动Microsoft认知服务的关键词识别器
-            // 使用RestartContinuousRecognition方法重启关键词识别
-            // 这确保了正确的连续识别逻辑并避免句柄错误
-            RestartContinuousRecognition();
-            
-            _logger?.LogInformation("关键词检测已恢复");
+            try
+            {
+                _isPaused = false;
+                
+                // 验证音频源是否可用
+                if (_useExternalAudioSource && _audioRecorder != null && !_audioRecorder.IsRecording)
+                {
+                    _logger?.LogWarning("外部音频源未录制，无法恢复关键词检测");
+                    _isPaused = true; // 回滚状态
+                    return;
+                }
+                
+                // 重新启动Microsoft认知服务的关键词识别器
+                // 使用RestartContinuousRecognition方法重启关键词识别
+                // 这确保了正确的连续识别逻辑并避免句柄错误
+                RestartContinuousRecognition();
+                
+                _logger?.LogInformation("关键词检测已恢复");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "恢复关键词检测时发生错误");
+                _isPaused = true; // 回滚状态
+                OnErrorOccurred($"恢复关键词检测失败: {ex.Message}");
+            }
+        }
+        else
+        {
+            if (!_isRunning)
+            {
+                _logger?.LogDebug("关键词检测器未运行，无法恢复");
+            }
+            else if (!_isPaused)
+            {
+                _logger?.LogDebug("关键词检测器未暂停，无需恢复");
+            }
         }
     }
 
@@ -691,13 +719,29 @@ public class KeywordSpottingService : IKeywordSpottingService
                 break;
 
             case DeviceState.Speaking:
-                // AI说话时保持检测，以便中断
-                //Resume();
+                // AI说话时暂停检测，避免误触发（匹配py-xiaozhi行为）
+                Pause();
                 break;
 
             case DeviceState.Idle:
                 // 空闲时恢复检测，等待下次唤醒
-                //Resume();
+                // 延迟恢复确保音频流稳定
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Task.Delay(200); // 短暂延迟确保状态稳定
+                        if (_lastDeviceState == DeviceState.Idle && _isRunning && _isPaused)
+                        {
+                            Resume();
+                            _logger?.LogDebug("在空闲状态恢复关键词检测");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "空闲状态恢复关键词检测时发生错误");
+                    }
+                });
                 break;
 
             case DeviceState.Connecting:
