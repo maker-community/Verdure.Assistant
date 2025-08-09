@@ -37,7 +37,6 @@ public class WebSocketClient : ICommunicationClient, IDisposable
 
     // MCP相关字段
     private readonly ConcurrentDictionary<int, TaskCompletionSource<string>> _mcpPendingRequests = new();
-    private int _mcpNextRequestId = 1;
     private bool _mcpInitialized = false;
     private McpIntegrationService? _mcpIntegrationService;
 
@@ -109,7 +108,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
                 sampleRate: 16000,
                 channels: 1,
                 frameDuration: 60,
-                supportMcp: false  // 声明支持MCP协议
+                supportMcp: true  // 声明支持MCP协议
             );
 
             await SendTextAsync(helloMessage);

@@ -141,36 +141,37 @@ public class VoiceChatService : IVoiceChatService
     private void InitializeStateMachine()
     {
         _stateMachine = new ConversationStateMachine();
-        _stateMachineContext = new ConversationStateMachineContext(_stateMachine);
-
-        // Set up state machine actions
-        _stateMachineContext.OnEnterListening = async () =>
+        _stateMachineContext = new ConversationStateMachineContext(_stateMachine)
         {
-            await StartListeningInternalAsync();
-        };
+            // Set up state machine actions
+            OnEnterListening = async () =>
+                {
+                    await StartListeningInternalAsync();
+                },
 
-        _stateMachineContext.OnExitListening = async () =>
-        {
-            await StopListeningInternalAsync();
-        };
+            OnExitListening = async () =>
+                {
+                    await StopListeningInternalAsync();
+                },
 
-        _stateMachineContext.OnEnterSpeaking = async () =>
-        {
-        };
+            OnEnterSpeaking = async () =>
+                {
+                },
 
-        _stateMachineContext.OnExitSpeaking = async () =>
-        {
-            await StopSpeakingInternalAsync();
-        };
+            OnExitSpeaking = async () =>
+                {
+                    await StopSpeakingInternalAsync();
+                },
 
-        _stateMachineContext.OnEnterIdle = async () =>
-        {
-            await EnterIdleStateAsync();
-        };
+            OnEnterIdle = async () =>
+                {
+                    await EnterIdleStateAsync();
+                },
 
-        _stateMachineContext.OnEnterConnecting = async () =>
-        {
-            await EnterConnectingStateAsync();
+            OnEnterConnecting = async () =>
+                {
+                    await EnterConnectingStateAsync();
+                }
         };
 
         // Subscribe to state changes to sync with legacy state property
@@ -716,7 +717,7 @@ public class VoiceChatService : IVoiceChatService
     /// <summary>
     /// 处理音频播放完成事件
     /// </summary>
-    private async void OnAudioPlaybackStopped(object? sender, EventArgs e)
+    private void OnAudioPlaybackStopped(object? sender, EventArgs e)
     {
         try
         {
@@ -760,42 +761,13 @@ public class VoiceChatService : IVoiceChatService
         }
     }
 
-    private void OnConnectionStateChanged(object? sender, bool isConnected)
+    private async void OnConnectionStateChanged(object? sender, bool isConnected)
     {
         _logger?.LogInformation("连接状态变化: {IsConnected}", isConnected);
 
         if (isConnected)
         {
             _stateMachine?.RequestTransition(ConversationTrigger.ServerConnected, "Connection established");
-
-            // 网络重连后，在后台异步恢复关键词检测（如果服务已设置并且处于空闲状态）
-            //_ = Task.Run(async () =>
-            //{
-            //    try
-            //    {
-            //        // 等待状态机稳定到空闲状态
-            //        await Task.Delay(1000);
-
-            //        if (_keywordSpottingService != null && CurrentState == DeviceState.Idle)
-            //        {
-            //            await StopKeywordDetectionAsync(); // 确保先停止检测器
-            //            _logger?.LogInformation("网络重连完成，尝试恢复关键词唤醒检测");
-            //            var result = await StartKeywordDetectionAsync();
-            //            if (result)
-            //            {
-            //                _logger?.LogInformation("网络重连后关键词唤醒检测已成功恢复");
-            //            }
-            //            else
-            //            {
-            //                _logger?.LogWarning("网络重连后关键词唤醒检测恢复失败，可能需要手动重启");
-            //            }
-            //        }
-            //    }
-            //    catch (Exception ex)
-            //    {
-            //        _logger?.LogError(ex, "网络重连后恢复关键词检测时发生错误");
-            //    }
-            //});
         }
         else
         {
@@ -805,23 +777,8 @@ public class VoiceChatService : IVoiceChatService
             if (_communicationClient != null)
             {
                 _logger?.LogInformation("连接断开，尝试断开WebSocket连接");
-                _communicationClient.DisconnectAsync().Wait();
+                await _communicationClient.DisconnectAsync();
             }
-
-
-            //连接断开时停止关键词检测，保存资源
-           // _ = Task.Run(async () =>
-           //{
-           //    try
-           //    {
-           //        await StopKeywordDetectionAsync();
-           //        _logger?.LogInformation("连接断开，已停止关键词唤醒检测");
-           //    }
-           //    catch (Exception ex)
-           //    {
-           //        _logger?.LogError(ex, "连接断开时停止关键词检测失败");
-           //    }
-           //});
         }
     }
 
@@ -948,27 +905,29 @@ public class VoiceChatService : IVoiceChatService
     /// <summary>
     /// 处理MCP准备就绪事件 - 设备声明支持MCP时自动初始化
     /// </summary>
-    private void OnMcpReadyForInitialization(object? sender, EventArgs e)
+    private async void OnMcpReadyForInitialization(object? sender, EventArgs e)
     {
         try
         {
             _logger?.LogInformation("设备已准备好MCP初始化，开始自动初始化MCP协议");
 
-            if (_communicationClient is WebSocketClient wsClient && _mcpIntegrationService != null)
+            if (_communicationClient is WebSocketClient wsClient && wsClient.IsConnected && _mcpIntegrationService != null)
             {
                 // 在后台线程执行MCP初始化
-                _ = Task.Run(async () =>
+                //_ = Task.Run(async () =>
+                //{
+
+                //});
+
+                try
                 {
-                    try
-                    {
-                        await wsClient.InitializeMcpAsync();
-                        _logger?.LogInformation("MCP协议自动初始化完成");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogError(ex, "MCP自动初始化过程中发生错误");
-                    }
-                });
+                    await wsClient.InitializeMcpAsync();
+                    _logger?.LogInformation("MCP协议自动初始化完成");
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "MCP自动初始化过程中发生错误");
+                }
             }
             else
             {

@@ -1,7 +1,6 @@
 using Microsoft.CognitiveServices.Speech;
 using Microsoft.CognitiveServices.Speech.Audio;
 using Microsoft.Extensions.Logging;
-using Verdure.Assistant.Core.Constants;
 using Verdure.Assistant.Core.Interfaces;
 
 namespace Verdure.Assistant.Core.Services;
@@ -12,7 +11,8 @@ namespace Verdure.Assistant.Core.Services;
 /// 支持使用.table模型文件进行离线关键词识别，无需订阅密钥
 /// </summary>
 public class KeywordSpottingService : IKeywordSpottingService
-{    private readonly ILogger<KeywordSpottingService>? _logger;
+{
+    private readonly ILogger<KeywordSpottingService>? _logger;
     private readonly IVoiceChatService _voiceChatService;
     private readonly AudioStreamManager _audioStreamManager;
 
@@ -25,21 +25,21 @@ public class KeywordSpottingService : IKeywordSpottingService
     private readonly string[] _keywordModels = {
         "keyword_xiaodian.table",  // 对应py-xiaozhi的"你好小天"等
         "keyword_cortana.table"    // 对应"Cortana"关键词
-    };    
+    };
     // 状态管理
     private bool _isRunning = false;
     private bool _isPaused = false;
     private bool _isEnabled = true;
-    private DeviceState _lastDeviceState = DeviceState.Idle;    
     // 音频处理
     private IAudioRecorder? _audioRecorder;
     private bool _useExternalAudioSource = false;
     private PushAudioInputStream? _pushStream;
     private Task? _audioPushTask;
-    private EventHandler<byte[]>? _audioDataHandler;    // 线程安全
+    private EventHandler<byte[]>? _audioDataHandler;
+    // 线程安全
     private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
     private CancellationTokenSource? _cancellationTokenSource;
-    
+
     // 状态同步 - 防止关键词检测和语音对话状态变化的竞争条件
     private readonly SemaphoreSlim _stateChangeSemaphore = new SemaphoreSlim(1, 1);
     private volatile bool _isProcessingKeywordDetection = false;
@@ -50,16 +50,13 @@ public class KeywordSpottingService : IKeywordSpottingService
 
     public bool IsRunning => _isRunning && !_isPaused;
     public bool IsPaused => _isPaused;
-    public bool IsEnabled => _isEnabled;    
-    public KeywordSpottingService(IVoiceChatService voiceChatService, 
+    public bool IsEnabled => _isEnabled;
+    public KeywordSpottingService(IVoiceChatService voiceChatService,
         AudioStreamManager audioStreamManager, ILogger<KeywordSpottingService>? logger = null)
     {
         _voiceChatService = voiceChatService;
         _audioStreamManager = audioStreamManager;
         _logger = logger;
-
-        // 订阅设备状态变化，实现py-xiaozhi的状态协调逻辑
-        _voiceChatService.DeviceStateChanged += OnDeviceStateChanged;
 
         InitializeSpeechConfig();
     }
@@ -281,7 +278,7 @@ public class KeywordSpottingService : IKeywordSpottingService
                     catch (Exception ex)
                     {
                         _logger?.LogWarning(ex, "写入音频数据到推送流时出错");
-                        
+
                         // 在严重错误时触发错误事件
                         if (ex is InvalidOperationException || ex is ArgumentException)
                         {
@@ -331,8 +328,8 @@ public class KeywordSpottingService : IKeywordSpottingService
 
         _keywordRecognizer.Recognized += (s, e) => OnKeywordRecognized(s, e);
         _keywordRecognizer.Canceled += (s, e) => OnRecognitionCanceled(s, e);
-    }    
-    
+    }
+
     /// <summary>
     /// 关键词识别事件处理
     /// </summary>
@@ -370,7 +367,7 @@ public class KeywordSpottingService : IKeywordSpottingService
             OnErrorOccurred($"关键词识别处理错误: {ex.Message}");
         }
     }
-   
+
     /// <summary>
     /// 识别取消事件处理
     /// </summary>
@@ -383,7 +380,7 @@ public class KeywordSpottingService : IKeywordSpottingService
             _logger?.LogWarning($"识别错误: {e.ErrorDetails}");
             OnErrorOccurred($"识别错误: {e.ErrorDetails}");
         }
-        
+
         // 如果是因为错误被取消且服务仍在运行，尝试重启识别
         if (e.Reason == CancellationReason.Error && _isRunning && !_isPaused)
         {
@@ -398,7 +395,7 @@ public class KeywordSpottingService : IKeywordSpottingService
             });
         }
     }
-    
+
     /// <summary>
     /// 重启连续关键词识别（实现持续检测功能）
     /// 为了避免 SPXERR_INVALID_HANDLE 错误，每次重启都创建全新的识别器实例
@@ -417,7 +414,7 @@ public class KeywordSpottingService : IKeywordSpottingService
             {
                 // 增加延迟时间以确保SDK完全释放资源
                 await Task.Delay(500);
-                
+
                 // 再次检查状态，防止在延迟期间服务被停止
                 if (!_isRunning || _isPaused)
                 {
@@ -433,10 +430,10 @@ public class KeywordSpottingService : IKeywordSpottingService
                     if (_isRunning && !_isPaused)
                     {
                         _logger?.LogDebug("开始重新创建关键词识别器...");
-                        
+
                         // 完全重建识别器以避免句柄错误
                         await RecreateKeywordRecognizer();
-                        
+
                         _logger?.LogDebug("关键词识别器已重新创建并启动，继续监听");
                     }
                 }
@@ -448,13 +445,13 @@ public class KeywordSpottingService : IKeywordSpottingService
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "重启连续关键词识别时发生错误");
-                
+
                 // 如果重建失败，尝试再次重建
                 if (_isRunning && !_isPaused)
                 {
                     _logger?.LogInformation("重建失败，1秒后尝试再次重建...");
                     await Task.Delay(1000);
-                    
+
                     if (_isRunning && !_isPaused)
                     {
                         try
@@ -480,8 +477,8 @@ public class KeywordSpottingService : IKeywordSpottingService
             }
         });
     }
-    
-    
+
+
     /// <summary>
     /// 停止关键词检测（对应py-xiaozhi的stop方法）
     /// </summary>
@@ -528,8 +525,8 @@ public class KeywordSpottingService : IKeywordSpottingService
         {
             _semaphore.Release();
         }
-    }    
-    
+    }
+
     /// <summary>
     /// 暂停检测（对应py-xiaozhi的pause方法）
     /// </summary>
@@ -538,7 +535,7 @@ public class KeywordSpottingService : IKeywordSpottingService
         if (_isRunning && !_isPaused)
         {
             _isPaused = true;
-            
+
             // 停止Microsoft认知服务的关键词识别器
             _ = Task.Run(async () =>
             {
@@ -563,7 +560,7 @@ public class KeywordSpottingService : IKeywordSpottingService
                     _logger?.LogError(ex, "暂停关键词检测时发生错误");
                 }
             });
-            
+
             _logger?.LogInformation("关键词检测已暂停");
         }
     }
@@ -578,7 +575,7 @@ public class KeywordSpottingService : IKeywordSpottingService
             try
             {
                 _isPaused = false;
-                
+
                 // 验证音频源是否可用
                 if (_useExternalAudioSource && _audioRecorder != null && !_audioRecorder.IsRecording)
                 {
@@ -586,12 +583,12 @@ public class KeywordSpottingService : IKeywordSpottingService
                     _isPaused = true; // 回滚状态
                     return;
                 }
-                
+
                 // 重新启动Microsoft认知服务的关键词识别器
                 // 使用RestartContinuousRecognition方法重启关键词识别
                 // 这确保了正确的连续识别逻辑并避免句柄错误
                 RestartContinuousRecognition();
-                
+
                 _logger?.LogInformation("关键词检测已恢复");
             }
             catch (Exception ex)
@@ -646,61 +643,13 @@ public class KeywordSpottingService : IKeywordSpottingService
     }
 
     /// <summary>
-    /// 设备状态变化处理（实现py-xiaozhi的状态协调）
-    /// </summary>
-    private void OnDeviceStateChanged(object? sender, DeviceState newState)
-    {
-        _lastDeviceState = newState;
-        _logger?.LogDebug($"设备状态变化: {newState}");
-
-        // 实现py-xiaozhi的状态协调逻辑
-        //switch (newState)
-        //{
-        //    case DeviceState.Listening:
-        //        // 开始监听时暂停关键词检测，避免干扰
-        //        Pause();
-        //        break;
-
-        //    case DeviceState.Speaking:
-        //        // AI说话时暂停检测，避免误触发（匹配py-xiaozhi行为）
-        //        Pause();
-        //        break;
-
-        //    case DeviceState.Idle:
-        //        // 空闲时恢复检测，等待下次唤醒
-        //        // 延迟恢复确保音频流稳定
-        //        _ = Task.Run(async () =>
-        //        {
-        //            try
-        //            {
-        //                await Task.Delay(200); // 短暂延迟确保状态稳定
-        //                if (_lastDeviceState == DeviceState.Idle && _isRunning && _isPaused)
-        //                {
-        //                    Resume();
-        //                    _logger?.LogDebug("在空闲状态恢复关键词检测");
-        //                }
-        //            }
-        //            catch (Exception ex)
-        //            {
-        //                _logger?.LogError(ex, "空闲状态恢复关键词检测时发生错误");
-        //            }
-        //        });
-        //        break;
-
-        //    case DeviceState.Connecting:
-        //        // 连接时暂停检测
-        //        Pause();
-        //        break;
-        //}
-    }
-
-    /// <summary>
     /// 触发错误事件
     /// </summary>
     private void OnErrorOccurred(string error)
     {
         ErrorOccurred?.Invoke(this, error);
-    }    public void Dispose()
+    }
+    public void Dispose()
     {
         // Use the async method but wait for completion during disposal
         try
@@ -712,21 +661,19 @@ public class KeywordSpottingService : IKeywordSpottingService
             _logger?.LogError(ex, "停止关键词检测时发生错误 (在Dispose中)");
         }
 
-        _voiceChatService.DeviceStateChanged -= OnDeviceStateChanged;
-
         _keywordModel?.Dispose();
 
         // SpeechConfig不实现IDisposable，无需手动释放
         _cancellationTokenSource?.Dispose();
         _semaphore.Dispose();
-        
+
         // 清理新添加的同步对象
         _stateChangeSemaphore?.Dispose();
 
         _logger?.LogInformation("关键词检测服务已释放");
     }
-    
-    
+
+
     /// <summary>
     /// 配置共享音频输入（类似 py-xiaozhi 的 AudioCodec 共享流模式）
     /// 每次调用都创建新的音频流实例以避免句柄错误
