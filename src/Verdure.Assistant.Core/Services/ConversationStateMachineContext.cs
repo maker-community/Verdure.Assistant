@@ -105,7 +105,7 @@ public class ConversationStateMachineContext
                 case DeviceState.Listening:
                     if (OnEnterListening != null)
                     {
-                        await Task.Delay(3000); // Small delay to ensure resources are ready
+                        await Task.Delay(1000); // Small delay to ensure resources are ready
                         await OnEnterListening();
                     }
                     break;
