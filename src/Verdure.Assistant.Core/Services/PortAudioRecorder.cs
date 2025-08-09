@@ -17,7 +17,8 @@ public class PortAudioRecorder : IAudioRecorder, IDisposable
     public event EventHandler<byte[]>? DataAvailable;
     public event EventHandler? RecordingStopped;
 
-    public bool IsRecording => _isRecording;      public async Task StartRecordingAsync(int sampleRate, int channels)
+    public bool IsRecording => _isRecording;      
+    public async Task StartRecordingAsync(int sampleRate, int channels)
     {
         if (_isRecording || _isDisposed) return;
 

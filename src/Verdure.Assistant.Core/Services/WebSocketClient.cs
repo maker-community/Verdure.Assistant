@@ -109,7 +109,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
                 sampleRate: 16000,
                 channels: 1,
                 frameDuration: 60,
-                supportMcp: true  // 声明支持MCP协议
+                supportMcp: false  // 声明支持MCP协议
             );
 
             await SendTextAsync(helloMessage);
@@ -154,7 +154,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
         {
             _isConnected = false;
             _sessionId = null;
-            ConnectionStateChanged?.Invoke(this, false);
+            //ConnectionStateChanged?.Invoke(this, false);
             _webSocket?.Dispose();
             _cancellationTokenSource?.Dispose();
             _logger?.LogInformation("WebSocket连接已断开");

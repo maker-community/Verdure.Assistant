@@ -355,7 +355,7 @@ public class KeywordSpottingService : IKeywordSpottingService
                 KeywordDetected?.Invoke(this, eventArgs);
 
                 // 实现py-xiaozhi的状态协调逻辑
-                HandleKeywordDetection(keyword);
+                //HandleKeywordDetection(keyword);
 
                 // 关键：重新启动关键词识别以实现连续检测
                 // KeywordRecognizer的RecognizeOnceAsync检测到关键词后会停止，需要手动重启

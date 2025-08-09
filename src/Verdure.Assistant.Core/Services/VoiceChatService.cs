@@ -107,8 +107,9 @@ public class VoiceChatService : IVoiceChatService
                     // Pause both VAD and keyword detection during user input (matches py-xiaozhi behavior)
                     // This prevents conflicts between user speech input and wake word detection
                     _interruptManager?.PauseVAD();
-                    _keywordSpottingService?.Pause();
+                    await StopKeywordDetectionAsync();
                     _logger?.LogDebug("Wake word detector and keyword spotting paused during Listening state");
+                    
                     break;
 
                 case DeviceState.Speaking:
@@ -142,20 +143,20 @@ public class VoiceChatService : IVoiceChatService
                             _interruptManager?.ResumeVAD();
 
                             // 确保关键词检测在空闲状态时恢复，特别是网络重连后
-                            if (_keywordSpottingService != null && IsConnected)
+                            if (_keywordSpottingService != null)
                             {
                                 var restartResult = await StartKeywordDetectionAsync();
-                                if (restartResult)
-                                {
-                                    _logger?.LogDebug("Wake word detector and keyword spotting resumed during {State} state", newState);
-                                }
-                                else
-                                {
-                                    _logger?.LogWarning("Failed to restart keyword detection in Idle state, will retry after delay");
-                                    // 如果启动失败，延迟后重试
-                                    await Task.Delay(2000);
-                                    await StartKeywordDetectionAsync();
-                                }
+                                //if (restartResult)
+                                //{
+                                //    _logger?.LogDebug("Wake word detector and keyword spotting resumed during {State} state", newState);
+                                //}
+                                //else
+                                //{
+                                //    _logger?.LogWarning("Failed to restart keyword detection in Idle state, will retry after delay");
+                                //    // 如果启动失败，延迟后重试
+                                //    await Task.Delay(2000);
+                                //    await StartKeywordDetectionAsync();
+                                //}
                             }
                         }
                         catch (Exception ex)
@@ -175,7 +176,7 @@ public class VoiceChatService : IVoiceChatService
                     {
                         await _communicationClient.ConnectAsync();
                         // Use state machine to transition to connected state
-                        _stateMachine?.RequestTransition(ConversationTrigger.ServerConnected, "Successfully connected to server");
+                        //_stateMachine?.RequestTransition(ConversationTrigger.ServerConnected, "Successfully connected to server");
                     }
                     break;
 
@@ -437,7 +438,7 @@ public class VoiceChatService : IVoiceChatService
                     _logger?.LogInformation("在空闲状态检测到关键词，启动语音对话");
 
                     // 添加小延迟确保keyword detection pause完成，避免音频流冲突
-                    await Task.Delay(50);
+                    //await Task.Delay(50);
                     KeepListening = true; // 启用持续监听模式
                     _stateMachine?.RequestTransition(ConversationTrigger.KeywordDetected, $"Keyword '{keyword}' detected in idle state");
                     break;
@@ -466,6 +467,13 @@ public class VoiceChatService : IVoiceChatService
                 case DeviceState.Listening:
                     // 在监听状态检测到关键词，可能是误触发，忽略
                     _logger?.LogDebug("在监听状态检测到关键词，忽略（可能是误触发）");
+                    // 在空闲状态检测到关键词，启动对话（对应py-xiaozhi的唤醒逻辑）
+                    _logger?.LogInformation("在空闲状态检测到关键词，启动语音对话");
+
+                    // 添加小延迟确保keyword detection pause完成，避免音频流冲突
+                    //await Task.Delay(50);
+                    KeepListening = true; // 启用持续监听模式
+                    _stateMachine?.RequestTransition(ConversationTrigger.KeywordDetected, $"Keyword '{keyword}' detected in idle state");
                     break;
 
                 case DeviceState.Connecting:
@@ -507,14 +515,10 @@ public class VoiceChatService : IVoiceChatService
         _config = config;
 
         // Use state machine to transition to connecting state
-        _stateMachine?.RequestTransition(ConversationTrigger.ConnectToServer, "Service initialization");
+        //_stateMachine?.RequestTransition(ConversationTrigger.ConnectToServer, "Service initialization");
 
         try
-        {            // Initialize configuration service first
-            if (!await _configurationService.InitializeMqttInfoAsync())
-            {
-                throw new InvalidOperationException("Failed to initialize MQTT configuration from OTA server");
-            }
+        {          
             // 初始化音频编解码器 - 使用OpusSharp
             _audioCodec = new OpusSharpAudioCodec();
             // 初始化音频录制和播放
@@ -531,60 +535,39 @@ public class VoiceChatService : IVoiceChatService
             if (config.UseWebSocket)
             {
                 _communicationClient = new WebSocketClient(_configurationService, _logger);
-            }
-            else
-            {
-                var mqttInfo = _configurationService.MqttInfo;
-                if (mqttInfo != null)
+                _communicationClient.MessageReceived += OnMessageReceived;
+                _communicationClient.ConnectionStateChanged += OnConnectionStateChanged;
+                // 订阅WebSocket专有的TTS状态变化事件
+                if (_communicationClient is WebSocketClient wsClient)
                 {
-                    _communicationClient = new MqttNetClient(
-                        mqttInfo.Endpoint,
-                        1883, // Default MQTT port
-                        mqttInfo.ClientId,
-                        mqttInfo.PublishTopic);
+                    wsClient.TtsStateChanged += OnTtsStateChanged;
+                    wsClient.AudioDataReceived += OnWebSocketAudioDataReceived;
+                    wsClient.MusicMessageReceived += OnMusicMessageReceived;
+                    wsClient.SystemStatusMessageReceived += OnSystemStatusMessageReceived;
+                    wsClient.LlmMessageReceived += OnLlmMessageReceived;
+
+                    // 订阅MCP事件
+                    wsClient.McpReadyForInitialization += OnMcpReadyForInitialization;
+                    wsClient.McpResponseReceived += OnMcpResponseReceived;
+                    wsClient.McpErrorOccurred += OnMcpErrorOccurred;
+
+                    // 如果已有MCP集成服务，立即配置到WebSocketClient
+                    if (_mcpIntegrationService != null)
+                    {
+                        wsClient.SetMcpIntegrationService(_mcpIntegrationService);
+                        _logger?.LogInformation("MCP集成服务已配置到WebSocketClient");
+                    }
                 }
-                else
+
+                // 启动关键词唤醒检测（对应py-xiaozhi的_start_wake_word_detector调用）
+                if (_keywordSpottingService != null)
                 {
-                    throw new InvalidOperationException("MQTT configuration not available");
+                    _logger?.LogInformation("正在启动关键词唤醒检测...");
+                    await StartKeywordDetectionAsync();
                 }
-            }
-            _communicationClient.MessageReceived += OnMessageReceived;
-            _communicationClient.ConnectionStateChanged += OnConnectionStateChanged;
-            // 订阅WebSocket专有的TTS状态变化事件
-            if (_communicationClient is WebSocketClient wsClient)
-            {
-                wsClient.TtsStateChanged += OnTtsStateChanged;
-                wsClient.AudioDataReceived += OnWebSocketAudioDataReceived;
-                wsClient.MusicMessageReceived += OnMusicMessageReceived;
-                wsClient.SystemStatusMessageReceived += OnSystemStatusMessageReceived;
-                wsClient.LlmMessageReceived += OnLlmMessageReceived;
 
-                // 订阅MCP事件
-                wsClient.McpReadyForInitialization += OnMcpReadyForInitialization;
-                wsClient.McpResponseReceived += OnMcpResponseReceived;
-                wsClient.McpErrorOccurred += OnMcpErrorOccurred;
-
-                // 如果已有MCP集成服务，立即配置到WebSocketClient
-                if (_mcpIntegrationService != null)
-                {
-                    wsClient.SetMcpIntegrationService(_mcpIntegrationService);
-                    _logger?.LogInformation("MCP集成服务已配置到WebSocketClient");
-                }
-            }
-            // 连接到服务器
-            await _communicationClient.ConnectAsync();
-
-            // Use state machine to transition to connected state
-            _stateMachine?.RequestTransition(ConversationTrigger.ServerConnected, "Successfully connected to server");
-
-            // 启动关键词唤醒检测（对应py-xiaozhi的_start_wake_word_detector调用）
-            //if (_keywordSpottingService != null)
-            //{
-            //    _logger?.LogInformation("正在启动关键词唤醒检测...");
-            //    await StartKeywordDetectionAsync();
-            //}
-
-            _logger?.LogInformation("语音聊天服务初始化完成");
+                _logger?.LogInformation("语音聊天服务初始化完成");
+            }        
         }
         catch (Exception ex)
         {
@@ -746,7 +729,7 @@ public class VoiceChatService : IVoiceChatService
                         // Only restart if we're still in idle state and keep listening is still enabled
                         if (CurrentState == DeviceState.Idle && KeepListening)
                         {
-                            _stateMachine?.RequestTransition(ConversationTrigger.StartVoiceChat, "Auto-restart from keep listening mode");
+                            //_stateMachine?.RequestTransition(ConversationTrigger.StartVoiceChat, "Auto-restart from keep listening mode");
                         }
                     }
                     catch (Exception ex)
@@ -894,6 +877,11 @@ public class VoiceChatService : IVoiceChatService
 
         try
         {
+            if(_communicationClient.IsConnected == false)
+            {
+                _logger?.LogWarning("无法发送音频数据，未连接到服务器");
+                return;
+            }
             // 编码音频数据
             var encodedData = _audioCodec.Encode(audioData, _config.AudioSampleRate, _config.AudioChannels);
 
@@ -1002,26 +990,27 @@ public class VoiceChatService : IVoiceChatService
         else
         {
             _stateMachine?.RequestTransition(ConversationTrigger.ServerDisconnected, "Connection lost");
-
-            if (_isVoiceChatActive)
+            
+            if(_communicationClient != null)
             {
-                // 连接断开时自动停止语音对话
-                _ = Task.Run(() => StopVoiceChatAsync());
+                _logger?.LogInformation("连接断开，尝试断开WebSocket连接");
+                _communicationClient.DisconnectAsync().Wait();
             }
 
-            // 连接断开时停止关键词检测，保存资源
+
+            //连接断开时停止关键词检测，保存资源
             _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await StopKeywordDetectionAsync();
-                    _logger?.LogInformation("连接断开，已停止关键词唤醒检测");
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "连接断开时停止关键词检测失败");
-                }
-            });
+           {
+               try
+               {
+                   await StopKeywordDetectionAsync();
+                   _logger?.LogInformation("连接断开，已停止关键词唤醒检测");
+               }
+               catch (Exception ex)
+               {
+                   _logger?.LogError(ex, "连接断开时停止关键词检测失败");
+               }
+           });
         }
     }
 

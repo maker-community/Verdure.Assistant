@@ -53,19 +53,19 @@ public class ConversationStateMachine
 
             if (toState == null)
             {
-                _logger?.LogWarning("Invalid state transition: {FromState} -> {Trigger} (context: {Context})", 
+                _logger?.LogWarning("Invalid state transition: {FromState} -> {Trigger} (context: {Context})",
                     fromState, trigger, context);
                 return false;
             }
 
             if (fromState == toState.Value)
             {
-                _logger?.LogDebug("State transition ignored (already in target state): {State} -> {Trigger}", 
+                _logger?.LogDebug("State transition ignored (already in target state): {State} -> {Trigger}",
                     fromState, trigger);
                 return true;
             }
 
-            _logger?.LogInformation("State transition: {FromState} -> {ToState} (trigger: {Trigger}, context: {Context})", 
+            _logger?.LogInformation("State transition: {FromState} -> {ToState} (trigger: {Trigger}, context: {Context})",
                 fromState, toState.Value, trigger, context);
 
             _currentState = toState.Value;
@@ -117,11 +117,11 @@ public class ConversationStateMachine
         {
             // From Idle state
             (DeviceState.Idle, ConversationTrigger.StartVoiceChat) => DeviceState.Listening,
-            (DeviceState.Idle, ConversationTrigger.KeywordDetected) => DeviceState.Listening,
+            (DeviceState.Idle, ConversationTrigger.KeywordDetected) => DeviceState.Connecting,
             (DeviceState.Idle, ConversationTrigger.ConnectToServer) => DeviceState.Connecting,
-
+            (DeviceState.Idle, ConversationTrigger.ServerDisconnected) => DeviceState.Idle,
             // From Connecting state
-            (DeviceState.Connecting, ConversationTrigger.ServerConnected) => DeviceState.Idle,
+            (DeviceState.Connecting, ConversationTrigger.ServerConnected) => DeviceState.Listening,
             (DeviceState.Connecting, ConversationTrigger.ConnectionFailed) => DeviceState.Idle,
 
             // From Listening state
@@ -130,6 +130,8 @@ public class ConversationStateMachine
             (DeviceState.Listening, ConversationTrigger.TtsStarted) => DeviceState.Speaking,
             (DeviceState.Listening, ConversationTrigger.AudioReceived) => DeviceState.Speaking,
             (DeviceState.Listening, ConversationTrigger.ServerDisconnected) => DeviceState.Connecting,
+
+            (DeviceState.Listening, ConversationTrigger.KeywordDetected) => DeviceState.Connecting,
 
             // From Speaking state
             (DeviceState.Speaking, ConversationTrigger.TtsCompleted) => DeviceState.Idle,
@@ -165,25 +167,25 @@ public enum ConversationTrigger
     // Voice chat control
     StartVoiceChat,
     StopVoiceChat,
-    
+
     // Keyword detection
     KeywordDetected,
-    
+
     // Audio events
     TtsStarted,
     TtsCompleted,
     AudioReceived,
     AudioPlaybackCompleted,
-    
+
     // User interaction
     UserInterrupt,
-    
+
     // Connection events
     ConnectToServer,
     ServerConnected,
     ServerDisconnected,
     ConnectionFailed,
-    
+
     // System events
     ForceIdle
 }
