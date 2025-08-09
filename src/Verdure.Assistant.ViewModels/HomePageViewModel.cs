@@ -6,6 +6,7 @@ using Verdure.Assistant.Core.Constants;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Services;
+using Verdure.Assistant.Core.Events;
 
 namespace Verdure.Assistant.ViewModels;
 

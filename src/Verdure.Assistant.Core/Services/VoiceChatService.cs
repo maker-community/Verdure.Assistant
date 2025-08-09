@@ -4,6 +4,7 @@ using Verdure.Assistant.Core.Constants;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Services.MCP;
+using Verdure.Assistant.Core.Events;
 
 namespace Verdure.Assistant.Core.Services;
 
@@ -113,19 +114,11 @@ public class VoiceChatService : IVoiceChatService
         _communicationClient = new WebSocketClient(_configurationService, _logger);
         _communicationClient.MessageReceived += OnMessageReceived;
         _communicationClient.ConnectionStateChanged += OnConnectionStateChanged;
-        // 订阅WebSocket专有的TTS状态变化事件
+        // 订阅WebSocket专有的事件
         if (_communicationClient is WebSocketClient wsClient)
         {
-            wsClient.TtsStateChanged += OnTtsStateChanged;
-            wsClient.AudioDataReceived += OnWebSocketAudioDataReceived;
-            wsClient.MusicMessageReceived += OnMusicMessageReceived;
-            wsClient.SystemStatusMessageReceived += OnSystemStatusMessageReceived;
-            wsClient.LlmMessageReceived += OnLlmMessageReceived;
-
-            // 订阅MCP事件
-            wsClient.McpReadyForInitialization += OnMcpReadyForInitialization;
-            wsClient.McpResponseReceived += OnMcpResponseReceived;
-            wsClient.McpErrorOccurred += OnMcpErrorOccurred;
+            // 使用新的统一事件系统
+            wsClient.WebSocketEventOccurred += OnWebSocketEventOccurred;
 
             // 如果已有MCP集成服务，立即配置到WebSocketClient
             if (_mcpIntegrationService != null)
@@ -154,8 +147,10 @@ public class VoiceChatService : IVoiceChatService
                     await StopListeningInternalAsync();
                 },
 
-            OnEnterSpeaking = async () =>
+            OnEnterSpeaking = () =>
                 {
+                    // 进入说话状态 - 同步处理
+                    return Task.CompletedTask;
                 },
 
             OnExitSpeaking = async () =>
@@ -783,184 +778,190 @@ public class VoiceChatService : IVoiceChatService
     }
 
     /// <summary>
-    /// 处理TTS状态变化事件
+    /// 统一处理WebSocket事件 - 简化事件处理逻辑
     /// </summary>
-    private void OnTtsStateChanged(object? sender, TtsMessage message)
+    private void OnWebSocketEventOccurred(object? sender, WebSocketEventArgs e)
     {
         try
         {
-            _logger?.LogDebug("收到TTS状态变化: {State}, 文本: {Text}", message.State, message.Text);
+            _logger?.LogDebug("WebSocket event received: {Trigger}", e.Trigger);
 
-            switch (message.State?.ToLowerInvariant())
+            switch (e.Trigger)
             {
-                case "start":
-                    // TTS开始播放时，从监听状态切换到说话状态
-                    _stateMachine?.RequestTransition(ConversationTrigger.TtsStarted, $"TTS started: {message.Text}");
+                case WebSocketEventTrigger.TtsStarted:
+                    if (e is TtsEventArgs ttsStarted)
+                        HandleTtsStarted(ttsStarted);
                     break;
 
-                case "stop":
-                    // TTS停止播放时，从说话状态切换回空闲或监听状态
-                    _stateMachine?.RequestTransition(ConversationTrigger.TtsCompleted, "TTS completed");
+                case WebSocketEventTrigger.TtsStopped:
+                    if (e is TtsEventArgs ttsStopped)
+                        HandleTtsStopped(ttsStopped);
                     break;
 
-                case "sentence_start":
-                    _logger?.LogDebug("TTS句子开始: {Text}", message.Text);
+                case WebSocketEventTrigger.TtsSentenceStarted:
+                    if (e is TtsEventArgs ttsSentenceStarted)
+                        HandleTtsSentenceStarted(ttsSentenceStarted);
                     break;
 
-                case "sentence_end":
-                    _logger?.LogDebug("TTS句子结束");
+                case WebSocketEventTrigger.TtsSentenceEnded:
+                    if (e is TtsEventArgs ttsSentenceEnded)
+                        HandleTtsSentenceEnded(ttsSentenceEnded);
                     break;
-            }
 
-            TtsStateChanged?.Invoke(this, message);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "处理TTS状态变化失败");
-            ErrorOccurred?.Invoke(this, $"处理TTS状态变化失败: {ex.Message}");
-        }
-    }
+                case WebSocketEventTrigger.AudioDataReceived:
+                    if (e is MessageEventArgs audioData)
+                        HandleAudioDataReceived(audioData);
+                    break;
 
-    /// <summary>
-    /// 处理WebSocket接收到的音频数据事件
-    /// </summary>
-    private async void OnWebSocketAudioDataReceived(object? sender, byte[] audioData)
-    {
-        try
-        {
-            _logger?.LogDebug("收到WebSocket音频数据，长度: {Length}", audioData.Length);
+                case WebSocketEventTrigger.MusicPlay:
+                case WebSocketEventTrigger.MusicPause:
+                case WebSocketEventTrigger.MusicStop:
+                case WebSocketEventTrigger.MusicLyricUpdate:
+                case WebSocketEventTrigger.MusicSeek:
+                    if (e is MusicEventArgs musicEvent)
+                        HandleMusicEvent(musicEvent);
+                    break;
 
-            if (_audioPlayer != null && _audioCodec != null && _config != null)
-            {
-                // Use state machine to transition to speaking when audio is received
-                _stateMachine?.RequestTransition(ConversationTrigger.AudioReceived, $"WebSocket audio data received: {audioData.Length} bytes");
+                case WebSocketEventTrigger.SystemStatusUpdate:
+                    if (e is SystemStatusEventArgs systemStatus)
+                        HandleSystemStatusEvent(systemStatus);
+                    break;
 
-                // 解码并播放音频数据 - 使用输出采样率
-                var pcmData = _audioCodec.Decode(audioData, _config.AudioOutputSampleRate, _config.AudioChannels);
-                await _audioPlayer.PlayAsync(pcmData, _config.AudioOutputSampleRate, _config.AudioChannels);
+                case WebSocketEventTrigger.LlmEmotionUpdate:
+                    if (e is LlmEmotionEventArgs llmEmotion)
+                        HandleLlmEmotionEvent(llmEmotion);
+                    break;
 
-                // 注意：不要在这里立即停止播放，因为可能还有更多音频数据要来
-                // 播放完成应该由播放器的PlaybackStopped事件或者明确的停止指令来触发
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "处理WebSocket音频数据失败");
-            ErrorOccurred?.Invoke(this, $"处理WebSocket音频数据失败: {ex.Message}");
-        }
-    }
+                case WebSocketEventTrigger.McpReadyForInitialization:
+                    if (e is McpEventArgs mcpReady)
+                        HandleMcpReadyForInitialization(mcpReady);
+                    break;
 
-    /// <summary>
-    /// 处理音乐播放器消息事件
-    /// </summary>
-    private void OnMusicMessageReceived(object? sender, MusicMessage message)
-    {
-        try
-        {
-            _logger?.LogDebug("收到音乐消息: {Action}, 歌曲: {Song}", message.Action, message.SongName);
-            MusicMessageReceived?.Invoke(this, message);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "处理音乐消息失败");
-            ErrorOccurred?.Invoke(this, $"处理音乐消息失败: {ex.Message}");
-        }
-    }
+                case WebSocketEventTrigger.McpResponseReceived:
+                    if (e is McpEventArgs mcpResponse)
+                        HandleMcpResponseReceived(mcpResponse);
+                    break;
 
-    /// <summary>
-    /// 处理系统状态消息事件
-    /// </summary>
-    private void OnSystemStatusMessageReceived(object? sender, SystemStatusMessage message)
-    {
-        try
-        {
-            _logger?.LogDebug("收到系统状态消息: {Component}, 状态: {Status}", message.Component, message.Status);
-            SystemStatusMessageReceived?.Invoke(this, message);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "处理系统状态消息失败");
-            ErrorOccurred?.Invoke(this, $"处理系统状态消息失败: {ex.Message}");
-        }
-    }
+                case WebSocketEventTrigger.McpError:
+                    if (e is McpEventArgs mcpError)
+                        HandleMcpError(mcpError);
+                    break;
 
-    /// <summary>
-    /// 处理LLM情感消息事件
-    /// </summary>
-    private void OnLlmMessageReceived(object? sender, LlmMessage message)
-    {
-        try
-        {
-            _logger?.LogDebug("收到LLM情感消息: {Emotion}", message.Emotion);
-            LlmMessageReceived?.Invoke(this, message);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "处理LLM情感消息失败");
-            ErrorOccurred?.Invoke(this, $"处理LLM情感消息失败: {ex.Message}");
-        }
-    }
-
-    #region MCP相关处理
-    /// <summary>
-    /// 处理MCP准备就绪事件 - 设备声明支持MCP时自动初始化
-    /// </summary>
-    private async void OnMcpReadyForInitialization(object? sender, EventArgs e)
-    {
-        try
-        {
-            _logger?.LogInformation("设备已准备好MCP初始化，开始自动初始化MCP协议");
-
-            if (_communicationClient is WebSocketClient wsClient && wsClient.IsConnected && _mcpIntegrationService != null)
-            {
-                // 在后台线程执行MCP初始化
-                //_ = Task.Run(async () =>
-                //{
-
-                //});
-
-                try
-                {
-                    await wsClient.InitializeMcpAsync();
-                    _logger?.LogInformation("MCP协议自动初始化完成");
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "MCP自动初始化过程中发生错误");
-                }
-            }
-            else
-            {
-                _logger?.LogWarning("无法自动初始化MCP：WebSocketClient或MCP集成服务未设置");
+                default:
+                    _logger?.LogDebug("Unhandled WebSocket event: {Trigger}", e.Trigger);
+                    break;
             }
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "MCP自动初始化失败");
-            ErrorOccurred?.Invoke(this, $"MCP初始化失败: {ex.Message}");
+            _logger?.LogError(ex, "Error handling WebSocket event: {Trigger}", e.Trigger);
         }
     }
 
-    /// <summary>
-    /// 处理MCP响应接收事件
-    /// 根据xiaozhi-esp32协议文档实现MCP响应处理逻辑
-    /// </summary>
-    private void OnMcpResponseReceived(object? sender, string response)
+    #region 分离的事件处理方法
+
+    private void HandleTtsStarted(TtsEventArgs e)
     {
+        // TTS开始播放时，从监听状态切换到说话状态
+        _stateMachine?.RequestTransition(ConversationTrigger.TtsStarted, $"TTS started: {e.Text}");
+        TtsStateChanged?.Invoke(this, e.TtsMessage!);
+    }
+
+    private void HandleTtsStopped(TtsEventArgs e)
+    {
+        // TTS停止播放时，从说话状态切换回空闲或监听状态
+        _stateMachine?.RequestTransition(ConversationTrigger.TtsCompleted, "TTS completed");
+        TtsStateChanged?.Invoke(this, e.TtsMessage!);
+    }
+
+    private void HandleTtsSentenceStarted(TtsEventArgs e)
+    {
+        _logger?.LogDebug("TTS句子开始: {Text}", e.Text);
+        TtsStateChanged?.Invoke(this, e.TtsMessage!);
+    }
+
+    private void HandleTtsSentenceEnded(TtsEventArgs e)
+    {
+        _logger?.LogDebug("TTS句子结束");
+        TtsStateChanged?.Invoke(this, e.TtsMessage!);
+    }
+
+    private async void HandleAudioDataReceived(MessageEventArgs e)
+    {
+        if (e.AudioData == null) return;
+
+        _logger?.LogDebug("收到WebSocket音频数据，长度: {Length}", e.AudioData.Length);
+
+        if (_audioPlayer != null && _audioCodec != null && _config != null)
+        {
+            // Use state machine to transition to speaking when audio is received
+            _stateMachine?.RequestTransition(ConversationTrigger.AudioReceived, $"WebSocket audio data received: {e.AudioData.Length} bytes");
+
+            // 解码并播放音频数据 - 使用输出采样率
+            var pcmData = _audioCodec.Decode(e.AudioData, _config.AudioOutputSampleRate, _config.AudioChannels);
+            await _audioPlayer.PlayAsync(pcmData, _config.AudioOutputSampleRate, _config.AudioChannels);
+
+            // 注意：不要在这里立即停止播放，因为可能还有更多音频数据要来
+            // 播放完成应该由播放器的PlaybackStopped事件或者明确的停止指令来触发
+        }
+    }
+
+    private void HandleMusicEvent(MusicEventArgs e)
+    {
+        _logger?.LogDebug("收到音乐消息: {Action}, 歌曲: {Song}", e.Action, e.SongName);
+        MusicMessageReceived?.Invoke(this, e.MusicMessage!);
+    }
+
+    private void HandleSystemStatusEvent(SystemStatusEventArgs e)
+    {
+        _logger?.LogDebug("收到系统状态消息: {Component}, 状态: {Status}", e.Component, e.Status);
+        SystemStatusMessageReceived?.Invoke(this, e.SystemStatusMessage!);
+    }
+
+    private void HandleLlmEmotionEvent(LlmEmotionEventArgs e)
+    {
+        _logger?.LogDebug("收到LLM情感消息: {Emotion}", e.Emotion);
+        LlmMessageReceived?.Invoke(this, e.LlmMessage!);
+    }
+
+    private async void HandleMcpReadyForInitialization(McpEventArgs e)
+    {
+        _logger?.LogInformation("设备已准备好MCP初始化，开始自动初始化MCP协议");
+
+        if (_communicationClient is WebSocketClient wsClient && wsClient.IsConnected && _mcpIntegrationService != null)
+        {
+            try
+            {
+                await wsClient.InitializeMcpAsync();
+                _logger?.LogInformation("MCP协议自动初始化完成");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "MCP自动初始化过程中发生错误");
+            }
+        }
+        else
+        {
+            _logger?.LogWarning("无法自动初始化MCP：WebSocketClient或MCP集成服务未设置");
+        }
+    }
+
+    private void HandleMcpResponseReceived(McpEventArgs e)
+    {
+        if (string.IsNullOrEmpty(e.ResponseJson)) return;
+
         try
         {
-            _logger?.LogDebug("收到MCP响应: {Response}", response);
+            _logger?.LogDebug("收到MCP响应: {Response}", e.ResponseJson);
 
             // 解析JSON-RPC 2.0响应
-            var responseElement = JsonSerializer.Deserialize<JsonDocument>(response);
+            var responseElement = JsonSerializer.Deserialize<JsonDocument>(e.ResponseJson);
             if (responseElement != null)
             {
                 // 检查是否是初始化响应
                 if (responseElement.RootElement.TryGetProperty("id", out var idElement) &&
                     responseElement.RootElement.TryGetProperty("method", out var methodElement))
                 {
-                    //var requestId = idElement.GetString();
-
                     var method = methodElement.GetString();
 
                     _logger?.LogDebug("处理MCP响应, 方法: {Method}", method);
@@ -970,7 +971,6 @@ public class VoiceChatService : IVoiceChatService
                     {
                         case "initialize":
                             // 处理初始化响应（id通常为1）
-
                             HandleMcpInitializeResponse(resultElement);
                             break;
 
@@ -981,22 +981,13 @@ public class VoiceChatService : IVoiceChatService
 
                         case "tools/call":
                             // 处理工具调用响应
-                            HandleMcpToolCallResponse(response);
+                            HandleMcpToolCallResponse(e.ResponseJson);
                             break;
                         default:
                             _logger?.LogDebug("收到未知类型的协议消息: {Type}", method);
                             break;
                     }
                 }
-                //// 处理通知消息（没有id字段）
-                //else if (responseElement.RootElement.TryGetProperty("method", out var methodElement))
-                //{
-                //    var method = methodElement.GetString();
-                //    if (method?.StartsWith("notifications/") == true)
-                //    {
-                //        HandleMcpNotification(responseElement.RootElement);
-                //    }
-                //}
             }
         }
         catch (Exception ex)
@@ -1004,6 +995,14 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogError(ex, "处理MCP响应时发生错误");
         }
     }
+
+    private void HandleMcpError(McpEventArgs e)
+    {
+        _logger?.LogError(e.Error, "MCP协议发生错误");
+        ErrorOccurred?.Invoke(this, $"MCP错误: {e.Error?.Message}");
+    }
+
+    #endregion
 
     /// <summary>
     /// 处理MCP初始化响应
@@ -1120,23 +1119,6 @@ public class VoiceChatService : IVoiceChatService
         }
     }
 
-    /// <summary>
-    /// 处理MCP错误事件
-    /// </summary>
-    private void OnMcpErrorOccurred(object? sender, Exception error)
-    {
-        try
-        {
-            _logger?.LogError(error, "MCP协议发生错误");
-            ErrorOccurred?.Invoke(this, $"MCP错误: {error.Message}");
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "处理MCP错误事件时发生异常");
-        }
-    }
-    #endregion
-
     public void Dispose()
     {
         try
@@ -1164,20 +1146,10 @@ public class VoiceChatService : IVoiceChatService
                 {
                     _communicationClient.MessageReceived -= OnMessageReceived;
                     _communicationClient.ConnectionStateChanged -= OnConnectionStateChanged;
-                    // 如果是WebSocket客户端，取消订阅更多事件
+                    // 如果是WebSocket客户端，取消订阅统一事件
                     if (_communicationClient is WebSocketClient webSocketClient)
                     {
-                        //webSocketClient.ProtocolMessageReceived -= OnProtocolMessageReceived;
-                        webSocketClient.AudioDataReceived -= OnWebSocketAudioDataReceived;
-                        webSocketClient.TtsStateChanged -= OnTtsStateChanged;
-                        webSocketClient.MusicMessageReceived -= OnMusicMessageReceived;
-                        webSocketClient.SystemStatusMessageReceived -= OnSystemStatusMessageReceived;
-                        webSocketClient.LlmMessageReceived -= OnLlmMessageReceived;
-
-                        // 取消订阅MCP事件
-                        webSocketClient.McpReadyForInitialization -= OnMcpReadyForInitialization;
-                        webSocketClient.McpResponseReceived -= OnMcpResponseReceived;
-                        webSocketClient.McpErrorOccurred -= OnMcpErrorOccurred;
+                        webSocketClient.WebSocketEventOccurred -= OnWebSocketEventOccurred;
                     }
 
                     _communicationClient.Dispose();

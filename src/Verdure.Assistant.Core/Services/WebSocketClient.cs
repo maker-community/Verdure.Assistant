@@ -8,6 +8,7 @@ using Verdure.Assistant.Core.Constants;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Services.MCP;
+using Verdure.Assistant.Core.Events;
 
 namespace Verdure.Assistant.Core.Services;
 
@@ -40,20 +41,45 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     private bool _mcpInitialized = false;
     private McpIntegrationService? _mcpIntegrationService;
 
+    // 统一事件管理器
+    private readonly WebSocketEventManager _eventManager;
+
+    // 保留现有事件以保持向后兼容（标记为过时）
+    [Obsolete("Use WebSocketEventOccurred instead")]
     public event EventHandler<ChatMessage>? MessageReceived;
+    [Obsolete("Use WebSocketEventOccurred instead")]
     public event EventHandler<bool>? ConnectionStateChanged;
+    [Obsolete("Use WebSocketEventOccurred instead")]
     public event EventHandler<ProtocolMessage>? ProtocolMessageReceived;
+    [Obsolete("Use WebSocketEventOccurred instead")]
     public event EventHandler<byte[]>? AudioDataReceived;
+    [Obsolete("Use WebSocketEventOccurred instead")]
     public event EventHandler<TtsMessage>? TtsStateChanged;
+    [Obsolete("Use WebSocketEventOccurred instead")]
     public event EventHandler<MusicMessage>? MusicMessageReceived;
+    [Obsolete("Use WebSocketEventOccurred instead")]
     public event EventHandler<SystemStatusMessage>? SystemStatusMessageReceived;
+    [Obsolete("Use WebSocketEventOccurred instead")]
     public event EventHandler<LlmMessage>? LlmMessageReceived;
+    [Obsolete("Use WebSocketEventOccurred instead")]
     public event EventHandler<McpMessage>? McpMessageReceived;
+    [Obsolete("Use WebSocketEventOccurred instead")]
     public event EventHandler<EventArgs>? McpReadyForInitialization;
 
-    // MCP事件
+    // 保留MCP事件以保持向后兼容
+    [Obsolete("Use WebSocketEventOccurred instead")]
     public event EventHandler<string>? McpResponseReceived;
+    [Obsolete("Use WebSocketEventOccurred instead")]
     public event EventHandler<Exception>? McpErrorOccurred;
+
+    /// <summary>
+    /// 新的统一WebSocket事件 - 推荐使用
+    /// </summary>
+    public event EventHandler<WebSocketEventArgs>? WebSocketEventOccurred
+    {
+        add => _eventManager.WebSocketEventOccurred += value;
+        remove => _eventManager.WebSocketEventOccurred -= value;
+    }
     public bool IsConnected => _isConnected;
     public string? SessionId => _sessionId;
 
@@ -64,6 +90,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     {
         _configurationService = configurationService;
         _logger = logger;
+        _eventManager = new WebSocketEventManager();
     }
 
     /// <summary>
@@ -95,6 +122,10 @@ public class WebSocketClient : ICommunicationClient, IDisposable
             var websocketUrl = _configurationService.WebSocketUrl;
             await _webSocket.ConnectAsync(new Uri(websocketUrl), _cancellationTokenSource.Token);
             _isConnected = true;
+            
+            // 触发连接建立事件
+            _eventManager.TriggerConnectionEvent(WebSocketEventTrigger.ConnectionEstablished, true, context: "WebSocket connected");
+            // 保持向后兼容
             ConnectionStateChanged?.Invoke(this, true);
 
             _logger?.LogInformation("WebSocket连接已建立，正在发送Hello消息");
@@ -118,7 +149,13 @@ public class WebSocketClient : ICommunicationClient, IDisposable
         catch (Exception ex)
         {
             _isConnected = false;
+            
+            // 触发连接错误事件
+            _eventManager.TriggerConnectionEvent(WebSocketEventTrigger.ConnectionError, false, 
+                errorMessage: ex.Message, context: "WebSocket connection failed");
+            // 保持向后兼容
             ConnectionStateChanged?.Invoke(this, false);
+            
             _logger?.LogError(ex, "连接WebSocket失败");
             throw new Exception($"连接WebSocket失败: {ex.Message}", ex);
         }
@@ -405,6 +442,10 @@ public class WebSocketClient : ICommunicationClient, IDisposable
                     Array.Copy(buffer, audioData, result.Count);
                     _logger?.LogDebug("收到WebSocket音频数据，长度: {Length}", audioData.Length);
 
+                    // 触发音频数据事件
+                    _eventManager.TriggerMessageEvent(WebSocketEventTrigger.AudioDataReceived, 
+                        audioData: audioData, context: $"Audio data: {audioData.Length} bytes");
+                    // 保持向后兼容
                     AudioDataReceived?.Invoke(this, audioData);
                 }
                 else if (result.MessageType == WebSocketMessageType.Close)
@@ -433,6 +474,11 @@ public class WebSocketClient : ICommunicationClient, IDisposable
             if (_isConnected)
             {
                 _isConnected = false;
+                
+                // 触发连接丢失事件
+                _eventManager.TriggerConnectionEvent(WebSocketEventTrigger.ConnectionLost, false, 
+                    context: "WebSocket receive loop terminated");
+                // 保持向后兼容
                 ConnectionStateChanged?.Invoke(this, false);
             }
         }
@@ -451,6 +497,11 @@ public class WebSocketClient : ICommunicationClient, IDisposable
             if (protocolMessage != null)
             {
                 await HandleProtocolMessageAsync(protocolMessage);
+                
+                // 触发协议消息事件
+                _eventManager.TriggerMessageEvent(WebSocketEventTrigger.ProtocolMessageReceived, 
+                    protocolMessage: protocolMessage, context: $"Protocol message: {protocolMessage.Type}");
+                // 保持向后兼容
                 ProtocolMessageReceived?.Invoke(this, protocolMessage);
                 return;
             }
@@ -459,6 +510,10 @@ public class WebSocketClient : ICommunicationClient, IDisposable
             var chatMessage = JsonSerializer.Deserialize<ChatMessage>(json);
             if (chatMessage != null)
             {
+                // 触发文本消息事件
+                _eventManager.TriggerMessageEvent(WebSocketEventTrigger.TextMessageReceived, 
+                    chatMessage: chatMessage, context: $"Chat message: {chatMessage.Type}");
+                // 保持向后兼容
                 MessageReceived?.Invoke(this, chatMessage);
             }
         }
@@ -550,9 +605,16 @@ public class WebSocketClient : ICommunicationClient, IDisposable
             _helloReceived.SetResult(true);
         }
 
+        // 触发Hello接收事件
+        _eventManager.TriggerConnectionEvent(WebSocketEventTrigger.HelloReceived, true, 
+            sessionId: _sessionId, context: $"Hello received from device, MCP support: {deviceSupportsMcp}");
+
         // 如果设备支持MCP，触发MCP准备就绪事件以便外部组件开始MCP初始化
         if (deviceSupportsMcp)
         {
+            _eventManager.TriggerMcpEvent(WebSocketEventTrigger.McpReadyForInitialization, 
+                context: "Device supports MCP protocol");
+            // 保持向后兼容
             McpReadyForInitialization?.Invoke(this, EventArgs.Empty);
         }
 
@@ -566,6 +628,11 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     private async Task HandleGoodbyeMessageAsync(GoodbyeMessage message)
     {
         _logger?.LogInformation("收到服务器Goodbye消息，准备断开连接");
+        
+        // 触发Goodbye接收事件
+        _eventManager.TriggerConnectionEvent(WebSocketEventTrigger.GoodbyeReceived, false, 
+            sessionId: _sessionId, context: "Goodbye received from server");
+        
         await DisconnectAsync();
     }    /// <summary>
          /// 处理TTS消息
@@ -574,7 +641,21 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     {
         _logger?.LogDebug("收到TTS消息，状态: {State}，文本: {Text}", message.State, message.Text);
 
-        // 触发TTS状态变化事件
+        // 根据TTS状态触发对应事件
+        var trigger = message.State?.ToLowerInvariant() switch
+        {
+            "start" => WebSocketEventTrigger.TtsStarted,
+            "stop" => WebSocketEventTrigger.TtsStopped,
+            "sentence_start" => WebSocketEventTrigger.TtsSentenceStarted,
+            "sentence_end" => WebSocketEventTrigger.TtsSentenceEnded,
+            _ => WebSocketEventTrigger.TtsStarted // 默认
+        };
+
+        // 触发TTS事件
+        _eventManager.TriggerTtsEvent(trigger, message, message.State, message.Text, 
+            context: $"TTS state: {message.State}");
+        
+        // 保持向后兼容
         TtsStateChanged?.Invoke(this, message);
 
         // 可以在这里添加TTS状态处理逻辑
@@ -606,11 +687,17 @@ public class WebSocketClient : ICommunicationClient, IDisposable
             message.State, message.Mode, message.Text);
         await Task.CompletedTask;
     }    /// <summary>
-         /// 处理LLM消息
-         /// </summary>
+    /// 处理LLM消息
+    /// </summary>
     private async Task HandleLlmMessageAsync(LlmMessage message)
     {
         _logger?.LogDebug("收到LLM消息，情感: {Emotion}", message.Emotion);
+
+        // 触发LLM情感事件
+        _eventManager.TriggerLlmEmotionEvent(WebSocketEventTrigger.LlmEmotionUpdate, 
+            message, message.Emotion, context: $"LLM emotion: {message.Emotion}");
+
+        // 保持向后兼容
         LlmMessageReceived?.Invoke(this, message);
         await Task.CompletedTask;
     }    /// <summary>
@@ -619,6 +706,25 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     private async Task HandleMusicMessageAsync(MusicMessage message)
     {
         _logger?.LogDebug("收到音乐消息，动作: {Action}，歌曲: {Song}", message.Action, message.SongName);
+
+        // 根据音乐动作触发对应事件
+        var trigger = message.Action?.ToLowerInvariant() switch
+        {
+            "play" => WebSocketEventTrigger.MusicPlay,
+            "pause" => WebSocketEventTrigger.MusicPause,
+            "stop" => WebSocketEventTrigger.MusicStop,
+            "lyric_update" => WebSocketEventTrigger.MusicLyricUpdate,
+            "seek" => WebSocketEventTrigger.MusicSeek,
+            _ => WebSocketEventTrigger.MusicPlay // 默认
+        };
+
+        // 触发音乐事件
+        _eventManager.TriggerMusicEvent(trigger, message, message.Action, message.SongName, 
+            message.Artist, message.LyricText, message.Position, message.Duration,
+            context: $"Music action: {message.Action}");
+
+        // 保持向后兼容
+        MusicMessageReceived?.Invoke(this, message);
 
         // 根据不同的音乐动作进行处理
         switch (message.Action?.ToLowerInvariant())
@@ -640,7 +746,6 @@ public class WebSocketClient : ICommunicationClient, IDisposable
                 break;
         }
 
-        MusicMessageReceived?.Invoke(this, message);
         await Task.CompletedTask;
     }
 
@@ -651,6 +756,13 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     {
         _logger?.LogDebug("收到系统状态消息，组件: {Component}，状态: {Status}，消息: {Message}",
             message.Component, message.Status, message.Message);
+
+        // 触发系统状态事件
+        _eventManager.TriggerSystemStatusEvent(WebSocketEventTrigger.SystemStatusUpdate, 
+            message, message.Component, message.Status, message.Message,
+            context: $"System status: {message.Component} -> {message.Status}");
+
+        // 保持向后兼容
         SystemStatusMessageReceived?.Invoke(this, message);
         await Task.CompletedTask;
     }
@@ -666,12 +778,22 @@ public class WebSocketClient : ICommunicationClient, IDisposable
             // 成功响应
             var responseJson = JsonSerializer.Serialize(message.Payload, JsonOptions);
 
-            // 触发响应事件
+            // 触发MCP响应事件
+            _eventManager.TriggerMcpEvent(WebSocketEventTrigger.McpResponseReceived, 
+                message, responseJson, context: "MCP message received");
+
+            // 保持向后兼容
             McpResponseReceived?.Invoke(this, responseJson);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error processing MCP message");
+            
+            // 触发MCP错误事件
+            _eventManager.TriggerMcpEvent(WebSocketEventTrigger.McpError, 
+                message, error: ex, context: "MCP message processing error");
+
+            // 保持向后兼容
             McpErrorOccurred?.Invoke(this, ex);
         }
         await Task.CompletedTask;
