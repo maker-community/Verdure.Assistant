@@ -8,7 +8,8 @@ namespace Verdure.Assistant.Core.Services;
 /// 参考 py-xiaozhi 的 AudioCodec 单例模式，避免重复初始化导致的资源冲突
 /// </summary>
 public sealed class PortAudioManager : IDisposable
-{    private static readonly Lazy<PortAudioManager> _instance = new(() => new PortAudioManager());
+{    
+    private static readonly Lazy<PortAudioManager> _instance = new(() => new PortAudioManager());
     private readonly object _lock = new();
     private bool _isInitialized = false;
     private bool _isDisposed = false;
