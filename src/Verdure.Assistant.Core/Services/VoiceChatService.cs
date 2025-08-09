@@ -23,8 +23,7 @@ public class VoiceChatService : IVoiceChatService
     private bool _isVoiceChatActive;
     private string _sessionId = Guid.NewGuid().ToString();
 
-    // Device state management
-    private DeviceState _currentState = DeviceState.Idle;
+    // Device state management - 简化为只需要监听模式和保持监听标志
     private ListeningMode _listeningMode = ListeningMode.Manual;
     private bool _keepListening = false;
     private AbortReason _lastAbortReason = AbortReason.None;
@@ -32,6 +31,12 @@ public class VoiceChatService : IVoiceChatService
     // State machine for conversation logic
     private ConversationStateMachine? _stateMachine;
     private ConversationStateMachineContext? _stateMachineContext;
+    
+    /// <summary>
+    /// 暴露状态机供外部直接访问，实现状态事件的直接订阅
+    /// </summary>
+    public ConversationStateMachine? StateMachine => _stateMachine;
+    
     // Wake word detector coordination (matches py-xiaozhi behavior)
     private InterruptManager? _interruptManager;
     // Keyword spotting service (Microsoft Cognitive Services based)
@@ -82,24 +87,10 @@ public class VoiceChatService : IVoiceChatService
             }
         }
     }
-    public DeviceState CurrentState
-    {
-        get => _stateMachine?.CurrentState ?? _currentState;
-        private set
-        {
-            if (_currentState != value)
-            {
-                var previousState = _currentState;
-                _currentState = value;
-                _logger?.LogInformation("Device state changed from {PreviousState} to {CurrentState}", previousState, value);
-
-                // Wake word detector coordination (matches py-xiaozhi behavior)
-                CoordinateWakeWordDetector(value);
-
-                DeviceStateChanged?.Invoke(this, value);
-            }
-        }
-    }
+    /// <summary>
+    /// 当前设备状态 - 直接从状态机获取，简化状态管理
+    /// </summary>
+    public DeviceState CurrentState => _stateMachine?.CurrentState ?? DeviceState.Idle;
 
     /// <summary>
     /// Coordinate wake word detector state based on device state changes
@@ -246,22 +237,17 @@ public class VoiceChatService : IVoiceChatService
     }
 
     /// <summary>
-    /// 处理状态机状态变化，同步到遗留的状态属性
+    /// 处理状态机状态变化，简化状态同步逻辑
     /// </summary>
     private void OnStateMachineStateChanged(object? sender, StateTransitionEventArgs e)
     {
-        // Update the private field to sync with state machine
-        if (_currentState != e.ToState)
-        {
-            var previousState = _currentState;
-            _currentState = e.ToState;
-            
-            // Coordinate wake word detector
-            CoordinateWakeWordDetector(e.ToState);
-            
-            // Fire the legacy event
-            DeviceStateChanged?.Invoke(this, e.ToState);
-        }
+        // 不再需要维护本地状态副本，直接协调wake word detector
+        CoordinateWakeWordDetector(e.ToState);
+        
+        // 直接转发状态机事件
+        DeviceStateChanged?.Invoke(this, e.ToState);
+        
+        _logger?.LogDebug("State synchronized from state machine: {FromState} -> {ToState}", e.FromState, e.ToState);
     }
 
     /// <summary>
@@ -1490,9 +1476,8 @@ public class VoiceChatService : IVoiceChatService
                 }
             }
 
-            // 10. 重置状态
+            // 10. 重置状态 - 不再需要重置_currentState，因为已经移除
             _isVoiceChatActive = false;
-            _currentState = DeviceState.Idle;
             _lastAbortReason = AbortReason.None;
 
             _logger?.LogInformation("VoiceChatService资源释放完成");

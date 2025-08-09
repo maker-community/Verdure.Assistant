@@ -98,6 +98,11 @@ public interface IVoiceChatService : IDisposable
     ListeningMode CurrentListeningMode { get; }    
     
     /// <summary>
+    /// 获取对话状态机，用于直接状态事件订阅
+    /// </summary>
+    ConversationStateMachine? StateMachine { get; }
+    
+    /// <summary>
     /// Set interrupt manager for wake word detector coordination
     /// This enables py-xiaozhi-like wake word detector pause/resume behavior
     /// </summary>

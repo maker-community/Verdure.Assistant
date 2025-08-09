@@ -267,10 +267,17 @@ public partial class HomePageViewModel : ViewModelBase
     }
 
     private async Task BindEventsAsync()
-    {        // 绑定语音服务事件
+    {        // 绑定语音服务事件 - 优化后直接订阅状态机事件
         if (_voiceChatService != null)
         {
-            _voiceChatService.DeviceStateChanged += OnDeviceStateChanged;
+            // 直接订阅状态机事件，简化状态管理
+            if (_voiceChatService.StateMachine != null)
+            {
+                _voiceChatService.StateMachine.StateChanged += OnStateMachineStateChanged;
+                _logger?.LogInformation("已直接订阅状态机状态变化事件，简化状态管理架构");
+            }
+            
+            // 保留必要的服务层事件
             _voiceChatService.VoiceChatStateChanged += OnVoiceChatStateChanged;
             _voiceChatService.MessageReceived += OnMessageReceived;
             _voiceChatService.ErrorOccurred += OnErrorOccurred;
@@ -345,12 +352,18 @@ public partial class HomePageViewModel : ViewModelBase
         });
     }
 
-    private void OnDeviceStateChanged(object? sender, DeviceState state)
+    /// <summary>
+    /// 直接处理状态机状态变化事件 - 简化状态管理架构
+    /// </summary>
+    private void OnStateMachineStateChanged(object? sender, StateTransitionEventArgs e)
     {
         // 使用UI调度器确保线程安全的事件处理
         _ = _uiDispatcher.InvokeAsync(() =>
         {
-            _logger?.LogDebug("Device state changed to: {State}, IsConnected: {IsConnected}", state, IsConnected);
+            _logger?.LogDebug("State machine transition: {FromState} -> {ToState} (Trigger: {Trigger})", 
+                e.FromState, e.ToState, e.Trigger);
+            
+            var state = e.ToState;
             
             switch (state)
             {
@@ -1733,10 +1746,17 @@ public partial class HomePageViewModel : ViewModelBase
     {
         if (_voiceChatService != null)
         {
+            // 清理状态机事件订阅
+            if (_voiceChatService.StateMachine != null)
+            {
+                _voiceChatService.StateMachine.StateChanged -= OnStateMachineStateChanged;
+                _logger?.LogInformation("状态机事件订阅已清理");
+            }
+            
+            // 清理服务层事件订阅
             _voiceChatService.MessageReceived -= OnMessageReceived;
             _voiceChatService.VoiceChatStateChanged -= OnVoiceChatStateChanged;
             _voiceChatService.ErrorOccurred -= OnErrorOccurred;
-            _voiceChatService.DeviceStateChanged -= OnDeviceStateChanged;
             _voiceChatService.MusicMessageReceived -= OnMusicMessageReceived;
             _voiceChatService.SystemStatusMessageReceived -= OnSystemStatusMessageReceived;
             _voiceChatService.LlmMessageReceived -= OnLlmMessageReceived;
