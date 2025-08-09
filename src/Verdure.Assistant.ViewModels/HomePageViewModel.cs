@@ -313,21 +313,6 @@ public partial class HomePageViewModel : ViewModelBase
                 _logger?.LogError(ex, "Failed to initialize InterruptManager");
             }
         }
-
-        // 设置关键词检测服务（对应py-xiaozhi的wake_word_detector集成）
-        if (_voiceChatService != null && _keywordSpottingService != null && _interruptManager != null)
-        {
-            try
-            {
-                _voiceChatService.SetInterruptManager(_interruptManager);
-                _voiceChatService.SetKeywordSpottingService(_keywordSpottingService);
-                _logger?.LogInformation("关键词唤醒服务已集成到语音聊天服务");
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to integrate keyword spotting service");
-            }
-        }
     }
 
     #region 事件处理
