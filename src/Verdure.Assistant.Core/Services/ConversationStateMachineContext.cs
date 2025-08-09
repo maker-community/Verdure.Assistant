@@ -20,7 +20,8 @@ public class ConversationStateMachineContext
     public Func<Task>? OnEnterIdle { get; set; }
     public Func<Task>? OnEnterConnecting { get; set; }
 
-    public ConversationStateMachineContext(ConversationStateMachine stateMachine, ILogger<ConversationStateMachineContext>? logger = null)
+    public ConversationStateMachineContext(ConversationStateMachine stateMachine, 
+        ILogger<ConversationStateMachineContext>? logger = null)
     {
         _stateMachine = stateMachine;
         _logger = logger;

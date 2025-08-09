@@ -129,12 +129,12 @@ public class ConversationStateMachine
             (DeviceState.Listening, ConversationTrigger.UserInterrupt) => DeviceState.Idle,
             (DeviceState.Listening, ConversationTrigger.TtsStarted) => DeviceState.Speaking,
             (DeviceState.Listening, ConversationTrigger.AudioReceived) => DeviceState.Speaking,
-            (DeviceState.Listening, ConversationTrigger.ServerDisconnected) => DeviceState.Connecting,
+            (DeviceState.Listening, ConversationTrigger.ServerDisconnected) => DeviceState.Idle,
 
             (DeviceState.Listening, ConversationTrigger.KeywordDetected) => DeviceState.Connecting,
 
             // From Speaking state
-            (DeviceState.Speaking, ConversationTrigger.TtsCompleted) => DeviceState.Idle,
+            (DeviceState.Speaking, ConversationTrigger.TtsCompleted) => DeviceState.Listening,
             (DeviceState.Speaking, ConversationTrigger.AudioPlaybackCompleted) => DeviceState.Idle,
             (DeviceState.Speaking, ConversationTrigger.UserInterrupt) => DeviceState.Idle,
             (DeviceState.Speaking, ConversationTrigger.KeywordDetected) => DeviceState.Idle, // Interrupt speaking

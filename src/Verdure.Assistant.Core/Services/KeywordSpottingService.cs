@@ -30,7 +30,8 @@ public class KeywordSpottingService : IKeywordSpottingService
     private bool _isRunning = false;
     private bool _isPaused = false;
     private bool _isEnabled = true;
-    private DeviceState _lastDeviceState = DeviceState.Idle;    // 音频处理
+    private DeviceState _lastDeviceState = DeviceState.Idle;    
+    // 音频处理
     private IAudioRecorder? _audioRecorder;
     private bool _useExternalAudioSource = false;
     private PushAudioInputStream? _pushStream;
@@ -50,7 +51,8 @@ public class KeywordSpottingService : IKeywordSpottingService
     public bool IsRunning => _isRunning && !_isPaused;
     public bool IsPaused => _isPaused;
     public bool IsEnabled => _isEnabled;    
-    public KeywordSpottingService(IVoiceChatService voiceChatService, AudioStreamManager audioStreamManager, ILogger<KeywordSpottingService>? logger = null)
+    public KeywordSpottingService(IVoiceChatService voiceChatService, 
+        AudioStreamManager audioStreamManager, ILogger<KeywordSpottingService>? logger = null)
     {
         _voiceChatService = voiceChatService;
         _audioStreamManager = audioStreamManager;
@@ -368,67 +370,8 @@ public class KeywordSpottingService : IKeywordSpottingService
             OnErrorOccurred($"关键词识别处理错误: {ex.Message}");
         }
     }
-      /// <summary>
-    /// 处理关键词检测（实现py-xiaozhi的状态协调逻辑）
-    /// 只负责状态管理和暂停/恢复逻辑，不直接调用业务操作
-    /// </summary>
-    private void HandleKeywordDetection(string keyword)
-    {
-        Task.Run(async () =>
-        {
-            // 防止并发处理关键词检测事件
-            if (_isProcessingKeywordDetection)
-            {
-                _logger?.LogDebug("关键词检测正在处理中，跳过当前检测");
-                return;
-            }
-
-            await _stateChangeSemaphore.WaitAsync();
-            try
-            {
-                _isProcessingKeywordDetection = true;
-
-                switch (_lastDeviceState)
-                {
-                    case DeviceState.Idle:
-                        // 在空闲状态检测到关键词，暂停检测避免干扰
-                        _logger?.LogInformation("在空闲状态检测到关键词，暂停关键词检测");
-                        Pause(); // 暂停检测避免干扰
-                        
-                        // 短暂延迟确保暂停操作完成
-                        await Task.Delay(100);
-                        // 注意：不在这里调用 StartVoiceChatAsync，让 VoiceChatService 的事件处理负责
-                        break;
-
-                    case DeviceState.Speaking:
-                        // 在AI说话时检测到关键词，准备中断对话
-                        _logger?.LogInformation("在AI说话时检测到关键词，准备中断当前对话");
-                        // 注意：不在这里调用 StopVoiceChatAsync，让 VoiceChatService 的事件处理负责
-                        break;
-
-                    case DeviceState.Listening:
-                        // 在监听状态检测到关键词，可能是误触发，忽略
-                        _logger?.LogDebug("在监听状态检测到关键词，忽略（可能是误触发）");
-                        break;
-
-                    default:
-                        _logger?.LogDebug($"在状态 {_lastDeviceState} 检测到关键词，暂不处理");
-                        break;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "处理关键词检测时发生错误");
-                OnErrorOccurred($"关键词检测处理错误: {ex.Message}");
-            }
-            finally
-            {
-                _isProcessingKeywordDetection = false;
-                _stateChangeSemaphore.Release();
-            }
-        });
-    }
-      /// <summary>
+   
+    /// <summary>
     /// 识别取消事件处理
     /// </summary>
     private void OnRecognitionCanceled(object? sender, SpeechRecognitionCanceledEventArgs e)
@@ -711,44 +654,44 @@ public class KeywordSpottingService : IKeywordSpottingService
         _logger?.LogDebug($"设备状态变化: {newState}");
 
         // 实现py-xiaozhi的状态协调逻辑
-        switch (newState)
-        {
-            case DeviceState.Listening:
-                // 开始监听时暂停关键词检测，避免干扰
-                Pause();
-                break;
+        //switch (newState)
+        //{
+        //    case DeviceState.Listening:
+        //        // 开始监听时暂停关键词检测，避免干扰
+        //        Pause();
+        //        break;
 
-            case DeviceState.Speaking:
-                // AI说话时暂停检测，避免误触发（匹配py-xiaozhi行为）
-                Pause();
-                break;
+        //    case DeviceState.Speaking:
+        //        // AI说话时暂停检测，避免误触发（匹配py-xiaozhi行为）
+        //        Pause();
+        //        break;
 
-            case DeviceState.Idle:
-                // 空闲时恢复检测，等待下次唤醒
-                // 延迟恢复确保音频流稳定
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await Task.Delay(200); // 短暂延迟确保状态稳定
-                        if (_lastDeviceState == DeviceState.Idle && _isRunning && _isPaused)
-                        {
-                            Resume();
-                            _logger?.LogDebug("在空闲状态恢复关键词检测");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogError(ex, "空闲状态恢复关键词检测时发生错误");
-                    }
-                });
-                break;
+        //    case DeviceState.Idle:
+        //        // 空闲时恢复检测，等待下次唤醒
+        //        // 延迟恢复确保音频流稳定
+        //        _ = Task.Run(async () =>
+        //        {
+        //            try
+        //            {
+        //                await Task.Delay(200); // 短暂延迟确保状态稳定
+        //                if (_lastDeviceState == DeviceState.Idle && _isRunning && _isPaused)
+        //                {
+        //                    Resume();
+        //                    _logger?.LogDebug("在空闲状态恢复关键词检测");
+        //                }
+        //            }
+        //            catch (Exception ex)
+        //            {
+        //                _logger?.LogError(ex, "空闲状态恢复关键词检测时发生错误");
+        //            }
+        //        });
+        //        break;
 
-            case DeviceState.Connecting:
-                // 连接时暂停检测
-                Pause();
-                break;
-        }
+        //    case DeviceState.Connecting:
+        //        // 连接时暂停检测
+        //        Pause();
+        //        break;
+        //}
     }
 
     /// <summary>
