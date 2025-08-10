@@ -179,6 +179,12 @@ public class VoiceChatService : IVoiceChatService
         _config = config;
         try
         {
+            // 将配置传递给关键词检测服务
+            if (_keywordSpottingService != null)
+            {
+                _keywordSpottingService.SetConfig(config);
+            }
+
             // 启动关键词唤醒检测（对应py-xiaozhi的_start_wake_word_detector调用）
             if (_keywordSpottingService != null)
             {
@@ -272,6 +278,35 @@ public class VoiceChatService : IVoiceChatService
     {
         _musicVoiceCoordinationService = musicVoiceCoordinationService;
         _logger?.LogInformation("音乐语音协调服务已设置");
+    }
+
+    /// <summary>
+    /// 切换关键词模型
+    /// </summary>
+    /// <param name="modelFileName">模型文件名</param>
+    /// <returns>切换是否成功</returns>
+    public async Task<bool> SwitchKeywordModelAsync(string modelFileName)
+    {
+        if (_keywordSpottingService == null)
+        {
+            _logger?.LogWarning("关键词检测服务未设置，无法切换模型");
+            return false;
+        }
+
+        _logger?.LogInformation("正在切换关键词模型为: {ModelFileName}", modelFileName);
+        
+        var result = await _keywordSpottingService.SwitchKeywordModelAsync(modelFileName);
+        
+        if (result)
+        {
+            _logger?.LogInformation("关键词模型切换成功");
+        }
+        else
+        {
+            _logger?.LogError("关键词模型切换失败");
+        }
+        
+        return result;
     }
 
     /// <summary>

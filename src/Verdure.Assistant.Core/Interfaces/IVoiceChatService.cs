@@ -140,4 +140,11 @@ public interface IVoiceChatService : IDisposable
     /// 实现音乐播放时自动暂停语音识别的同步机制
     /// </summary>
     void SetMusicVoiceCoordinationService(Services.MusicVoiceCoordinationService musicVoiceCoordinationService);
+    
+    /// <summary>
+    /// 切换关键词模型
+    /// </summary>
+    /// <param name="modelFileName">模型文件名</param>
+    /// <returns>切换是否成功</returns>
+    Task<bool> SwitchKeywordModelAsync(string modelFileName);
 }

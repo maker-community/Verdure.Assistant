@@ -2,6 +2,7 @@ using Microsoft.CognitiveServices.Speech;
 using Microsoft.CognitiveServices.Speech.Audio;
 using Microsoft.Extensions.Logging;
 using Verdure.Assistant.Core.Interfaces;
+using Verdure.Assistant.Core.Models;
 
 namespace Verdure.Assistant.Core.Services;
 
@@ -21,11 +22,8 @@ public class KeywordSpottingService : IKeywordSpottingService
     private KeywordRecognizer? _keywordRecognizer;
     private KeywordRecognitionModel? _keywordModel;
 
-    // 关键词模型配置
-    private readonly string[] _keywordModels = {
-        "keyword_xiaodian.table",  // 对应py-xiaozhi的"你好小天"等
-        "keyword_cortana.table"    // 对应"Cortana"关键词
-    };
+    // 配置信息
+    private VerdureConfig? _config;
     // 状态管理
     private bool _isRunning = false;
     private bool _isPaused = false;
@@ -59,6 +57,15 @@ public class KeywordSpottingService : IKeywordSpottingService
         _logger = logger;
 
         InitializeSpeechConfig();
+    }
+
+    /// <summary>
+    /// 设置配置信息（在启动前调用）
+    /// </summary>
+    public void SetConfig(VerdureConfig config)
+    {
+        _config = config;
+        _logger?.LogInformation("关键词检测服务配置已更新");
     }
 
     /// <summary>
@@ -163,7 +170,7 @@ public class KeywordSpottingService : IKeywordSpottingService
     }
 
     /// <summary>
-    /// 加载关键词模型（使用Assets目录中的.table文件）
+    /// 加载关键词模型（使用配置中的模型路径和文件）
     /// 每次调用都创建新的模型实例以避免句柄错误
     /// </summary>
     private bool LoadKeywordModels()
@@ -187,29 +194,18 @@ public class KeywordSpottingService : IKeywordSpottingService
                 }
             }
 
-            // 获取Assets目录路径
-            var assetsPath = GetAssetsPath();
-            var keywordsPath = Path.Combine(assetsPath, "keywords");
-
-            if (!Directory.Exists(keywordsPath))
+            // 获取模型文件路径
+            var modelPath = GetKeywordModelPath();
+            if (string.IsNullOrEmpty(modelPath) || !File.Exists(modelPath))
             {
-                _logger?.LogError($"关键词模型目录不存在: {keywordsPath}");
-                return false;
-            }
-
-            // 优先使用xiaodian模型（对应py-xiaozhi的主要唤醒词）
-            var primaryModelPath = Path.Combine(keywordsPath, "keyword_xiaodian.table");
-
-            if (!File.Exists(primaryModelPath))
-            {
-                _logger?.LogError($"主要关键词模型文件不存在: {primaryModelPath}");
+                _logger?.LogError($"关键词模型文件不存在: {modelPath}");
                 return false;
             }
 
             // 从.table文件创建关键词模型 - 每次都创建新实例
-            _keywordModel = KeywordRecognitionModel.FromFile(primaryModelPath);
+            _keywordModel = KeywordRecognitionModel.FromFile(modelPath);
 
-            _logger?.LogInformation($"成功加载关键词模型: {primaryModelPath}");
+            _logger?.LogInformation($"成功加载关键词模型: {modelPath}");
             return true;
         }
         catch (Exception ex)
@@ -220,14 +216,56 @@ public class KeywordSpottingService : IKeywordSpottingService
     }
 
     /// <summary>
-    /// 获取Assets目录路径
+    /// 获取关键词模型文件的完整路径
     /// </summary>
-    private string GetAssetsPath()
+    private string GetKeywordModelPath()
     {
-        // 从当前程序集位置推断Assets路径
-        var assemblyPath = AppDomain.CurrentDomain.BaseDirectory;
+        var modelsPath = GetModelsDirectoryPath();
+        var currentModel = _config?.KeywordModels.CurrentModel ?? "keyword_xiaodian.table";
+        
+        return Path.Combine(modelsPath, currentModel);
+    }
 
-        // 向上查找到解决方案根目录，然后定位到WinUI项目的Assets
+    /// <summary>
+    /// 获取模型文件目录路径
+    /// </summary>
+    private string GetModelsDirectoryPath()
+    {
+        // 如果配置中指定了路径，使用配置的路径
+        if (!string.IsNullOrEmpty(_config?.KeywordModels.ModelsPath))
+        {
+            var configPath = _config.KeywordModels.ModelsPath;
+            if (Path.IsPathRooted(configPath))
+            {
+                return configPath;
+            }
+            else
+            {
+                // 相对路径，基于当前程序目录
+                return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, configPath);
+            }
+        }
+
+        // 使用默认逻辑：根据当前项目类型自动检测
+        return GetDefaultModelsPath();
+    }
+
+    /// <summary>
+    /// 获取默认的模型文件路径（保持向后兼容）
+    /// </summary>
+    private string GetDefaultModelsPath()
+    {
+        var assemblyPath = AppDomain.CurrentDomain.BaseDirectory;
+        
+        // 首先尝试Console项目的ModelFiles目录
+        var consoleModelsPath = Path.Combine(assemblyPath, "ModelFiles");
+        if (Directory.Exists(consoleModelsPath))
+        {
+            _logger?.LogDebug("使用Console项目模型路径: {Path}", consoleModelsPath);
+            return consoleModelsPath;
+        }
+
+        // 然后尝试从解决方案根目录查找WinUI项目的Assets/keywords
         var currentDir = new DirectoryInfo(assemblyPath);
         while (currentDir != null && !File.Exists(Path.Combine(currentDir.FullName, "Verdure.Assistant.sln")))
         {
@@ -236,11 +274,60 @@ public class KeywordSpottingService : IKeywordSpottingService
 
         if (currentDir != null)
         {
-            return Path.Combine(currentDir.FullName, "src", "Verdure.Assistant.WinUI", "Assets");
+            var winuiModelsPath = Path.Combine(currentDir.FullName, "src", "Verdure.Assistant.WinUI", "Assets", "keywords");
+            if (Directory.Exists(winuiModelsPath))
+            {
+                _logger?.LogDebug("使用WinUI项目模型路径: {Path}", winuiModelsPath);
+                return winuiModelsPath;
+            }
         }
 
-        // 如果找不到解决方案目录，使用相对路径
-        return Path.Combine(assemblyPath, "..", "..", "..", "..", "Verdure.Assistant.WinUI", "Assets");
+        // 回退到相对路径
+        var fallbackPath = Path.Combine(assemblyPath, "..", "..", "..", "..", "Verdure.Assistant.WinUI", "Assets", "keywords");
+        _logger?.LogDebug("使用回退模型路径: {Path}", fallbackPath);
+        return fallbackPath;
+    }
+
+    /// <summary>
+    /// 切换关键词模型
+    /// </summary>
+    public async Task<bool> SwitchKeywordModelAsync(string modelFileName)
+    {
+        if (_config == null)
+        {
+            _logger?.LogWarning("配置未设置，无法切换关键词模型");
+            return false;
+        }
+
+        // 验证模型文件是否存在
+        var modelsPath = GetModelsDirectoryPath();
+        var modelPath = Path.Combine(modelsPath, modelFileName);
+        
+        if (!File.Exists(modelPath))
+        {
+            _logger?.LogError($"关键词模型文件不存在: {modelPath}");
+            return false;
+        }
+
+        // 更新配置
+        _config.KeywordModels.CurrentModel = modelFileName;
+        
+        // 如果当前正在运行，重新启动以使用新模型
+        if (_isRunning)
+        {
+            _logger?.LogInformation("正在切换关键词模型，重新启动检测服务");
+            
+            var audioRecorder = _audioRecorder;
+            await StopAsync();
+            
+            // 等待一小段时间确保完全停止
+            await Task.Delay(100);
+            
+            return await StartAsync(audioRecorder);
+        }
+
+        _logger?.LogInformation($"关键词模型已切换为: {modelFileName}");
+        return true;
     }
 
     /// <summary>

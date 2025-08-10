@@ -23,4 +23,34 @@ public class VerdureConfig
     /// 启动时是否自动连接到语音助手服务
     /// </summary>
     public bool AutoConnect { get; set; } = false;
+    
+    /// <summary>
+    /// 关键词模型配置
+    /// </summary>
+    public KeywordModelConfig KeywordModels { get; set; } = new KeywordModelConfig();
+}
+
+/// <summary>
+/// 关键词模型配置
+/// </summary>
+public class KeywordModelConfig
+{
+    /// <summary>
+    /// 关键词模型文件目录路径，如果为空则使用默认路径
+    /// </summary>
+    public string? ModelsPath { get; set; }
+    
+    /// <summary>
+    /// 当前使用的关键词模型文件名（不含路径）
+    /// </summary>
+    public string CurrentModel { get; set; } = "keyword_xiaodian.table";
+    
+    /// <summary>
+    /// 可用的关键词模型列表
+    /// </summary>
+    public string[] AvailableModels { get; set; } = 
+    {
+        "keyword_xiaodian.table",  // 小点唤醒词
+        "keyword_cortana.table"    // Cortana唤醒词
+    };
 }

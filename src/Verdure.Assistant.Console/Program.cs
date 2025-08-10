@@ -120,7 +120,9 @@ class Program
                 });
                 services.AddSingleton<McpIntegrationService>();
 
-            });static VerdureConfig LoadConfiguration()
+            });
+
+    static VerdureConfig LoadConfiguration()
     {
         var configuration = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
@@ -130,6 +132,13 @@ class Program
 
         var config = new VerdureConfig();
         configuration.Bind(config);
+        
+        // 为Console项目设置关键词模型配置
+        if (string.IsNullOrEmpty(config.KeywordModels.ModelsPath))
+        {
+            // Console项目的模型文件在 ModelFiles 目录
+            config.KeywordModels.ModelsPath = "ModelFiles";
+        }
         
         return config;
     }    

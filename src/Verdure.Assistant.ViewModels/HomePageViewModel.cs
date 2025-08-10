@@ -168,7 +168,13 @@ public partial class HomePageViewModel : ViewModelBase
             AudioSampleRate = 16000,
             AudioChannels = 1,
             AudioFormat = "opus",
-            AutoConnect = true // 设置自动连接标志
+            AutoConnect = true, // 设置自动连接标志
+            KeywordModels = new KeywordModelConfig
+            {
+                // WinUI项目的模型文件在 Assets/keywords 目录
+                ModelsPath = null, // 使用默认自动检测
+                CurrentModel = "keyword_xiaodian.table"
+            }
         };
     }
 
@@ -1863,6 +1869,57 @@ public partial class HomePageViewModel : ViewModelBase
                 _logger?.LogWarning("Unhandled interrupt reason: {Reason}", reason);
                 break;
         }
+    }
+
+    /// <summary>
+    /// 切换关键词模型
+    /// </summary>
+    /// <param name="modelFileName">模型文件名</param>
+    /// <returns>切换是否成功</returns>
+    public async Task<bool> SwitchKeywordModelAsync(string modelFileName)
+    {
+        if (_voiceChatService == null)
+        {
+            _logger?.LogWarning("VoiceChatService is null, cannot switch keyword model");
+            return false;
+        }
+
+        _logger?.LogInformation("Switching keyword model to: {ModelFileName}", modelFileName);
+        
+        var result = await _voiceChatService.SwitchKeywordModelAsync(modelFileName);
+        
+        if (result)
+        {
+            // 更新配置中的当前模型
+            _config.KeywordModels.CurrentModel = modelFileName;
+            AddMessage($"[系统] 已切换关键词模型为: {modelFileName}", false);
+            _logger?.LogInformation("Keyword model switched successfully");
+        }
+        else
+        {
+            AddMessage($"[系统] 切换关键词模型失败: {modelFileName}", false);
+            _logger?.LogError("Failed to switch keyword model");
+        }
+        
+        return result;
+    }
+
+    /// <summary>
+    /// 获取可用的关键词模型列表
+    /// </summary>
+    /// <returns>模型文件名列表</returns>
+    public string[] GetAvailableKeywordModels()
+    {
+        return _config.KeywordModels.AvailableModels;
+    }
+
+    /// <summary>
+    /// 获取当前使用的关键词模型
+    /// </summary>
+    /// <returns>当前模型文件名</returns>
+    public string GetCurrentKeywordModel()
+    {
+        return _config.KeywordModels.CurrentModel;
     }
 
     partial void OnVolumeValueChanged(double value)
