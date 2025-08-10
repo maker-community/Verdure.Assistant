@@ -6,6 +6,7 @@ using Verdure.Assistant.Core.Constants;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Services;
+using Verdure.Assistant.Core.Events;
 
 namespace Verdure.Assistant.ViewModels;
 
@@ -13,12 +14,15 @@ namespace Verdure.Assistant.ViewModels;
 /// 主页ViewModel - 语音对话界面逻辑
 /// </summary>
 public partial class HomePageViewModel : ViewModelBase
-{    private readonly IVoiceChatService? _voiceChatService;
+{
+    private readonly IVoiceChatService? _voiceChatService;
     private readonly IEmotionManager? _emotionManager;
     private readonly IKeywordSpottingService? _keywordSpottingService;
     private readonly IVerificationService? _verificationService;
     private readonly IMusicPlayerService? _musicPlayerService;
     private readonly IConfigurationService? _configurationService;
+
+    private readonly VerdureConfig _config;
 
     // UI thread dispatcher for cross-platform thread marshaling
     private IUIDispatcher _uiDispatcher;
@@ -121,22 +125,28 @@ public partial class HomePageViewModel : ViewModelBase
     // Manual按钮可用状态 - 基于连接状态、推送说话状态和等待响应状态
     public bool IsManualButtonEnabled => IsConnected && !IsPushToTalkActive && !IsWaitingForResponse;
 
+    // 连接按钮可用状态 - 未连接且未在连接/断开过程中
+    public bool IsConnectButtonEnabled => !IsConnected && !_isConnecting && !_isDisconnecting;
+
+    // 断开按钮可用状态 - 已连接且未在连接/断开过程中
+    public bool IsDisconnectButtonEnabled => IsConnected && !_isConnecting && !_isDisconnecting;
+
     #endregion
 
     #region 集合
 
     public ObservableCollection<ChatMessageViewModel> Messages { get; } = new();
 
-    #endregion        
-      public HomePageViewModel(ILogger<HomePageViewModel> logger,
-        IVoiceChatService? voiceChatService = null,
-        IEmotionManager? emotionManager = null,
-        InterruptManager? interruptManager = null,
-        IKeywordSpottingService? keywordSpottingService = null,
-        IVerificationService? verificationService = null,
-        IMusicPlayerService? musicPlayerService = null,
-        IConfigurationService? configurationService = null,
-        IUIDispatcher? uiDispatcher = null) : base(logger)
+    #endregion
+    public HomePageViewModel(ILogger<HomePageViewModel> logger,
+      IVoiceChatService? voiceChatService = null,
+      IEmotionManager? emotionManager = null,
+      InterruptManager? interruptManager = null,
+      IKeywordSpottingService? keywordSpottingService = null,
+      IVerificationService? verificationService = null,
+      IMusicPlayerService? musicPlayerService = null,
+      IConfigurationService? configurationService = null,
+      IUIDispatcher? uiDispatcher = null) : base(logger)
     {
         _voiceChatService = voiceChatService;
         _emotionManager = emotionManager;
@@ -149,6 +159,23 @@ public partial class HomePageViewModel : ViewModelBase
         // 设置初始状态
         InitializeDefaultState();
         _uiDispatcher = uiDispatcher ?? new DefaultUIDispatcher();
+
+        _config = new VerdureConfig
+        {
+            ServerUrl = ServerUrl,
+            UseWebSocket = true,
+            EnableVoice = true,
+            AudioSampleRate = 16000,
+            AudioChannels = 1,
+            AudioFormat = "opus",
+            AutoConnect = true, // 设置自动连接标志
+            KeywordModels = new KeywordModelConfig
+            {
+                // WinUI项目的模型文件在 Assets/keywords 目录
+                ModelsPath = null, // 使用默认自动检测
+                CurrentModel = "keyword_xiaodian.table"
+            }
+        };
     }
 
     private void InitializeDefaultState()
@@ -163,8 +190,13 @@ public partial class HomePageViewModel : ViewModelBase
         ManualButtonText = "按住说话";
         AutoButtonText = "开始对话";
         SetEmotion("neutral");
-    }    
-    
+
+        // 确保按钮状态正确初始化
+        OnPropertyChanged(nameof(IsConnectButtonEnabled));
+        OnPropertyChanged(nameof(IsDisconnectButtonEnabled));
+        OnPropertyChanged(nameof(IsManualButtonEnabled));
+    }
+
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
@@ -185,13 +217,88 @@ public partial class HomePageViewModel : ViewModelBase
 
         // 绑定服务事件
         await BindEventsAsync();
+
+        // 检查自动连接设置并触发连接
+        //await TryAutoConnectAsync();
+    }
+
+    /// <summary>
+    /// 尝试自动连接到语音助手服务
+    /// </summary>
+    private async Task TryAutoConnectAsync()
+    {
+        try
+        {
+            // 从设置服务获取自动连接配置
+            bool shouldAutoConnect = true; // 默认启用自动连接
+
+            // TODO: 这里可以扩展从配置服务或设置系统获取自动连接设置的逻辑
+            // 例如：shouldAutoConnect = await GetAutoConnectSettingAsync();
+
+            if (shouldAutoConnect && !IsConnected && _voiceChatService != null)
+            {
+                _logger?.LogInformation("启动时自动连接功能启用，开始连接到语音助手服务");
+
+                // 延迟一小段时间以确保所有服务都已初始化完成
+                await Task.Delay(800);
+
+                // 检查是否仍然需要连接（用户可能手动取消了）
+                if (!IsConnected && !_isConnecting)
+                {
+                    AddMessage("🚀 启动自动连接...", false);
+
+                    // 更新按钮状态以反映自动连接开始
+                    OnPropertyChanged(nameof(IsConnectButtonEnabled));
+                    OnPropertyChanged(nameof(IsDisconnectButtonEnabled));
+
+                    await ConnectCommand.ExecuteAsync(null);
+                }
+            }
+            else
+            {
+                _logger?.LogInformation("自动连接未启用或条件不满足 - AutoConnect: {ShouldAutoConnect}, Connected: {IsConnected}, Service: {HasService}",
+                    shouldAutoConnect, IsConnected, _voiceChatService != null);
+
+                // 确保按钮状态正确（应该是连接按钮可用，断开按钮不可用）
+                OnPropertyChanged(nameof(IsConnectButtonEnabled));
+                OnPropertyChanged(nameof(IsDisconnectButtonEnabled));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "自动连接过程中发生错误");
+            AddMessage($"⚠️ 自动连接失败: {ex.Message}", true);
+            // 自动连接失败不应该阻止应用启动，只记录错误
+
+            // 确保按钮状态正确
+            OnPropertyChanged(nameof(IsConnectButtonEnabled));
+            OnPropertyChanged(nameof(IsDisconnectButtonEnabled));
+        }
+    }
+
+    /// <summary>
+    /// 获取自动连接设置（预留接口）
+    /// </summary>
+    private async Task<bool> GetAutoConnectSettingAsync()
+    {
+        // TODO: 从设置服务或配置文件获取自动连接设置
+        // 现在暂时返回默认值
+        await Task.CompletedTask;
+        return true;
     }
 
     private async Task BindEventsAsync()
-    {        // 绑定语音服务事件
+    {        // 绑定语音服务事件 - 优化后直接订阅状态机事件
         if (_voiceChatService != null)
         {
-            _voiceChatService.DeviceStateChanged += OnDeviceStateChanged;
+            // 直接订阅状态机事件，简化状态管理
+            if (_voiceChatService.StateMachine != null)
+            {
+                _voiceChatService.StateMachine.StateChanged += OnStateMachineStateChanged;
+                _logger?.LogInformation("已直接订阅状态机状态变化事件，简化状态管理架构");
+            }
+
+            // 保留必要的服务层事件
             _voiceChatService.VoiceChatStateChanged += OnVoiceChatStateChanged;
             _voiceChatService.MessageReceived += OnMessageReceived;
             _voiceChatService.ErrorOccurred += OnErrorOccurred;
@@ -199,6 +306,8 @@ public partial class HomePageViewModel : ViewModelBase
             _voiceChatService.SystemStatusMessageReceived += OnSystemStatusMessageReceived;
             _voiceChatService.LlmMessageReceived += OnLlmMessageReceived;
             _voiceChatService.TtsStateChanged += OnTtsStateChanged;
+
+            await _voiceChatService.InitializeAsync(_config);
         }        // 绑定音乐播放服务事件
         if (_musicPlayerService != null)
         {
@@ -227,21 +336,6 @@ public partial class HomePageViewModel : ViewModelBase
                 _logger?.LogError(ex, "Failed to initialize InterruptManager");
             }
         }
-
-        // 设置关键词检测服务（对应py-xiaozhi的wake_word_detector集成）
-        if (_voiceChatService != null && _keywordSpottingService != null && _interruptManager != null)
-        {
-            try
-            {
-                _voiceChatService.SetInterruptManager(_interruptManager);
-                _voiceChatService.SetKeywordSpottingService(_keywordSpottingService);
-                _logger?.LogInformation("关键词唤醒服务已集成到语音聊天服务");
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to integrate keyword spotting service");
-            }
-        }
     }
 
     #region 事件处理
@@ -266,20 +360,34 @@ public partial class HomePageViewModel : ViewModelBase
         });
     }
 
-    private void OnDeviceStateChanged(object? sender, DeviceState state)
+    /// <summary>
+    /// 直接处理状态机状态变化事件 - 简化状态管理架构
+    /// </summary>
+    private void OnStateMachineStateChanged(object? sender, StateTransitionEventArgs e)
     {
         // 使用UI调度器确保线程安全的事件处理
         _ = _uiDispatcher.InvokeAsync(() =>
         {
-            _logger?.LogDebug("Device state changed to: {State}", state);
-            
+            _logger?.LogDebug("State machine transition: {FromState} -> {ToState} (Trigger: {Trigger})",
+                e.FromState, e.ToState, e.Trigger);
+
+            var state = e.ToState;
+
             switch (state)
             {
                 case DeviceState.Listening:
+                    IsConnected = true; // 确保连接状态正确
                     if (IsConnected) // 确保只在连接状态下更新
                     {
                         StatusText = "正在聆听";
                         SetEmotion("listening");
+                        ShowMicrophoneVisualizer = true;
+
+                        // 确保按钮状态正确
+                        if (IsPushToTalkActive)
+                        {
+                            SetManualButtonRecordingState();
+                        }
                     }
                     break;
                 case DeviceState.Speaking:
@@ -287,11 +395,19 @@ public partial class HomePageViewModel : ViewModelBase
                     {
                         StatusText = "正在播放";
                         SetEmotion("speaking");
+                        ShowMicrophoneVisualizer = false;
+
+                        // 如果是手动模式且在等待响应，更新按钮状态
+                        if (IsWaitingForResponse)
+                        {
+                            SetManualButtonProcessingState();
+                        }
                     }
                     break;
                 case DeviceState.Connecting:
                     StatusText = "连接中";
                     SetEmotion("thinking");
+                    ShowMicrophoneVisualizer = false;
                     break;
                 case DeviceState.Idle:
                 default:
@@ -299,6 +415,7 @@ public partial class HomePageViewModel : ViewModelBase
                     {
                         StatusText = "待命";
                         SetEmotion("neutral");
+                        ShowMicrophoneVisualizer = false;
 
                         // Reset push-to-talk state when AI response completes
                         if (IsWaitingForResponse)
@@ -309,13 +426,43 @@ public partial class HomePageViewModel : ViewModelBase
                             AddMessage("✅ AI 回复完成，可以继续对话");
                             _logger?.LogInformation("AI response completed, manual button restored");
                         }
+
+                        // 确保按钮状态正确
+                        if (IsPushToTalkActive)
+                        {
+                            IsPushToTalkActive = false;
+                            RestoreManualButtonState();
+                        }
                     }
                     else
                     {
                         StatusText = "未连接";
                         SetEmotion("neutral");
+                        ShowMicrophoneVisualizer = false;
+
+                        // 在未连接状态下，确保所有相关状态都被正确重置
+                        if (IsListening || IsWaitingForResponse || IsPushToTalkActive)
+                        {
+                            _logger?.LogWarning("Device state is Idle but disconnected, forcing state reset. Listening: {IsListening}, Waiting: {IsWaitingForResponse}, PushToTalk: {IsPushToTalkActive}",
+                                IsListening, IsWaitingForResponse, IsPushToTalkActive);
+
+                            IsListening = false;
+                            IsWaitingForResponse = false;
+                            IsPushToTalkActive = false;
+                            ShowMicrophoneVisualizer = false;
+                            RestoreManualButtonState();
+                        }
                     }
                     break;
+            }
+
+            // 更新UI可用状态
+            OnPropertyChanged(nameof(IsManualButtonEnabled));
+
+            // 验证状态一致性
+            if (!IsConnected && (state == DeviceState.Listening || state == DeviceState.Speaking))
+            {
+                _logger?.LogWarning("Inconsistent state detected: Device state is {DeviceState} but IsConnected is false", state);
             }
         });
     }
@@ -325,16 +472,21 @@ public partial class HomePageViewModel : ViewModelBase
         // 使用UI调度器确保线程安全的事件处理
         _ = _uiDispatcher.InvokeAsync(() =>
         {
-            _logger?.LogDebug("Voice chat state changed: IsActive={IsActive}, Connected={Connected}", isActive, IsConnected);
+            var currentDeviceState = _voiceChatService?.CurrentState ?? DeviceState.Idle;
+
             
+            _logger?.LogDebug("Voice chat state changed: IsActive={IsActive}, Connected={Connected}, DeviceState={DeviceState}",
+                isActive, IsConnected, currentDeviceState);
+
             // 只在连接状态下处理语音聊天状态变化
-            if (!IsConnected) 
+            if (!IsConnected)
             {
                 IsListening = false;
                 ShowMicrophoneVisualizer = false;
+                _logger?.LogWarning("Voice chat state change ignored due to disconnected state");
                 return;
             }
-            
+
             IsListening = isActive;
             ShowMicrophoneVisualizer = isActive;
 
@@ -351,9 +503,37 @@ public partial class HomePageViewModel : ViewModelBase
                 }
             }
 
-        });            
-    }    
-    
+            // 更新手动按钮状态
+            if (!IsAutoMode)
+            {
+                if (isActive && IsPushToTalkActive)
+                {
+                    SetManualButtonRecordingState();
+                }
+                else if (!isActive && IsWaitingForResponse)
+                {
+                    SetManualButtonProcessingState();
+                }
+                else if (!isActive && !IsWaitingForResponse)
+                {
+                    RestoreManualButtonState();
+                }
+            }
+
+            // 更新UI可用状态
+            OnPropertyChanged(nameof(IsManualButtonEnabled));
+
+            // 验证状态一致性：语音聊天状态应该与设备状态匹配
+            var expectedListening = (currentDeviceState == DeviceState.Listening);
+            if (isActive != expectedListening)
+            {
+                _logger?.LogWarning("State inconsistency detected - VoiceChat IsActive: {IsActive}, Device State: {DeviceState}, Expected Listening: {ExpectedListening}",
+                    isActive, currentDeviceState, expectedListening);
+            }
+
+        });
+    }
+
     private void OnMessageReceived(object? sender, ChatMessage message)
     {
         // 使用UI调度器确保线程安全的事件处理
@@ -372,7 +552,7 @@ public partial class HomePageViewModel : ViewModelBase
             if (message.Role == "assistant")
             {
                 TtsText = message.Content;
-                
+
                 // 检查是否包含验证码
                 _ = HandleVerificationCodeAsync(message.Content);
             }
@@ -446,19 +626,22 @@ public partial class HomePageViewModel : ViewModelBase
                 case "seek":
                     MusicPosition = message.Position;
                     break;
-            }        });
+            }
+        });
     }
 
     // 音乐播放服务事件处理
     private void OnMusicPlaybackStateChanged(object? sender, MusicPlaybackEventArgs e)
     {
         _ = _uiDispatcher.InvokeAsync(() =>
-        {            if (e.Track != null)
+        {
+            if (e.Track != null)
             {
                 CurrentSongName = e.Track.Name;
                 CurrentArtist = e.Track.Artist;
                 MusicDuration = e.Track.Duration;
-            }MusicStatus = e.Status switch
+            }
+            MusicStatus = e.Status switch
             {
                 "Playing" => "播放中",
                 "Paused" => "暂停",
@@ -492,7 +675,8 @@ public partial class HomePageViewModel : ViewModelBase
                 AddMessage($"错误详情: {e.Message}", true);
             }
         });
-    }    private void OnMusicLyricUpdated(object? sender, LyricUpdateEventArgs e)
+    }
+    private void OnMusicLyricUpdated(object? sender, LyricUpdateEventArgs e)
     {
         _ = _uiDispatcher.InvokeAsync(() =>
         {
@@ -500,7 +684,7 @@ public partial class HomePageViewModel : ViewModelBase
             {
                 var timeStr = FormatTime(e.Position);
                 CurrentLyric = $"[{timeStr}] {e.LyricText}";
-                
+
                 // 只有当前歌词有意义时才显示在消息中
                 if (!string.IsNullOrWhiteSpace(e.LyricText))
                 {
@@ -508,7 +692,8 @@ public partial class HomePageViewModel : ViewModelBase
                 }
             }
         });
-    }    private void OnMusicProgressUpdated(object? sender, ProgressUpdateEventArgs e)
+    }
+    private void OnMusicProgressUpdated(object? sender, ProgressUpdateEventArgs e)
     {
         _ = _uiDispatcher.InvokeAsync(() =>
         {
@@ -527,12 +712,12 @@ public partial class HomePageViewModel : ViewModelBase
             {
                 statusText += $" - {message.Message}";
             }
-            
+
             SystemStatusText = statusText;
             AddMessage($"📊 {statusText}", false);
         });
     }
-    
+
     private void OnLlmMessageReceived(object? sender, LlmMessage message)
     {
         // 使用UI调度器确保线程安全的事件处理
@@ -579,31 +764,33 @@ public partial class HomePageViewModel : ViewModelBase
     [RelayCommand]
     private async Task ConnectAsync()
     {
-        if (IsConnected || _voiceChatService == null || _isConnecting || _isDisconnecting) 
+        if (IsConnected || _voiceChatService == null || _isConnecting || _isDisconnecting)
         {
-            _logger?.LogWarning("Connect request ignored: Connected={Connected}, Connecting={Connecting}, Disconnecting={Disconnecting}", 
-                IsConnected, _isConnecting, _isDisconnecting);
+            _logger?.LogWarning("Connect request ignored: Connected={Connected}, Service={ServiceNull}, Connecting={Connecting}, Disconnecting={Disconnecting}",
+                IsConnected, _voiceChatService == null, _isConnecting, _isDisconnecting);
             return;
         }
 
         _isConnecting = true;
+
+        // 立即更新按钮状态，禁用连接按钮
+        OnPropertyChanged(nameof(IsConnectButtonEnabled));
+        OnPropertyChanged(nameof(IsDisconnectButtonEnabled));
+
         try
         {
             StatusText = "连接中";
             ConnectionStatusText = "连接中";
 
-            // 创建配置
-            var config = new VerdureConfig
-            {
-                ServerUrl = ServerUrl,
-                UseWebSocket = true,
-                EnableVoice = true,
-                AudioSampleRate = 16000,
-                AudioChannels = 1,
-                AudioFormat = "opus"
-            };
+            // 在连接前清理之前的状态
+            CleanupEventSubscriptions();
 
-            await _voiceChatService.InitializeAsync(config);
+            _logger?.LogInformation("Starting connection to voice chat service with URL: {ServerUrl}", ServerUrl);
+
+            await _voiceChatService.InitializeAsync(_config);
+
+            // 重新绑定事件（因为服务可能被重新初始化）
+            await BindEventsAsync();
 
             // Set up wake word detector coordination
             if (_interruptManager != null)
@@ -618,15 +805,30 @@ public partial class HomePageViewModel : ViewModelBase
 
             if (isConnected)
             {
-                AddMessage("连接成功");
+                AddMessage("✅ 连接成功");
                 _logger?.LogInformation("Successfully connected to voice chat service");
-                
+
+                // 验证连接后的状态一致性
+                var deviceState = _voiceChatService.CurrentState;
+                _logger?.LogInformation("Post-connection verification - Device State: {DeviceState}, IsConnected: {IsConnected}", deviceState, IsConnected);
+
                 // 启动关键词检测（对应py-xiaozhi的关键词唤醒功能）
-                await StartKeywordDetectionAsync();
+                //await StartKeywordDetectionAsync();
+
+                // 连接成功后验证状态机状态
+                if (deviceState != DeviceState.Idle)
+                {
+                    _logger?.LogWarning("Device state is not Idle after connection: {DeviceState}", deviceState);
+                }
+
+                // 确保UI状态正确更新
+                OnPropertyChanged(nameof(IsManualButtonEnabled));
+
+                _logger?.LogInformation("Connection completed successfully, UI states updated");
             }
             else
             {
-                AddMessage("连接失败: 服务未连接", true);
+                AddMessage("❌ 连接失败: 服务未连接", true);
                 StatusText = "连接失败";
                 ConnectionStatusText = "离线";
                 _logger?.LogWarning("Connection failed: Service not connected");
@@ -635,37 +837,62 @@ public partial class HomePageViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to connect to voice chat service");
-            AddMessage($"连接失败: {ex.Message}", true);
+            AddMessage($"❌ 连接失败: {ex.Message}", true);
             UpdateConnectionState(false);
         }
         finally
         {
             _isConnecting = false;
+
+            // 更新按钮状态
+            OnPropertyChanged(nameof(IsConnectButtonEnabled));
+            OnPropertyChanged(nameof(IsDisconnectButtonEnabled));
         }
     }
 
     [RelayCommand]
     private async Task DisconnectAsync()
     {
-        if (!IsConnected || _voiceChatService == null || _isDisconnecting || _isConnecting) 
+        if (!IsConnected || _voiceChatService == null || _isDisconnecting || _isConnecting)
         {
-            _logger?.LogWarning("Disconnect request ignored: Connected={Connected}, Connecting={Connecting}, Disconnecting={Disconnecting}", 
+            _logger?.LogWarning("Disconnect request ignored: Connected={Connected}, Connecting={Connecting}, Disconnecting={Disconnecting}",
                 IsConnected, _isConnecting, _isDisconnecting);
             return;
         }
 
         _isDisconnecting = true;
+
+        // 立即更新按钮状态，禁用断开按钮
+        OnPropertyChanged(nameof(IsConnectButtonEnabled));
+        OnPropertyChanged(nameof(IsDisconnectButtonEnabled));
+
         try
         {
             StatusText = "断开连接中";
             ConnectionStatusText = "断开中";
             _logger?.LogInformation("Starting disconnection process");
-            
-            // 停止当前语音对话
-            if (IsListening)
+
+            // 记录当前设备状态以便调试
+            var currentDeviceState = _voiceChatService.CurrentState;
+            _logger?.LogInformation("Disconnecting from device state: {CurrentState}", currentDeviceState);
+
+            // 停止当前语音对话 - 与状态机协调
+            if (IsListening || _voiceChatService.IsVoiceChatActive)
             {
+                _logger?.LogInformation("Stopping active voice chat before disconnect");
                 await _voiceChatService.StopVoiceChatAsync();
-                _logger?.LogInformation("Voice chat stopped");
+
+                // 等待状态机转换完成
+                await Task.Delay(100);
+                _logger?.LogInformation("Voice chat stopped, current state: {CurrentState}", _voiceChatService.CurrentState);
+            }
+
+            // 如果在自动模式，先停止自动模式
+            if (IsAutoMode)
+            {
+                IsAutoMode = false;
+                _voiceChatService.KeepListening = false;
+                _logger?.LogInformation("Auto mode disabled before disconnect");
             }
 
             // 停止关键词检测
@@ -674,12 +901,17 @@ public partial class HomePageViewModel : ViewModelBase
             // 清理事件订阅
             CleanupEventSubscriptions();
 
+            // 释放语音聊天服务资源
             _voiceChatService.Dispose();
 
-            // 重置所有状态
+            // 重置所有状态 - 确保与状态机逻辑同步
             UpdateConnectionState(false);
 
-            AddMessage("已断开连接");
+            // 验证状态重置是否正确
+            _logger?.LogInformation("Connection state updated - IsConnected: {IsConnected}, IsListening: {IsListening}, IsAutoMode: {IsAutoMode}",
+                IsConnected, IsListening, IsAutoMode);
+
+            AddMessage("🔌 已断开连接，系统已重置为等待连接状态");
             _logger?.LogInformation("Successfully disconnected from voice chat service");
         }
         catch (Exception ex)
@@ -692,6 +924,10 @@ public partial class HomePageViewModel : ViewModelBase
         finally
         {
             _isDisconnecting = false;
+
+            // 更新按钮状态，确保连接按钮重新可用
+            OnPropertyChanged(nameof(IsConnectButtonEnabled));
+            OnPropertyChanged(nameof(IsDisconnectButtonEnabled));
         }
     }
 
@@ -700,7 +936,7 @@ public partial class HomePageViewModel : ViewModelBase
     {
         if (_voiceChatService == null || !IsConnected || IsPushToTalkActive || IsWaitingForResponse)
         {
-            _logger?.LogWarning("Cannot start manual recording: Service={ServiceNull}, Connected={Connected}, PushToTalk={PushToTalk}, Waiting={Waiting}", 
+            _logger?.LogWarning("Cannot start manual recording: Service={ServiceNull}, Connected={Connected}, PushToTalk={PushToTalk}, Waiting={Waiting}",
                 _voiceChatService == null, IsConnected, IsPushToTalkActive, IsWaitingForResponse);
             return;
         }
@@ -731,7 +967,7 @@ public partial class HomePageViewModel : ViewModelBase
     {
         if (_voiceChatService == null || !IsConnected || !IsPushToTalkActive)
         {
-            _logger?.LogWarning("Cannot stop manual recording: Service={ServiceNull}, Connected={Connected}, PushToTalk={PushToTalk}", 
+            _logger?.LogWarning("Cannot stop manual recording: Service={ServiceNull}, Connected={Connected}, PushToTalk={PushToTalk}",
                 _voiceChatService == null, IsConnected, IsPushToTalkActive);
             return;
         }
@@ -806,12 +1042,66 @@ public partial class HomePageViewModel : ViewModelBase
                 AddMessage("已中断当前操作");
                 TtsText = "待命";
                 SetEmotion("neutral");
+
+                // 重置相关UI状态
+                if (IsPushToTalkActive || IsWaitingForResponse)
+                {
+                    IsPushToTalkActive = false;
+                    IsWaitingForResponse = false;
+                    RestoreManualButtonState();
+                }
+
+                // 更新UI可用状态
+                OnPropertyChanged(nameof(IsManualButtonEnabled));
             }
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to abort current operation");
             AddMessage($"中断操作失败: {ex.Message}", true);
+        }
+    }
+
+    /// <summary>
+    /// 重新连接命令 - 断开当前连接并重新连接
+    /// </summary>
+    [RelayCommand]
+    private async Task ReconnectAsync()
+    {
+        if (_isConnecting || _isDisconnecting)
+        {
+            _logger?.LogWarning("Reconnect ignored: already in transition state");
+            return;
+        }
+
+        try
+        {
+            AddMessage("🔄 开始重新连接...", false);
+
+            // 如果当前已连接，先断开
+            if (IsConnected)
+            {
+                await DisconnectCommand.ExecuteAsync(null);
+
+                // 等待断开完成
+                await Task.Delay(1000);
+
+                // 确保按钮状态正确更新
+                OnPropertyChanged(nameof(IsConnectButtonEnabled));
+                OnPropertyChanged(nameof(IsDisconnectButtonEnabled));
+            }
+
+            // 重新连接
+            await ConnectCommand.ExecuteAsync(null);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to reconnect");
+            AddMessage($"❌ 重新连接失败: {ex.Message}", true);
+
+            // 确保按钮状态正确
+            OnPropertyChanged(nameof(IsConnectButtonEnabled));
+            OnPropertyChanged(nameof(IsDisconnectButtonEnabled));
         }
     }
 
@@ -856,7 +1146,8 @@ public partial class HomePageViewModel : ViewModelBase
         if (_voiceChatService == null || !IsConnected) return;
 
         try
-        {            if (_voiceChatService.IsKeywordDetectionEnabled)
+        {
+            if (_voiceChatService.IsKeywordDetectionEnabled)
             {
                 await StopKeywordDetectionAsync();
                 AddMessage("🔇 关键词唤醒已关闭");
@@ -916,7 +1207,8 @@ public partial class HomePageViewModel : ViewModelBase
             _logger?.LogError(ex, "打开登录页面失败");
             AddMessage("❌ 打开登录页面失败", true);
         }
-    }    [RelayCommand]
+    }
+    [RelayCommand]
     private void DismissVerificationCode()
     {
         IsVerificationCodeVisible = false;
@@ -929,14 +1221,14 @@ public partial class HomePageViewModel : ViewModelBase
     [RelayCommand]
     private async Task PlayMusicAsync(string? query = null)
     {
-        if (_musicPlayerService == null) 
+        if (_musicPlayerService == null)
         {
             AddMessage("❌ 音乐播放服务未可用", true);
             return;
         }
 
         try
-        {            
+        {
             if (string.IsNullOrWhiteSpace(query))
             {
                 // 如果没有搜索词，尝试切换播放/暂停状态
@@ -955,12 +1247,12 @@ public partial class HomePageViewModel : ViewModelBase
             _logger?.LogError(ex, "播放音乐失败: {Query}", query);
             AddMessage($"❌ 播放失败: {ex.Message}", true);
         }
-    }    
-    
+    }
+
     [RelayCommand]
     private async Task PauseMusicAsync()
     {
-        if (_musicPlayerService == null) 
+        if (_musicPlayerService == null)
         {
             AddMessage("❌ 音乐播放服务未可用", true);
             return;
@@ -981,7 +1273,7 @@ public partial class HomePageViewModel : ViewModelBase
     [RelayCommand]
     private async Task ResumeMusicAsync()
     {
-        if (_musicPlayerService == null) 
+        if (_musicPlayerService == null)
         {
             AddMessage("❌ 音乐播放服务未可用", true);
             return;
@@ -1002,7 +1294,7 @@ public partial class HomePageViewModel : ViewModelBase
     [RelayCommand]
     private async Task StopMusicAsync()
     {
-        if (_musicPlayerService == null) 
+        if (_musicPlayerService == null)
         {
             AddMessage("❌ 音乐播放服务未可用", true);
             return;
@@ -1023,14 +1315,15 @@ public partial class HomePageViewModel : ViewModelBase
     [RelayCommand]
     private async Task SeekMusicAsync(double position)
     {
-        if (_musicPlayerService == null) 
+        if (_musicPlayerService == null)
         {
             AddMessage("❌ 音乐播放服务未可用", true);
             return;
-        }        try
+        }
+        try
         {
             await _musicPlayerService.SeekAsync(position);
-            
+
             var timeStr = FormatTime(position);
             AddMessage($"⏭️ 跳转到: {timeStr}");
         }
@@ -1044,7 +1337,7 @@ public partial class HomePageViewModel : ViewModelBase
     [RelayCommand]
     private async Task SetMusicVolumeAsync(double volume)
     {
-        if (_musicPlayerService == null) 
+        if (_musicPlayerService == null)
         {
             AddMessage("❌ 音乐播放服务未可用", true);
             return;
@@ -1069,27 +1362,93 @@ public partial class HomePageViewModel : ViewModelBase
     #region 辅助方法    
     private void UpdateConnectionState(bool connected)
     {
+        var previousState = IsConnected;
         IsConnected = connected;
         ConnectionStatusText = connected ? "在线" : "离线";
         StatusText = connected ? "已连接" : "未连接";
-        
-        // 确保在断开连接时重置所有相关状态
+
+        _logger?.LogInformation("Connection state transition: {PreviousState} -> {CurrentState}", previousState, connected);
+
+        // 确保在断开连接时重置所有相关状态，与状态机逻辑保持同步
         if (!connected)
         {
+            // 重置所有语音相关状态
+            var wasListening = IsListening;
+            var wasInAutoMode = IsAutoMode;
+            var wasWaitingForResponse = IsWaitingForResponse;
+            var wasPushToTalkActive = IsPushToTalkActive;
+
             IsListening = false;
             IsPushToTalkActive = false;
             IsWaitingForResponse = false;
             IsAutoMode = false;
             ShowMicrophoneVisualizer = false;
-            
-            // 重置按钮状态
+
+            // 重置按钮状态 - 确保UI能重新使用
             RestoreManualButtonState();
             AutoButtonText = "开始对话";
             ModeToggleText = "手动";
-            
-            // 重置情感状态
+            ManualButtonText = "按住说话";
+
+            // 重置音乐和媒体状态
+            CurrentSongName = string.Empty;
+            CurrentArtist = string.Empty;
+            CurrentLyric = string.Empty;
+            MusicStatus = "停止";
+            MusicPosition = 0.0;
+            MusicDuration = 0.0;
+
+            // 重置情感和系统状态
             SetEmotion("neutral");
             TtsText = "待命";
+            SystemStatusText = string.Empty;
+            IotStatusText = string.Empty;
+
+            // 重置验证码相关状态
+            IsVerificationCodeVisible = false;
+            VerificationCode = string.Empty;
+            VerificationCodeMessage = string.Empty;
+
+            // 记录状态重置详情
+            if (wasListening || wasInAutoMode || wasWaitingForResponse || wasPushToTalkActive)
+            {
+                _logger?.LogInformation("Reset UI states on disconnect - Listening: {WasListening} -> false, AutoMode: {WasAutoMode} -> false, WaitingForResponse: {WasWaitingForResponse} -> false, PushToTalk: {WasPushToTalkActive} -> false",
+                    wasListening, wasInAutoMode, wasWaitingForResponse, wasPushToTalkActive);
+            }
+
+            // 确保服务端状态也被重置
+            if (_voiceChatService != null)
+            {
+                try
+                {
+                    _voiceChatService.KeepListening = false;
+                    _logger?.LogDebug("VoiceChatService KeepListening reset to false");
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Failed to reset VoiceChatService KeepListening state");
+                }
+            }
+
+            // 更新所有按钮状态，确保连接按钮重新可用，断开按钮不可用
+            OnPropertyChanged(nameof(IsManualButtonEnabled));
+            OnPropertyChanged(nameof(IsConnectButtonEnabled));
+            OnPropertyChanged(nameof(IsDisconnectButtonEnabled));
+
+            // 添加断开连接后的状态说明消息
+            AddMessage("🔌 连接已断开，所有状态已重置，可以重新连接", false);
+        }
+        else
+        {
+            _logger?.LogInformation("Connected to voice chat service successfully");
+
+            // 连接成功后，更新所有按钮状态：连接按钮不可用，断开按钮可用，手动按钮可用
+            OnPropertyChanged(nameof(IsManualButtonEnabled));
+            OnPropertyChanged(nameof(IsConnectButtonEnabled));
+            OnPropertyChanged(nameof(IsDisconnectButtonEnabled));
+
+            // 添加连接成功的状态说明
+            AddMessage("✅ 连接成功，语音助手已就绪", false);
         }
     }
 
@@ -1124,8 +1483,8 @@ public partial class HomePageViewModel : ViewModelBase
             AddMessage($"关键词唤醒启动错误: {ex.Message}", true);
         }
     }    /// <summary>
-    /// 停止关键词检测
-    /// </summary>
+         /// 停止关键词检测
+         /// </summary>
     private async Task StopKeywordDetectionAsync()
     {
         if (_voiceChatService == null) return;
@@ -1187,8 +1546,8 @@ public partial class HomePageViewModel : ViewModelBase
     private void UpdateVolumeText(double value)
     {
         VolumeText = $"{(int)value}%";
-    }    
-    
+    }
+
     private void SetEmotion(string emotionName)
     {
         try
@@ -1216,16 +1575,16 @@ public partial class HomePageViewModel : ViewModelBase
             {
                 // 首先尝试获取GIF动画路径
                 var gifPath = await _emotionManager.GetEmotionImageAsync(emotionName);
-                
+
                 if (!string.IsNullOrEmpty(gifPath))
                 {
                     // 有GIF动画可用，通知View切换到动画显示
-                    EmotionGifPathChanged?.Invoke(this, new EmotionGifPathEventArgs 
-                    { 
+                    EmotionGifPathChanged?.Invoke(this, new EmotionGifPathEventArgs
+                    {
                         GifPath = gifPath,
                         EmotionName = emotionName
                     });
-                    
+
                     _logger?.LogDebug($"Updated emotion to GIF: {emotionName} -> {gifPath}");
                 }
                 else
@@ -1234,14 +1593,14 @@ public partial class HomePageViewModel : ViewModelBase
                     var emoji = _emotionManager.GetEmotionEmoji(emotionName);
                     CurrentEmotion = emoji;
                     DefaultEmotionText = emoji;
-                    
+
                     // 通知View切换回文本显示
-                    EmotionGifPathChanged?.Invoke(this, new EmotionGifPathEventArgs 
-                    { 
+                    EmotionGifPathChanged?.Invoke(this, new EmotionGifPathEventArgs
+                    {
                         GifPath = null,
                         EmotionName = emotionName
                     });
-                    
+
                     _logger?.LogDebug($"Updated emotion to emoji: {emotionName} -> {emoji}");
                 }
             }
@@ -1249,7 +1608,7 @@ public partial class HomePageViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to update emotion display: {EmotionName}", emotionName);
-            
+
             // 出错时回退到简单表情符号
             CurrentEmotion = ConvertEmotionToEmoji(emotionName);
             DefaultEmotionText = CurrentEmotion;
@@ -1280,8 +1639,9 @@ public partial class HomePageViewModel : ViewModelBase
         ManualButtonText = "处理中...";
         ManualButtonStateChanged?.Invoke(this, new ManualButtonStateEventArgs
         {
-            State = ManualButtonState.Processing        
-        });    }
+            State = ManualButtonState.Processing
+        });
+    }
 
     /// <summary>
     /// 处理从配置服务接收到的验证码事件
@@ -1388,25 +1748,49 @@ public partial class HomePageViewModel : ViewModelBase
             _logger?.LogError(ex, "处理验证码时发生错误");
             AddMessage("❌ 处理验证码时发生错误", true);
         }
-    }    
-    
+    }
+
     private void CleanupEventSubscriptions()
     {
         if (_voiceChatService != null)
         {
+            // 清理状态机事件订阅
+            if (_voiceChatService.StateMachine != null)
+            {
+                _voiceChatService.StateMachine.StateChanged -= OnStateMachineStateChanged;
+                _logger?.LogInformation("状态机事件订阅已清理");
+            }
+
+            // 清理服务层事件订阅
             _voiceChatService.MessageReceived -= OnMessageReceived;
             _voiceChatService.VoiceChatStateChanged -= OnVoiceChatStateChanged;
             _voiceChatService.ErrorOccurred -= OnErrorOccurred;
-            _voiceChatService.DeviceStateChanged -= OnDeviceStateChanged;
             _voiceChatService.MusicMessageReceived -= OnMusicMessageReceived;
             _voiceChatService.SystemStatusMessageReceived -= OnSystemStatusMessageReceived;
             _voiceChatService.LlmMessageReceived -= OnLlmMessageReceived;
             _voiceChatService.TtsStateChanged -= OnTtsStateChanged;
+
+            _logger?.LogInformation("Voice chat service event subscriptions cleaned up");
         }
 
         if (_interruptManager != null)
         {
             _interruptManager.InterruptTriggered -= OnInterruptTriggered;
+            _logger?.LogInformation("Interrupt manager event subscriptions cleaned up");
+        }
+
+        if (_musicPlayerService != null)
+        {
+            _musicPlayerService.PlaybackStateChanged -= OnMusicPlaybackStateChanged;
+            _musicPlayerService.LyricUpdated -= OnMusicLyricUpdated;
+            _musicPlayerService.ProgressUpdated -= OnMusicProgressUpdated;
+            _logger?.LogInformation("Music player service event subscriptions cleaned up");
+        }
+
+        if (_configurationService != null)
+        {
+            _configurationService.VerificationCodeReceived -= OnConfigurationVerificationCodeReceived;
+            _logger?.LogInformation("Configuration service event subscriptions cleaned up");
         }
     }
 
@@ -1487,6 +1871,57 @@ public partial class HomePageViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// 切换关键词模型
+    /// </summary>
+    /// <param name="modelFileName">模型文件名</param>
+    /// <returns>切换是否成功</returns>
+    public async Task<bool> SwitchKeywordModelAsync(string modelFileName)
+    {
+        if (_voiceChatService == null)
+        {
+            _logger?.LogWarning("VoiceChatService is null, cannot switch keyword model");
+            return false;
+        }
+
+        _logger?.LogInformation("Switching keyword model to: {ModelFileName}", modelFileName);
+        
+        var result = await _voiceChatService.SwitchKeywordModelAsync(modelFileName);
+        
+        if (result)
+        {
+            // 更新配置中的当前模型
+            _config.KeywordModels.CurrentModel = modelFileName;
+            AddMessage($"[系统] 已切换关键词模型为: {modelFileName}", false);
+            _logger?.LogInformation("Keyword model switched successfully");
+        }
+        else
+        {
+            AddMessage($"[系统] 切换关键词模型失败: {modelFileName}", false);
+            _logger?.LogError("Failed to switch keyword model");
+        }
+        
+        return result;
+    }
+
+    /// <summary>
+    /// 获取可用的关键词模型列表
+    /// </summary>
+    /// <returns>模型文件名列表</returns>
+    public string[] GetAvailableKeywordModels()
+    {
+        return _config.KeywordModels.AvailableModels;
+    }
+
+    /// <summary>
+    /// 获取当前使用的关键词模型
+    /// </summary>
+    /// <returns>当前模型文件名</returns>
+    public string GetCurrentKeywordModel()
+    {
+        return _config.KeywordModels.CurrentModel;
+    }
+
     partial void OnVolumeValueChanged(double value)
     {
         UpdateVolumeText(value);
@@ -1507,8 +1942,8 @@ public partial class HomePageViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsManualButtonEnabled));
     }
 
-    #endregion    
-    
+    #endregion
+
     #region 事件
 
     public event EventHandler<InterruptEventArgs>? InterruptTriggered;

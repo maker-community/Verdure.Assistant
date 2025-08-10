@@ -17,6 +17,13 @@ class Program
 
     static async Task Main(string[] args)
     {
+        // 检查是否有测试音乐播放器的参数
+        if (args.Length > 0 && args[0] == "--test-music")
+        {
+            await TestMusic.MusicPlayerTest.TestMusicPlayback();
+            return;
+        }
+
         // 创建主机
         var host = CreateHostBuilder(args).Build();       
         
@@ -120,7 +127,9 @@ class Program
                 });
                 services.AddSingleton<McpIntegrationService>();
 
-            });static VerdureConfig LoadConfiguration()
+            });
+
+    static VerdureConfig LoadConfiguration()
     {
         var configuration = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
@@ -130,6 +139,13 @@ class Program
 
         var config = new VerdureConfig();
         configuration.Bind(config);
+        
+        // 为Console项目设置关键词模型配置
+        if (string.IsNullOrEmpty(config.KeywordModels.ModelsPath))
+        {
+            // Console项目的模型文件在 ModelFiles 目录
+            config.KeywordModels.ModelsPath = "ModelFiles";
+        }
         
         return config;
     }    
