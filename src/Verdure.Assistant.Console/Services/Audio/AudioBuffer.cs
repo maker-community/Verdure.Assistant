@@ -16,7 +16,7 @@ namespace Verdure.Assistant.Console.Services.Audio
         private bool _disposed;
         private bool _isEndOfStream;
 
-        public AudioBuffer(int maxBufferCount = 50) // 减少默认缓冲区大小
+        public AudioBuffer(int maxBufferCount = 30) // 减少默认缓冲区大小降低延迟
         {
             _bufferQueue = new ConcurrentQueue<float[]>();
             _bufferSemaphore = new SemaphoreSlim(0, maxBufferCount);

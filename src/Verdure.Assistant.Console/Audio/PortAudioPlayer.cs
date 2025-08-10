@@ -52,21 +52,24 @@ namespace Verdure.Assistant.Console.Audio
                             throw new InvalidOperationException("未找到音频输出设备");
                         }
 
-                        // 配置音频流参数
+                        // 配置音频流参数 - 匹配Core项目的配置
                         var outputParameters = new StreamParameters
                         {
                             device = defaultOutputDevice,
                             channelCount = _channels,
-                            sampleFormat = SampleFormat.Float32,
+                            sampleFormat = SampleFormat.Int16, // 改为Int16匹配Core项目
                             suggestedLatency = PortAudio.GetDeviceInfo(defaultOutputDevice).defaultLowOutputLatency
                         };
+
+                        // 计算正确的帧大小 - 匹配Core项目的60ms帧
+                        int frameSize = sampleRate * 60 / 1000; // 60ms帧，匹配Core项目
 
                         // 创建输出流
                         _stream = new PortAudioSharp.Stream(
                             null,
                             outputParameters,
                             sampleRate,
-                            1024, // 帧大小
+                            (uint)frameSize, // 使用计算出的帧大小
                             StreamFlags.ClipOff,
                             AudioCallback,
                             IntPtr.Zero);
@@ -128,63 +131,66 @@ namespace Verdure.Assistant.Console.Audio
             {
                 if (_audioBuffer == null || output == IntPtr.Zero)
                 {
-                    // 填充静音
-                    var silenceBytes = new byte[frameCount * _channels * sizeof(float)];
+                    // 填充静音 - 使用Int16格式
+                    var silenceBytes = new byte[frameCount * _channels * sizeof(short)];
                     System.Runtime.InteropServices.Marshal.Copy(silenceBytes, 0, output, silenceBytes.Length);
                     return StreamCallbackResult.Continue;
                 }
 
                 var samplesNeeded = (int)frameCount * _channels;
-                var outputBuffer = new float[samplesNeeded];
+                var outputBuffer = new short[samplesNeeded]; // 改为short数组
                 var currentSample = 0;
 
                 // 尝试从缓冲区获取足够的音频数据
                 var attempts = 0;
-                const int maxAttempts = 5; // 限制尝试次数，避免卡顿
+                const int maxAttempts = 10; // 增加尝试次数
 
                 while (currentSample < samplesNeeded && attempts < maxAttempts)
                 {
-                    var audioData = _audioBuffer.TryDequeue(1); // 1ms 超时，快速响应
+                    var audioData = _audioBuffer.TryDequeue(50); // 增加超时时间
                     if (audioData == null)
                     {
                         attempts++;
                         continue;
                     }
 
-                    // 复制可用的样本
+                    // 转换float到short并复制样本
                     var samplesToCopy = Math.Min(audioData.Length, samplesNeeded - currentSample);
-                    Array.Copy(audioData, 0, outputBuffer, currentSample, samplesToCopy);
+                    for (int i = 0; i < samplesToCopy; i++)
+                    {
+                        // 转换float [-1.0, 1.0] 到 short [-32768, 32767]
+                        var floatSample = Math.Max(-1.0f, Math.Min(1.0f, audioData[i]));
+                        outputBuffer[currentSample + i] = (short)(floatSample * 32767);
+                    }
                     currentSample += samplesToCopy;
                     
-                    // 如果这个音频块还有剩余数据，放回缓冲区
+                    // 如果这个音频块还有剩余数据，重新计算剩余数据的起始位置
+                    // 不要放回缓冲区，直接丢弃以避免重复播放导致的回音
                     if (samplesToCopy < audioData.Length)
                     {
-                        var remaining = new float[audioData.Length - samplesToCopy];
-                        Array.Copy(audioData, samplesToCopy, remaining, 0, remaining.Length);
-                        _audioBuffer.TryEnqueue(remaining); // 放回剩余数据
+                        _logger?.LogDebug("丢弃了 {Count} 个多余的音频样本", audioData.Length - samplesToCopy);
                     }
                 }
 
                 // 如果数据不足，填充剩余部分为静音
                 for (int i = currentSample; i < samplesNeeded; i++)
                 {
-                    outputBuffer[i] = 0.0f;
+                    outputBuffer[i] = 0;
                 }
 
                 // 将数据复制到输出缓冲区
                 System.Runtime.InteropServices.Marshal.Copy(outputBuffer, 0, output, outputBuffer.Length);
 
-                // 如果获取到了足够数据，继续播放
-                return currentSample >= samplesNeeded / 2 ? StreamCallbackResult.Continue : StreamCallbackResult.Continue;
+                return StreamCallbackResult.Continue;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "PortAudio 回调错误");
+                _logger?.LogError(ex, "PortAudio 回调错误");
                 
-                // 发生错误时填充静音，避免杂音
+                // 发生错误时填充静音以避免杂音
                 try
                 {
-                    var silenceBytes = new byte[frameCount * _channels * sizeof(float)];
+                    var silenceBytes = new byte[frameCount * _channels * sizeof(short)];
                     System.Runtime.InteropServices.Marshal.Copy(silenceBytes, 0, output, silenceBytes.Length);
                 }
                 catch { }

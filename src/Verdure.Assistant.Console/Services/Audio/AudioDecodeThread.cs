@@ -75,16 +75,16 @@ namespace Verdure.Assistant.Console.Services.Audio
         {
             try
             {
-                var bufferSize = 4096; // 每次读取的采样数
+                var bufferSize = 2304; // 匹配NLayer的最大输出大小：up to 2,304 elements
                 var audioData = new float[bufferSize];
                 var totalSamples = 0;
 
                 while (!_cancellationTokenSource!.Token.IsCancellationRequested)
                 {
                     // 检查缓冲区是否过满，如果是则等待消费
-                    if (_buffer.Count > 50) // 限制缓冲区深度
+                    if (_buffer.Count > 30) // 降低缓冲区深度，减少延迟
                     {
-                        Thread.Sleep(10); // 等待消费者消费数据
+                        Thread.Sleep(5); // 等待消费者消费数据
                         continue;
                     }
 
@@ -109,7 +109,7 @@ namespace Verdure.Assistant.Console.Services.Audio
                         else
                         {
                             // 缓冲区满，稍微等待
-                            Thread.Sleep(5);
+                            Thread.Sleep(2);
                         }
                     }
                     else
@@ -120,7 +120,7 @@ namespace Verdure.Assistant.Console.Services.Audio
                     }
 
                     // 动态休眠：缓冲区少时快速解码，多时慢速解码
-                    var sleepTime = _buffer.Count > 20 ? 5 : 1;
+                    var sleepTime = _buffer.Count > 15 ? 3 : 1;
                     Thread.Sleep(sleepTime);
                 }
             }
