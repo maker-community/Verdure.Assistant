@@ -17,6 +17,13 @@ class Program
 
     static async Task Main(string[] args)
     {
+        // 检查是否有测试音乐播放器的参数
+        if (args.Length > 0 && args[0] == "--test-music")
+        {
+            await TestMusic.MusicPlayerTest.TestMusicPlayback();
+            return;
+        }
+
         // 创建主机
         var host = CreateHostBuilder(args).Build();       
         

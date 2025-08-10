@@ -22,6 +22,8 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.8" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.8" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.8" />
+    <PackageReference Include="NLayer" Version="1.16.0" />
+    <PackageReference Include="PortAudioSharp2" Version="1.0.4" />
   </ItemGroup>
 
 </Project>
