@@ -72,13 +72,27 @@ public sealed class PortAudioManager : IDisposable
                 {
                     try
                     {
-                        PortAudio.Terminate();
-                        _isInitialized = false;
-                        Console.WriteLine("PortAudio 已终止");
+                        Console.WriteLine("正在终止 PortAudio...");
+                        
+                        // 使用超时机制避免在某些平台上 PortAudio.Terminate() 卡死
+                        var terminateTask = Task.Run(() => PortAudio.Terminate());
+                        var completed = terminateTask.Wait(3000); // 3秒超时
+                        
+                        if (completed)
+                        {
+                            _isInitialized = false;
+                            Console.WriteLine("PortAudio 已终止");
+                        }
+                        else
+                        {
+                            Console.WriteLine("PortAudio 终止超时，强制设置状态");
+                            _isInitialized = false; // 强制设置状态，避免资源泄漏
+                        }
                     }
                     catch (Exception ex)
                     {
                         Console.WriteLine($"PortAudio 终止时出现警告: {ex.Message}");
+                        _isInitialized = false; // 即使出错也要重置状态
                     }
                 }
             }

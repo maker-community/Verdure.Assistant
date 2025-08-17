@@ -100,9 +100,23 @@ namespace Verdure.Assistant.Console.Audio
 
                     try
                     {
-                        _stream.Stop();
-                        _stream.Close();
-                        _stream.Dispose();
+                        _logger.LogDebug("正在停止 PortAudio 流...");
+                        
+                        // 使用超时机制避免在某些平台上卡死
+                        var stopTask = Task.Run(() =>
+                        {
+                            _stream.Stop();
+                            _stream.Close();
+                            _stream.Dispose();
+                        });
+                        
+                        var completed = stopTask.Wait(5000); // 5秒超时
+                        
+                        if (!completed)
+                        {
+                            _logger.LogWarning("停止 PortAudio 流超时");
+                        }
+                        
                         _stream = null;
                         _isPlaying = false;
 
@@ -114,6 +128,17 @@ namespace Verdure.Assistant.Console.Audio
                     catch (Exception ex)
                     {
                         _logger.LogWarning(ex, "停止 PortAudio 流时出现警告");
+                        // 确保即使出错也要重置状态
+                        _stream = null;
+                        _isPlaying = false;
+                        try
+                        {
+                            PortAudioManager.Instance.ReleaseReference();
+                        }
+                        catch (Exception releaseEx)
+                        {
+                            _logger.LogWarning(releaseEx, "释放 PortAudio 引用时出错");
+                        }
                     }
                 }
             });

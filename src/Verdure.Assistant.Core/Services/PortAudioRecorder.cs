@@ -86,9 +86,28 @@ public class PortAudioRecorder : IAudioRecorder, IDisposable
             {
                 try
                 {
-                    _inputStream.Stop();
-                    _inputStream.Close();
-                    _inputStream.Dispose();
+                    Console.WriteLine("正在停止音频流...");
+                    
+                    // 使用超时机制避免在某些平台上卡死
+                    var stopTask = Task.Run(() =>
+                    {
+                        _inputStream.Stop();
+                        _inputStream.Close();
+                        _inputStream.Dispose();
+                    });
+                    
+                    var timeoutTask = Task.Delay(5000); // 5秒超时
+                    var completedTask = await Task.WhenAny(stopTask, timeoutTask);
+                    
+                    if (completedTask == timeoutTask)
+                    {
+                        Console.WriteLine("停止音频流超时，强制释放资源");
+                    }
+                    else
+                    {
+                        await stopTask; // 等待正常完成
+                        Console.WriteLine("音频流正常停止");
+                    }
                 }
                 catch (Exception ex)
                 {

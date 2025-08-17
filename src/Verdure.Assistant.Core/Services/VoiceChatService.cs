@@ -147,10 +147,12 @@ public class VoiceChatService : IVoiceChatService
                     await StopListeningInternalAsync();
                 },
 
-            OnEnterSpeaking = () =>
+            OnEnterSpeaking = async () =>
                 {
-                    // 进入说话状态 - 同步处理
-                    return Task.CompletedTask;
+                    // 进入说话状态 - 保持录音以检测用户打断
+                    // 不需要停止录音，继续监听用户的打断
+                    _logger?.LogDebug("进入说话状态，保持录音以检测打断");
+                    await Task.CompletedTask;
                 },
 
             OnExitSpeaking = async () =>
@@ -526,12 +528,29 @@ public class VoiceChatService : IVoiceChatService
                 // Determine listening mode based on KeepListening setting
                 var mode = KeepListening ? ListeningMode.AutoStop : ListeningMode.Manual;
                 await wsClient.SendStartListenAsync(mode);
+                _logger?.LogDebug("已发送开始监听消息，模式: {Mode}", mode);
                 _logger?.LogDebug("Sent start listen message with mode: {Mode}", mode);
             }
 
             if (_config?.EnableVoice == true && _audioStreamManager != null)
             {
-                await _audioStreamManager.StartRecordingAsync(_config.AudioSampleRate, _config.AudioChannels);
+                // 检查当前录音状态
+                var wasRecording = _audioStreamManager.IsRecording;
+                _logger?.LogDebug("当前录音状态: {IsRecording}", wasRecording);
+                
+                if (!wasRecording)
+                {
+                    _logger?.LogDebug("启动音频录制...");
+                    await _audioStreamManager.StartRecordingAsync(_config.AudioSampleRate, _config.AudioChannels);
+                    _logger?.LogDebug("音频录制已启动");
+                }
+                else
+                {
+                    _logger?.LogDebug("音频录制已在运行，无需重新启动");
+                    // 即使已经在录音，也要确保参数正确
+                    await _audioStreamManager.StartRecordingAsync(_config.AudioSampleRate, _config.AudioChannels);
+                }
+                
                 _isVoiceChatActive = true;
                 VoiceChatStateChanged?.Invoke(this, true);
                 _logger?.LogInformation("Started listening");
@@ -557,12 +576,37 @@ public class VoiceChatService : IVoiceChatService
             if (_communicationClient is WebSocketClient wsClient)
             {
                 await wsClient.SendStopListenAsync();
+                _logger?.LogDebug("已发送停止监听消息");
                 _logger?.LogDebug("Sent stop listen message");
             }
 
             if (_audioStreamManager != null)
             {
-                await _audioStreamManager.StopRecordingAsync();
+                // 只有在确实正在录音时才尝试停止
+                if (_audioStreamManager.IsRecording)
+                {
+                    _logger?.LogDebug("Stop Recording");
+                    
+                    // 添加超时保护，避免在树莓派等平台上卡死
+                    var stopTask = _audioStreamManager.StopRecordingAsync();
+                    var timeoutTask = Task.Delay(10000); // 10秒超时
+                    
+                    var completedTask = await Task.WhenAny(stopTask, timeoutTask);
+                    
+                    if (completedTask == timeoutTask)
+                    {
+                        _logger?.LogWarning("停止音频录制超时，可能存在平台兼容性问题");
+                    }
+                    else
+                    {
+                        await stopTask; // 等待正常完成
+                        _logger?.LogDebug("Stop Record ok");
+                    }
+                }
+                else
+                {
+                    _logger?.LogDebug("音频录制未运行，跳过停止操作");
+                }
             }
 
             _isVoiceChatActive = false;
@@ -573,6 +617,11 @@ public class VoiceChatService : IVoiceChatService
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to stop listening");
+            
+            // 确保即使出错也要重置状态
+            _isVoiceChatActive = false;
+            VoiceChatStateChanged?.Invoke(this, false);
+            
             ErrorOccurred?.Invoke(this, $"Failed to stop listening: {ex.Message}");
         }
     }
