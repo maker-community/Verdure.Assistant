@@ -25,5 +25,10 @@
     <PackageReference Include="NLayer" Version="1.16.0" />
     <PackageReference Include="PortAudioSharp2" Version="1.0.4" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 
 </Project>
