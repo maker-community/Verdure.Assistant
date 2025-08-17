@@ -98,6 +98,10 @@ namespace Verdure.Assistant.Console.Audio
                     if (!_isPlaying || _stream == null)
                         return;
 
+                    var streamToDispose = _stream; // 保存引用
+                    _stream = null; // 立即清空引用，避免重复调用
+                    _isPlaying = false;
+
                     try
                     {
                         _logger.LogDebug("正在停止 PortAudio 流...");
@@ -105,20 +109,26 @@ namespace Verdure.Assistant.Console.Audio
                         // 使用超时机制避免在某些平台上卡死
                         var stopTask = Task.Run(() =>
                         {
-                            _stream.Stop();
-                            _stream.Close();
-                            _stream.Dispose();
+                            streamToDispose.Stop();
+                            streamToDispose.Close();
+                            streamToDispose.Dispose();
                         });
                         
                         var completed = stopTask.Wait(5000); // 5秒超时
                         
                         if (!completed)
                         {
-                            _logger.LogWarning("停止 PortAudio 流超时");
+                            _logger.LogWarning("停止 PortAudio 流超时，抑制终结器");
+                            // 超时情况下，抑制终结器避免 GC 时出错
+                            try
+                            {
+                                GC.SuppressFinalize(streamToDispose);
+                            }
+                            catch (Exception suppressEx)
+                            {
+                                _logger.LogWarning(suppressEx, "抑制终结器时出错");
+                            }
                         }
-                        
-                        _stream = null;
-                        _isPlaying = false;
 
                         // 释放 PortAudio 引用
                         PortAudioManager.Instance.ReleaseReference();
@@ -128,9 +138,8 @@ namespace Verdure.Assistant.Console.Audio
                     catch (Exception ex)
                     {
                         _logger.LogWarning(ex, "停止 PortAudio 流时出现警告");
-                        // 确保即使出错也要重置状态
-                        _stream = null;
-                        _isPlaying = false;
+                        
+                        // 确保即使出错也要释放 PortAudio 引用
                         try
                         {
                             PortAudioManager.Instance.ReleaseReference();
@@ -237,7 +246,50 @@ namespace Verdure.Assistant.Console.Audio
 
         public void Dispose()
         {
-            StopAsync().Wait();
+            try
+            {
+                StopAsync().Wait(10000); // 10秒超时
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Dispose 时停止 PortAudio 流出现警告");
+                // 即使停止失败，也要尝试清理资源
+                lock (_lock)
+                {
+                    if (_stream != null)
+                    {
+                        try
+                        {
+                            // 尝试强制释放
+                            _stream.Dispose();
+                        }
+                        catch (Exception disposeEx)
+                        {
+                            _logger?.LogWarning(disposeEx, "强制释放 Stream 时出现警告");
+                        }
+                        finally
+                        {
+                            _stream = null;
+                            _isPlaying = false;
+                        }
+                    }
+                    
+                    // 确保释放 PortAudio 引用
+                    try
+                    {
+                        PortAudioManager.Instance.ReleaseReference();
+                    }
+                    catch (Exception releaseEx)
+                    {
+                        _logger?.LogWarning(releaseEx, "Dispose 时释放 PortAudio 引用出现警告");
+                    }
+                }
+            }
+            finally
+            {
+                // 抑制终结器调用，避免双重释放
+                GC.SuppressFinalize(this);
+            }
         }
     }
 }

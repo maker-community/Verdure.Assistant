@@ -196,6 +196,15 @@ public class AudioStreamManager : IAudioRecorder, IDisposable
                     if (!completed)
                     {
                         _logger?.LogWarning("清理音频流超时，强制释放引用");
+                        // 超时情况下，抑制终结器避免 GC 时出错
+                        try
+                        {
+                            GC.SuppressFinalize(_sharedInputStream);
+                        }
+                        catch (Exception suppressEx)
+                        {
+                            _logger?.LogWarning(suppressEx, "抑制终结器时出错");
+                        }
                     }
                     else
                     {

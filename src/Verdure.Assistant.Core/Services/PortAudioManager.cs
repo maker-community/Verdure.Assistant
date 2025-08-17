@@ -150,6 +150,8 @@ public sealed class PortAudioManager : IDisposable
             {
                 _isDisposed = true;
                 _referenceCount = 0;
+                // 抑制终结器调用
+                GC.SuppressFinalize(this);
             }
         }
     }

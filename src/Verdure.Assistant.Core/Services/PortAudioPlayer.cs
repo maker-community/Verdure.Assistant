@@ -293,6 +293,43 @@ public class PortAudioPlayer : IAudioPlayer
         catch (Exception ex)
         {
             _logger?.LogWarning(ex, "释放音频播放器资源时出现警告");
+            
+            // 即使停止失败，也要尝试清理资源
+            lock (_lock)
+            {
+                if (_outputStream != null)
+                {
+                    try
+                    {
+                        // 尝试强制释放
+                        _outputStream.Dispose();
+                    }
+                    catch (Exception disposeEx)
+                    {
+                        _logger?.LogWarning(disposeEx, "强制释放 Stream 时出现警告");
+                    }
+                    finally
+                    {
+                        _outputStream = null;
+                        _isPlaying = false;
+                    }
+                }
+                
+                // 确保释放 PortAudio 引用
+                try
+                {
+                    PortAudioManager.Instance.ReleaseReference();
+                }
+                catch (Exception releaseEx)
+                {
+                    _logger?.LogWarning(releaseEx, "Dispose 时释放 PortAudio 引用出现警告");
+                }
+            }
+        }
+        finally
+        {
+            // 抑制终结器调用，避免双重释放
+            GC.SuppressFinalize(this);
         }
     }
 }

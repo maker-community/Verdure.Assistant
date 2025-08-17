@@ -227,6 +227,43 @@ public class PortAudioRecorder : IAudioRecorder, IDisposable
         catch (Exception ex)
         {
             Console.WriteLine($"释放音频录制器资源时出现警告: {ex.Message}");
+            
+            // 即使停止失败，也要尝试清理资源
+            lock (_lock)
+            {
+                if (_inputStream != null)
+                {
+                    try
+                    {
+                        // 尝试强制释放
+                        _inputStream.Dispose();
+                    }
+                    catch (Exception disposeEx)
+                    {
+                        Console.WriteLine($"强制释放 Stream 时出现警告: {disposeEx.Message}");
+                    }
+                    finally
+                    {
+                        _inputStream = null;
+                        _isRecording = false;
+                    }
+                }
+                
+                // 确保释放 PortAudio 引用
+                try
+                {
+                    PortAudioManager.Instance.ReleaseReference();
+                }
+                catch (Exception releaseEx)
+                {
+                    Console.WriteLine($"Dispose 时释放 PortAudio 引用出现警告: {releaseEx.Message}");
+                }
+            }
+        }
+        finally
+        {
+            // 抑制终结器调用，避免双重释放
+            GC.SuppressFinalize(this);
         }
     }
 }
