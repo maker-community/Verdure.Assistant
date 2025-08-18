@@ -18,6 +18,7 @@ public class AudioStreamManager : IAudioRecorder, IDisposable
     private readonly List<EventHandler<byte[]>> _dataSubscribers = new();
     private bool _isRecording = false;
     private bool _isDisposed = false;
+    private bool _isCleaningUp = false; // 添加清理状态标志
     private int _sampleRate = 16000;
     private int _channels = 1;
     private readonly ILogger<AudioStreamManager>? _logger;
@@ -170,71 +171,150 @@ public class AudioStreamManager : IAudioRecorder, IDisposable
 
     /// <summary>
     /// 内部清理流资源的方法（在锁内调用）
+    /// 优化版本：增强异常处理、防止重复清理、状态检查
     /// </summary>
     private void CleanupStreamInternal()
     {
+        // 防止重复清理
+        if (_isCleaningUp)
+        {
+            _logger?.LogDebug("清理操作正在进行中，跳过重复调用");
+            return;
+        }
+
         try
         {
+            _isCleaningUp = true; // 设置清理标志
             _isRecording = false;
 
             if (_sharedInputStream != null)
             {
+                var streamToCleanup = _sharedInputStream;
+                _sharedInputStream = null; // 立即置空以防止重复清理
+
                 try
                 {
-                    _logger?.LogDebug("清理现有音频流...");
+                    _logger?.LogDebug("开始清理音频流...");
                     
-                    // 使用超时机制清理
-                    var cleanupTask = Task.Run(() =>
+                    // 检查流状态，只有在运行状态下才需要停止
+                    bool needsStop = false;
+                    try
                     {
-                        _sharedInputStream.Stop();
-                        _sharedInputStream.Close();
-                        _sharedInputStream.Dispose();
-                    });
-                    
-                    var completed = cleanupTask.Wait(3000); // 3秒超时
-                    
-                    if (!completed)
+                        // 使用 IsActive 属性检查流状态
+                        needsStop = streamToCleanup.IsActive;
+                    }
+                    catch (Exception checkEx)
                     {
-                        _logger?.LogWarning("清理音频流超时，强制释放引用");
-                        // 超时情况下，抑制终结器避免 GC 时出错
-                        try
+                        _logger?.LogDebug(checkEx, "检查流状态时出错，假设需要停止");
+                        needsStop = true; // 保守处理，假设需要停止
+                    }
+
+                    if (needsStop)
+                    {
+                        // 使用更长超时和分步清理机制
+                        var cleanupTask = Task.Run(() =>
                         {
-                            GC.SuppressFinalize(_sharedInputStream);
+                            try
+                            {
+                                // 分步清理：先停止，再关闭，最后释放
+                                _logger?.LogDebug("正在停止音频流...");
+                                streamToCleanup.Stop();
+                                
+                                _logger?.LogDebug("正在关闭音频流...");
+                                streamToCleanup.Close();
+                                
+                                _logger?.LogDebug("正在释放音频流...");
+                                streamToCleanup.Dispose();
+                            }
+                            catch (PortAudioException paEx)
+                            {
+                                _logger?.LogWarning(paEx, "PortAudio 流停止时出现已知异常（可能是正常的资源释放）");
+                                // 对于 PortAudio 异常，仍然尝试释放资源
+                                try
+                                {
+                                    streamToCleanup.Dispose();
+                                }
+                                catch (Exception disposeEx)
+                                {
+                                    _logger?.LogDebug(disposeEx, "强制释放流资源时出错");
+                                }
+                            }
+                        });
+                        
+                        var completed = cleanupTask.Wait(5000); // 增加到5秒超时
+                        
+                        if (!completed)
+                        {
+                            _logger?.LogWarning("清理音频流超时，将进行强制清理");
+                            // 超时情况下的强制清理
+                            try
+                            {
+                                GC.SuppressFinalize(streamToCleanup);
+                                _logger?.LogDebug("已抑制音频流终结器");
+                            }
+                            catch (Exception suppressEx)
+                            {
+                                _logger?.LogDebug(suppressEx, "抑制终结器时出错");
+                            }
                         }
-                        catch (Exception suppressEx)
+                        else
                         {
-                            _logger?.LogWarning(suppressEx, "抑制终结器时出错");
+                            _logger?.LogDebug("音频流清理完成");
                         }
                     }
                     else
                     {
-                        _logger?.LogDebug("音频流清理完成");
+                        _logger?.LogDebug("音频流未处于活动状态，直接释放");
+                        try
+                        {
+                            streamToCleanup.Dispose();
+                        }
+                        catch (Exception disposeEx)
+                        {
+                            _logger?.LogDebug(disposeEx, "释放非活动流时出错");
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogWarning(ex, "清理音频流时出现警告");
-                }
-                finally
-                {
-                    _sharedInputStream = null;
+                    _logger?.LogWarning(ex, "清理音频流时出现警告，继续执行清理流程");
+                    // 即使出错也要尝试强制释放
+                    try
+                    {
+                        streamToCleanup.Dispose();
+                    }
+                    catch (Exception forceEx)
+                    {
+                        _logger?.LogDebug(forceEx, "强制释放流时出错");
+                    }
                 }
 
-                // 释放 PortAudio 引用
-                try
+                // 延迟释放 PortAudio 引用，确保流完全释放
+                Task.Run(async () =>
                 {
-                    PortAudioManager.Instance.ReleaseReference();
-                    _logger?.LogDebug("已释放 PortAudio 引用");
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogWarning(ex, "释放 PortAudio 引用时出错");
-                }
+                    try
+                    {
+                        await Task.Delay(100); // 短暂延迟确保资源释放完毕
+                        PortAudioManager.Instance.ReleaseReference();
+                        _logger?.LogDebug("已释放 PortAudio 引用");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "释放 PortAudio 引用时出错");
+                    }
+                });
             }
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "清理流资源时出错");
+            _logger?.LogError(ex, "清理流资源时出现严重错误");
+            // 确保状态重置
+            _isRecording = false;
+            _sharedInputStream = null;
+        }
+        finally
+        {
+            _isCleaningUp = false; // 清理完成，重置标志
         }
     }
 
