@@ -59,9 +59,8 @@ namespace Verdure.Assistant.Api.Audio
             set
             {
                 _volume = Math.Max(0, Math.Min(100, value));
-                _logger.LogDebug("音量设置为: {Volume}%", _volume);
-                // mpg123 使用 --volume 参数，范围是 0-32768
-                ApplyVolumeSettings();
+                _logger.LogDebug("音量设置为: {Volume}% (暂不支持实时音量调节)", _volume);
+                // Windows下暂时不支持实时音量调节，避免参数问题
             }
         }
 
@@ -220,26 +219,16 @@ namespace Verdure.Assistant.Api.Audio
                     return;
                 }
 
-                _logger.LogInformation("跳转到位置: {Position}", position);
+                _logger.LogInformation("跳转到位置: {Position} (Windows下暂不支持跳转)", position);
                 
-                var wasPlaying = _currentState == MusicPlayerState.Playing;
-                
-                // 停止当前播放
-                await StopInternalAsync();
-                
-                // 更新位置
+                // Windows下暂时不支持跳转功能，避免参数问题
+                // 简单更新内部位置记录
                 lock (_lock)
                 {
                     _currentPosition = position;
                 }
                 
-                // 如果之前在播放，从新位置继续播放
-                if (wasPlaying)
-                {
-                    await StartMpg123ProcessAsync();
-                    OnStateChanged(MusicPlayerState.Playing);
-                    StartPositionUpdateTask();
-                }
+                await Task.CompletedTask;
             }
             catch (Exception ex)
             {
@@ -303,24 +292,15 @@ namespace Verdure.Assistant.Api.Audio
             }
         }
 
-        private async Task StartMpg123ProcessAsync()
+        private Task StartMpg123ProcessAsync()
         {
             if (string.IsNullOrEmpty(_currentFilePath))
-                return;
+                return Task.CompletedTask;
 
             try
             {
-                var volumeValue = (int)(_volume / 100.0 * 32768);
-                var seekSeconds = _currentPosition.TotalSeconds;
-                
-                var arguments = $"--volume {volumeValue}";
-                
-                if (seekSeconds > 0)
-                {
-                    arguments += $" --skip {(int)seekSeconds}";
-                }
-                
-                arguments += $" \"{_currentFilePath}\"";
+                // 简化参数，移除可能在Windows下有问题的参数
+                var arguments = $"\"{_currentFilePath}\"";
 
                 var startInfo = new ProcessStartInfo
                 {
@@ -332,6 +312,9 @@ namespace Verdure.Assistant.Api.Audio
                     CreateNoWindow = true
                 };
 
+                _logger.LogInformation("启动mpg123进程，命令: mpg123 {Arguments}", arguments);
+                Console.WriteLine($"[音乐缓存] 启动mpg123进程，命令: mpg123 {arguments}");
+
                 _mpg123Process = Process.Start(startInfo);
                 if (_mpg123Process == null)
                 {
@@ -339,7 +322,48 @@ namespace Verdure.Assistant.Api.Audio
                 }
 
                 _logger.LogDebug("mpg123进程已启动，PID: {ProcessId}", _mpg123Process.Id);
-                Console.WriteLine($"[音乐缓存] mpg123进程已启动，参数: {arguments}");
+                Console.WriteLine($"[音乐缓存] mpg123进程已启动，PID: {_mpg123Process.Id}");
+
+                // 读取进程输出用于调试
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        while (!_mpg123Process.HasExited)
+                        {
+                            var output = await _mpg123Process.StandardOutput.ReadLineAsync();
+                            if (!string.IsNullOrEmpty(output))
+                            {
+                                _logger.LogDebug("mpg123 输出: {Output}", output);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "读取mpg123输出时发生异常");
+                    }
+                });
+
+                // 读取错误输出用于调试
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        while (!_mpg123Process.HasExited)
+                        {
+                            var error = await _mpg123Process.StandardError.ReadLineAsync();
+                            if (!string.IsNullOrEmpty(error))
+                            {
+                                _logger.LogWarning("mpg123 错误: {Error}", error);
+                                Console.WriteLine($"[音乐缓存] mpg123 错误: {error}");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "读取mpg123错误输出时发生异常");
+                    }
+                });
 
                 // 监控进程退出
                 _ = Task.Run(async () =>
@@ -347,6 +371,9 @@ namespace Verdure.Assistant.Api.Audio
                     try
                     {
                         await _mpg123Process.WaitForExitAsync();
+                        _logger.LogInformation("mpg123进程已退出，退出码: {ExitCode}", _mpg123Process.ExitCode);
+                        Console.WriteLine($"[音乐缓存] mpg123进程已退出，退出码: {_mpg123Process.ExitCode}");
+                        
                         if (_currentState == MusicPlayerState.Playing)
                         {
                             OnStateChanged(MusicPlayerState.Ended);
@@ -357,10 +384,13 @@ namespace Verdure.Assistant.Api.Audio
                         _logger.LogError(ex, "监控mpg123进程时发生异常");
                     }
                 });
+
+                return Task.CompletedTask;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "启动mpg123进程失败");
+                Console.WriteLine($"[音乐缓存] 启动mpg123进程失败: {ex.Message}");
                 throw;
             }
         }
@@ -387,12 +417,6 @@ namespace Verdure.Assistant.Api.Audio
                     _mpg123Process = null;
                 }
             }
-        }
-
-        private void ApplyVolumeSettings()
-        {
-            // 对于正在播放的音频，我们需要重启进程来应用音量设置
-            // 在实际应用中，可以考虑使用mpg123的控制接口
         }
 
         private void StartPositionUpdateTask()
