@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Services;
 using Verdure.Assistant.Core.Services.MCP;
+using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Api.Services;
 using Verdure.Assistant.Api.Audio;
 
@@ -105,4 +106,87 @@ catch (Exception ex)
     Console.WriteLine($"MCP服务初始化失败: {ex.Message}");
 }
 
+// 可选：自动初始化语音聊天服务（类似Console项目）
+var autoStartVoiceChat = app.Configuration.GetValue<bool>("AutoStartVoiceChat", false);
+if (autoStartVoiceChat)
+{
+    try
+    {
+        logger?.LogInformation("自动启动语音聊天功能...");
+        Console.WriteLine("[语音聊天] 自动启动语音聊天功能...");
+        
+        var voiceChatService = app.Services.GetService<IVoiceChatService>();
+        var interruptManager = app.Services.GetService<InterruptManager>();
+        var keywordSpottingService = app.Services.GetService<IKeywordSpottingService>();
+        var musicVoiceCoordinationService = app.Services.GetService<MusicVoiceCoordinationService>();
+        var mcpIntegrationServiceForVoice = app.Services.GetService<McpIntegrationService>();
+        
+        if (voiceChatService != null && interruptManager != null && keywordSpottingService != null)
+        {
+            // 设置语音聊天服务的各种组件（类似Console项目）
+            voiceChatService.SetInterruptManager(interruptManager);
+            await interruptManager.InitializeAsync();
+            
+            voiceChatService.SetKeywordSpottingService(keywordSpottingService);
+            Console.WriteLine("[语音聊天] 关键词唤醒功能已启用（基于Microsoft认知服务）");
+            
+            if (musicVoiceCoordinationService != null)
+            {
+                voiceChatService.SetMusicVoiceCoordinationService(musicVoiceCoordinationService);
+                Console.WriteLine("[语音聊天] 音乐语音协调服务已启用");
+            }
+            
+            if (mcpIntegrationServiceForVoice != null)
+            {
+                voiceChatService.SetMcpIntegrationService(mcpIntegrationServiceForVoice);
+                Console.WriteLine("[语音聊天] MCP集成服务已连接");
+            }
+            
+            // 创建默认配置并初始化
+            var config = CreateDefaultVerdureConfig(app.Configuration);
+            await voiceChatService.InitializeAsync(config);
+            
+            logger?.LogInformation("语音聊天服务自动启动完成");
+            Console.WriteLine("[语音聊天] 语音聊天服务自动启动完成，开始监听关键词唤醒...");
+        }
+        else
+        {
+            logger?.LogWarning("语音聊天服务组件不完整，跳过自动启动");
+            Console.WriteLine("[语音聊天] 语音聊天服务组件不完整，跳过自动启动");
+        }
+    }
+    catch (Exception ex)
+    {
+        logger?.LogError(ex, "自动启动语音聊天失败");
+        Console.WriteLine($"[语音聊天] 自动启动失败: {ex.Message}");
+    }
+}
+
 app.Run();
+
+// 创建默认配置的辅助方法
+static VerdureConfig CreateDefaultVerdureConfig(IConfiguration configuration)
+{
+    var config = new VerdureConfig();
+    configuration.Bind(config);
+    
+    // 设置默认值
+    if (string.IsNullOrEmpty(config.ServerUrl))
+        config.ServerUrl = "wss://api.tenclass.net/xiaozhi/v1/";
+    if (string.IsNullOrEmpty(config.MqttClientId))
+        config.MqttClientId = "xiaozhi_api_client";
+    if (string.IsNullOrEmpty(config.MqttTopic))
+        config.MqttTopic = "xiaozhi/chat";
+    
+    // API项目没有ModelFiles目录，可能需要调整
+    if (config.KeywordModels == null)
+    {
+        config.KeywordModels = new KeywordModelConfig
+        {
+            ModelsPath = "ModelFiles", // 可能需要复制模型文件或使用绝对路径
+            CurrentModel = "keyword_xiaodian.table"
+        };
+    }
+    
+    return config;
+}
