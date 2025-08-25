@@ -299,8 +299,8 @@ namespace Verdure.Assistant.Api.Audio
 
             try
             {
-                // 简化参数，移除可能在Windows下有问题的参数
-                var arguments = $"\"{_currentFilePath}\"";
+                // 添加-q参数减少详细输出
+                var arguments = $"-q \"{_currentFilePath}\"";
 
                 var startInfo = new ProcessStartInfo
                 {
@@ -354,8 +354,19 @@ namespace Verdure.Assistant.Api.Audio
                             var error = await _mpg123Process.StandardError.ReadLineAsync();
                             if (!string.IsNullOrEmpty(error))
                             {
-                                _logger.LogWarning("mpg123 错误: {Error}", error);
-                                Console.WriteLine($"[音乐缓存] mpg123 错误: {error}");
+                                // 过滤mpg123的正常信息输出，只记录真正的错误
+                                if (error.Contains("Error") || error.Contains("error") || 
+                                    error.Contains("Failed") || error.Contains("failed") ||
+                                    error.Contains("Cannot") || error.Contains("cannot"))
+                                {
+                                    _logger.LogWarning("mpg123 错误: {Error}", error);
+                                    Console.WriteLine($"[音乐缓存] mpg123 错误: {error}");
+                                }
+                                else
+                                {
+                                    // 正常信息用Debug级别记录
+                                    _logger.LogDebug("mpg123 信息: {Error}", error);
+                                }
                             }
                         }
                     }
