@@ -270,6 +270,8 @@ public class MockVoiceChatService : IVoiceChatService
     public ListeningMode CurrentListeningMode { get; private set; } = ListeningMode.Manual;
     public bool IsKeywordDetectionEnabled { get; private set; } = true;
 
+    public ConversationStateMachine? StateMachine => throw new NotImplementedException();
+
     public Task InitializeAsync(VerdureConfig config)
     {
         return Task.FromResult(true);

@@ -17,9 +17,16 @@ class Program
 
     static async Task Main(string[] args)
     {
+        // 检查是否有测试音乐播放器的参数
+        if (args.Length > 0 && args[0] == "--test-music")
+        {
+            await TestMusic.MusicPlayerTest.TestMusicPlayback();
+            return;
+        }
+
         // 创建主机
-        var host = CreateHostBuilder(args).Build();       
-        
+        var host = CreateHostBuilder(args).Build();
+
         _logger = host.Services.GetRequiredService<ILogger<Program>>();
         _voiceChatService = host.Services.GetRequiredService<IVoiceChatService>();
         var interruptManager = host.Services.GetRequiredService<InterruptManager>();
@@ -43,12 +50,12 @@ class Program
 
             // Set up wake word detector coordination (matches py-xiaozhi behavior)
             _voiceChatService.SetInterruptManager(interruptManager);
-            await interruptManager.InitializeAsync();            
-            
+            await interruptManager.InitializeAsync();
+
             // Set up Microsoft Cognitive Services keyword spotting (matches py-xiaozhi wake word detector)
             _voiceChatService.SetKeywordSpottingService(keywordSpottingService);
             System.Console.WriteLine("关键词唤醒功能已启用（基于Microsoft认知服务）");
-            
+
             // Set up Music-Voice Coordination Service for automatic synchronization
             var musicVoiceCoordinationService = host.Services.GetRequiredService<MusicVoiceCoordinationService>();
             _voiceChatService.SetMusicVoiceCoordinationService(musicVoiceCoordinationService);
@@ -62,11 +69,13 @@ class Program
 
             // 初始化服务 (this will establish WebSocket connection and trigger IoT initialization)
             await _voiceChatService.InitializeAsync(_config);
-            
+
             System.Console.WriteLine($"已连接到服务器: {(_config.UseWebSocket ? _config.ServerUrl : $"{_config.MqttBroker}:{_config.MqttPort}")}");
             System.Console.WriteLine();
 
-            await ShowMenu();
+           System.Console.ReadLine();
+
+            //await ShowMenu();
         }
         catch (Exception ex)
         {
@@ -77,7 +86,9 @@ class Program
         {
             _voiceChatService?.Dispose();
         }
-    }    static IHostBuilder CreateHostBuilder(string[] args) =>
+    }
+
+    static IHostBuilder CreateHostBuilder(string[] args) =>
         Host.CreateDefaultBuilder(args)
             .ConfigureServices((context, services) =>
             {
@@ -85,19 +96,19 @@ class Program
                 {
                     builder.AddConsole();
                     // Set Debug as the minimum level, can be overridden by appsettings.json
-                    builder.SetMinimumLevel(LogLevel.Information);
-                });                
-                
+                    builder.SetMinimumLevel(LogLevel.Debug);
+                });
+
                 // Register services with dependency injection
                 services.AddSingleton<IVerificationService, VerificationService>();
                 services.AddSingleton<IConfigurationService, ConfigurationService>();
                 services.AddSingleton<IVoiceChatService, VoiceChatService>();
-                
+
                 // Add InterruptManager for wake word detector coordination
-                services.AddSingleton<InterruptManager>();                
+                services.AddSingleton<InterruptManager>();
                 // Add Microsoft Cognitive Services keyword spotting service
                 services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
-                
+
                 // Add Music-Voice Coordination Service for automatic pause/resume synchronization
                 services.AddSingleton<MusicVoiceCoordinationService>();
 
@@ -105,10 +116,11 @@ class Program
                 services.AddSingleton<AudioStreamManager>(provider =>
                 {
                     var logger = provider.GetService<ILogger<AudioStreamManager>>();
-                    return AudioStreamManager.GetInstance(logger);                });                
+                    return AudioStreamManager.GetInstance(logger);
+                });
                 // Music player service (required for MCP music device)
                 services.AddSingleton<IMusicPlayerService, KugouMusicService>();
-                services.AddSingleton<IMusicAudioPlayer, ConsoleMusicAudioPlayer>();                
+                services.AddSingleton<IMusicAudioPlayer, ConsoleMusicAudioPlayer>();
                 // Register MCP services (new architecture based on xiaozhi-esp32)
                 services.AddSingleton<McpServer>();
                 services.AddSingleton<McpDeviceManager>(provider =>
@@ -120,7 +132,9 @@ class Program
                 });
                 services.AddSingleton<McpIntegrationService>();
 
-            });static VerdureConfig LoadConfiguration()
+            });
+
+    static VerdureConfig LoadConfiguration()
     {
         var configuration = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
@@ -130,10 +144,17 @@ class Program
 
         var config = new VerdureConfig();
         configuration.Bind(config);
-        
+
+        // 为Console项目设置关键词模型配置
+        if (string.IsNullOrEmpty(config.KeywordModels.ModelsPath))
+        {
+            // Console项目的模型文件在 ModelFiles 目录
+            config.KeywordModels.ModelsPath = "ModelFiles";
+        }
+
         return config;
-    }    
-    
+    }
+
     /// <summary>
     /// Initialize MCP IoT devices and setup integration (based on xiaozhi-esp32's MCP architecture)
     /// </summary>
@@ -179,9 +200,9 @@ class Program
             // Set MCP integration service on VoiceChatService (new MCP-based integration)
             voiceChatService.SetMcpIntegrationService(mcpIntegrationService);
 
-            logger?.LogInformation("MCP IoT设备初始化完成，共注册了 {DeviceCount} 个设备", 
+            logger?.LogInformation("MCP IoT设备初始化完成，共注册了 {DeviceCount} 个设备",
                 mcpDeviceManager.Devices.Count);
-                
+
             System.Console.WriteLine($"MCP IoT设备初始化完成，注册了 {mcpDeviceManager.Devices.Count} 个设备");
         }
         catch (Exception ex)
@@ -191,8 +212,8 @@ class Program
             System.Console.WriteLine($"MCP IoT设备初始化失败: {ex.Message}");
         }
     }/// <summary>
-    /// Initialize MCP services (new architecture based on xiaozhi-esp32)
-    /// </summary>
+     /// Initialize MCP services (new architecture based on xiaozhi-esp32)
+     /// </summary>
     static async Task InitializeMcpServicesAsync(IServiceProvider services)
     {
         try
@@ -235,7 +256,8 @@ class Program
     static async Task ShowMenu()
     {
         while (true)
-        {            System.Console.WriteLine("\n请选择操作:");
+        {
+            System.Console.WriteLine("\n请选择操作:");
             System.Console.WriteLine("1. 开始语音对话");
             System.Console.WriteLine("2. 停止语音对话");
             System.Console.WriteLine("3. 切换对话状态 (自动模式)");
@@ -246,7 +268,7 @@ class Program
             System.Console.Write("请输入选项 (1-7): ");
 
             var input = System.Console.ReadLine();
-              switch (input)
+            switch (input)
             {
                 case "1":
                     await StartVoiceChat();
@@ -332,13 +354,14 @@ class Program
 
         System.Console.Write("请输入消息: ");
         var message = System.Console.ReadLine();
-        
+
         if (!string.IsNullOrWhiteSpace(message))
         {
             await _voiceChatService.SendTextMessageAsync(message);
             System.Console.WriteLine("消息已发送");
         }
-    }    static void ShowConnectionStatus()
+    }
+    static void ShowConnectionStatus()
     {
         if (_voiceChatService == null)
         {
@@ -378,7 +401,8 @@ class Program
         {
             System.Console.WriteLine($"切换对话状态失败: {ex.Message}");
         }
-    }    static Task ToggleAutoDialogueMode()
+    }
+    static Task ToggleAutoDialogueMode()
     {
         if (_voiceChatService == null)
         {
@@ -388,12 +412,12 @@ class Program
 
         _voiceChatService.KeepListening = !_voiceChatService.KeepListening;
         System.Console.WriteLine($"自动对话模式: {(_voiceChatService.KeepListening ? "已启用" : "已禁用")}");
-        
+
         if (_voiceChatService.KeepListening)
         {
             System.Console.WriteLine("设备将在对话结束后自动开始下一轮监听");
         }
-        
+
         return Task.CompletedTask;
     }
 
