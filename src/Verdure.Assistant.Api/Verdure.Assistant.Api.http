@@ -1,0 +1,6 @@
+@Verdure.Assistant.Api_HostAddress = http://localhost:5031
+
+GET {{Verdure.Assistant.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
