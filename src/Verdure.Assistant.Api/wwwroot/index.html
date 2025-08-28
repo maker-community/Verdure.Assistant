@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verdure.Assistant.Api 机器人控制面板</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .danger {
+            background-color: #dc3545;
+        }
+        .danger:hover {
+            background-color: #c82333;
+        }
+        .success {
+            background-color: #28a745;
+        }
+        .success:hover {
+            background-color: #218838;
+        }
+        .status {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .log {
+            background-color: #000;
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 4px;
+            height: 200px;
+            overflow-y: scroll;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .button-group {
+            margin-bottom: 20px;
+        }
+        .input-group {
+            margin: 10px 0;
+        }
+        input, select {
+            padding: 5px;
+            margin: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Verdure.Assistant.Api 机器人控制面板</h1>
+        <p>集成语音助手与机器人情感表达的控制系统</p>
+    </div>
+
+    <div class="container">
+        <h2>📊 系统状态</h2>
+        <div class="status" id="status">
+            <strong>状态:</strong> 未知<br>
+            <strong>当前情感:</strong> 无<br>
+            <strong>开始时间:</strong> 无
+        </div>
+        <button onclick="testConnection()">🔌 测试连接</button>
+        <button onclick="updateStatus()">刷新状态</button>
+        <button onclick="getAvailableEmotions()">获取可用表情</button>
+    </div>
+
+    <div class="container">
+        <h2>🎭 表情和动作控制</h2>
+        
+        <div class="button-group">
+            <h3>组合播放</h3>
+            <button onclick="playEmotion('neutral', true, true)">😐 平静 (表情+动作)</button>
+            <button onclick="playEmotion('happy', true, true)">😊 快乐 (表情+动作)</button>
+            <button onclick="playEmotion('sad', true, true)">😢 悲伤 (表情+动作)</button>
+            <button onclick="playEmotion('angry', true, true)">😠 愤怒 (表情+动作)</button>
+            <button onclick="playEmotion('surprised', true, true)">😲 惊讶 (表情+动作)</button>
+            <button onclick="playEmotion('confused', true, true)">😕 困惑 (表情+动作)</button>
+            <button onclick="playRandom(true, true)">🎲 随机播放 (表情+动作)</button>
+        </div>
+
+        <div class="button-group">
+            <h3>仅表情播放</h3>
+            <button onclick="playEmotion('neutral', false, true)">😐 平静表情</button>
+            <button onclick="playEmotion('happy', false, true)">😊 快乐表情</button>
+            <button onclick="playEmotion('sad', false, true)">😢 悲伤表情</button>
+            <button onclick="playEmotion('angry', false, true)">😠 愤怒表情</button>
+            <button onclick="playEmotion('surprised', false, true)">😲 惊讶表情</button>
+            <button onclick="playEmotion('confused', false, true)">😕 困惑表情</button>
+            <button onclick="playRandom(false, true)">🎲 随机表情</button>
+        </div>
+
+        <div class="button-group">
+            <h3>仅动作播放</h3>
+            <button onclick="playEmotion('neutral', true, false)">🤖 平静动作</button>
+            <button onclick="playEmotion('happy', true, false)">🤖 快乐动作</button>
+            <button onclick="playEmotion('sad', true, false)">🤖 悲伤动作</button>
+            <button onclick="playEmotion('angry', true, false)">🤖 愤怒动作</button>
+            <button onclick="playEmotion('surprised', true, false)">🤖 惊讶动作</button>
+            <button onclick="playEmotion('confused', true, false)">🤖 困惑动作</button>
+            <button onclick="playRandom(true, false)">🎲 随机动作</button>
+        </div>
+
+        <div class="button-group">
+            <h3>控制命令</h3>
+            <button class="danger" onclick="stopPlayback()">⏸️ 停止播放</button>
+            <button class="danger" onclick="clearScreen()">⏹️ 停止并清屏</button>
+            <button class="success" onclick="initialize()">🔄 初始化机器人</button>
+            <button onclick="runDemo()">🎪 运行演示程序</button>
+        </div>
+
+        <div class="input-group">
+            <h3>自定义播放参数</h3>
+            <label>循环次数: <input type="number" id="loops" value="1" min="1" max="10"></label>
+            <label>帧率: <input type="number" id="fps" value="30" min="10" max="60"></label>
+            <br>
+            <button onclick="playCustom()">▶️ 自定义播放</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📝 操作日志</h2>
+        <div class="log" id="log"></div>
+        <button onclick="clearLog()">清空日志</button>
+    </div>
+
+    <script>
+        // 自动检测API基础URL
+        const API_BASE = `${window.location.origin}/api/emotion`;
+        
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            try {
+                const options = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                };
+                
+                if (body) {
+                    options.body = JSON.stringify(body);
+                }
+
+                const fullUrl = `${API_BASE}${endpoint}`;
+                log(`API调用: ${method} ${fullUrl}`);
+                
+                const response = await fetch(fullUrl, options);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    log(`❌ HTTP错误 ${response.status}: ${errorText}`);
+                    return null;
+                }
+                
+                const contentType = response.headers.get('content-type');
+                let data;
+                
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    const text = await response.text();
+                    data = { message: text };
+                }
+                
+                log(`✅ 成功: ${data.message || JSON.stringify(data).substring(0, 100)}`);
+                return data;
+            } catch (error) {
+                log(`❌ 网络错误: ${error.message}`);
+                return null;
+            }
+        }
+
+        async function testConnection() {
+            const result = await apiCall('/test');
+            if (result) {
+                log(`🔌 连接测试成功: ${result.message} (${result.timestamp})`);
+            } else {
+                log('🔌 连接测试失败');
+            }
+        }
+
+        async function updateStatus() {
+            const status = await apiCall('/status');
+            if (status) {
+                const statusDiv = document.getElementById('status');
+                statusDiv.innerHTML = `
+                    <strong>状态:</strong> ${status.status || '未知'}<br>
+                    <strong>当前情感:</strong> ${status.currentEmotion || '无'}<br>
+                    <strong>开始时间:</strong> ${status.startTime ? new Date(status.startTime).toLocaleString() : '无'}<br>
+                    <strong>当前循环:</strong> ${status.currentLoop || 0}<br>
+                    <strong>错误信息:</strong> ${status.errorMessage || '无'}
+                `;
+            }
+        }
+
+        async function getAvailableEmotions() {
+            const emotions = await apiCall('/emotions');
+            if (emotions && Array.isArray(emotions)) {
+                log(`可用表情: ${emotions.map(e => e.name || e.type).join(', ')}`);
+            }
+        }
+
+        async function playEmotion(emotionType, includeAction, includeEmotion) {
+            const loops = parseInt(document.getElementById('loops').value) || 1;
+            const fps = parseInt(document.getElementById('fps').value) || 30;
+            
+            const request = {
+                emotionType: emotionType,
+                includeAction: includeAction,
+                includeEmotion: includeEmotion,
+                loops: loops,
+                fps: fps
+            };
+
+            log(`发送播放请求: ${JSON.stringify(request)}`);
+            await apiCall('/play', 'POST', request);
+            setTimeout(updateStatus, 500);
+        }
+
+        async function playRandom(includeAction, includeEmotion) {
+            const loops = parseInt(document.getElementById('loops').value) || 1;
+            const fps = parseInt(document.getElementById('fps').value) || 30;
+            
+            const params = new URLSearchParams({
+                includeAction: includeAction.toString(),
+                includeEmotion: includeEmotion.toString(),
+                loops: loops.toString(),
+                fps: fps.toString()
+            });
+
+            await apiCall(`/play-random?${params}`, 'POST');
+            setTimeout(updateStatus, 500);
+        }
+
+        async function playCustom() {
+            const loops = parseInt(document.getElementById('loops').value) || 1;
+            const fps = parseInt(document.getElementById('fps').value) || 30;
+            
+            const request = {
+                emotionType: 'happy',
+                includeAction: true,
+                includeEmotion: true,
+                loops: loops,
+                fps: fps
+            };
+
+            await apiCall('/play', 'POST', request);
+            setTimeout(updateStatus, 500);
+        }
+
+        async function stopPlayback() {
+            await apiCall('/stop', 'POST');
+            setTimeout(updateStatus, 500);
+        }
+
+        async function clearScreen() {
+            await apiCall('/clear-screen', 'POST');
+            setTimeout(updateStatus, 500);
+        }
+
+        async function initialize() {
+            await apiCall('/initialize', 'POST');
+            setTimeout(updateStatus, 500);
+        }
+
+        async function runDemo() {
+            await apiCall('/demo', 'POST');
+            log('演示程序已启动，请查看控制台日志');
+        }
+
+        // 页面加载时更新状态
+        window.onload = function() {
+            log(`🚀 Verdure.Assistant.Api 机器人控制面板已加载`);
+            log(`API基础地址: ${API_BASE}`);
+            
+            // 先测试连接
+            testConnection();
+            
+            setTimeout(() => {
+                updateStatus();
+                getAvailableEmotions();
+            }, 1000);
+            
+            // 每5秒自动更新状态
+            setInterval(updateStatus, 5000);
+        };
+    </script>
+</body>
+</html>
