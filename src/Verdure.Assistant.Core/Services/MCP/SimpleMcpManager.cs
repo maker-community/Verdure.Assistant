@@ -42,13 +42,13 @@ public class SimpleMcpManager : IMcpIntegration
             // 音乐播放器工具
             RegisterMusicPlayerTools();
             
-            // 摄像头控制工具
-            RegisterCameraTools();
+            // 摄像头控制工具 - 已禁用，使用新的 EnhancedMcpCameraDevice 替代
+            // RegisterCameraTools();
             
             // 设备状态工具
             RegisterDeviceStatusTools();
             
-            _logger.LogInformation("All MCP tools registered successfully");
+            _logger.LogInformation("All MCP tools registered successfully - Camera tools disabled (using enhanced camera device)");
         }
         catch (Exception ex)
         {

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Interfaces;
+using Verdure.Assistant.Core.Services;
 
 namespace Verdure.Assistant.Core.Services.MCP
 {
@@ -70,16 +71,40 @@ namespace Verdure.Assistant.Core.Services.MCP
             var lamp = new McpLampDevice(_mcpServer, null);
             var speaker = new McpSpeakerDevice(_mcpServer, null);
             var musicPlayer = new McpMusicPlayerDevice(_mcpServer, _musicPlayerService, null);
-            var camera = new McpCameraDevice(_mcpServer, null);
+            
+            // 使用新的增强相机设备替代旧的 McpCameraDevice
+            // var camera = new McpCameraDevice(_mcpServer, null);
+            
+            // 创建增强相机设备（需要相机服务）
+            // 注意：这里需要从DI容器获取ICameraService，但为了保持兼容性，我们将在外部处理
 
             // Add devices
             //await AddDeviceAsync(lamp);
             //await AddDeviceAsync(speaker);
             await AddDeviceAsync(musicPlayer);
-            await AddDeviceAsync(camera);
-
-            _logger.LogInformation("Default MCP devices initialized - Music service available: {HasMusicService}, Camera device added", 
+            // await AddDeviceAsync(camera); // 旧相机设备已禁用
+            
+            _logger.LogInformation("Default MCP devices initialized - Music service available: {HasMusicService}, Enhanced camera will be added separately", 
                 _musicPlayerService != null);
+        }
+
+        /// <summary>
+        /// 添加增强相机设备（需要外部传入ICameraService）
+        /// </summary>
+        public async Task AddEnhancedCameraDeviceAsync(ICameraService cameraService)
+        {
+            try
+            {
+                // 传递null作为logger，EnhancedMcpCameraDevice会处理null logger
+                var enhancedCamera = new EnhancedMcpCameraDevice(_mcpServer, cameraService, null);
+                await AddDeviceAsync(enhancedCamera);
+                _logger.LogInformation("Enhanced camera device added successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to add enhanced camera device");
+                throw;
+            }
         }
 
         /// <summary>

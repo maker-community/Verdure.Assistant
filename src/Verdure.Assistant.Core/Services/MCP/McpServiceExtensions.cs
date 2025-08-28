@@ -16,6 +16,12 @@ public static class McpServiceExtensions
     /// </summary>
     public static IServiceCollection AddSimpleMcpServices(this IServiceCollection services)
     {
+        // 自动注册相机服务
+        services.AddSingleton<ICameraService>(provider =>
+        {
+            return CameraServiceFactory.CreateCameraService(provider);
+        });
+
         // 注册简化的MCP管理器 - 自包含所有MCP功能
         services.AddSingleton<SimpleMcpManager>(provider =>
         {

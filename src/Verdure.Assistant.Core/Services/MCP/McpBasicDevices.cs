@@ -388,25 +388,37 @@ public class McpCameraDevice : McpIoTDevice
 {
     private readonly ILogger<McpCameraDevice>? _deviceLogger;
     private readonly HttpClient _httpClient;
+    private readonly ICameraService _cameraService;
     private string _explainUrl = "http://api.xiaozhi.me/mcp/vision/explain";
     private string _explainToken = "test-token";
     private byte[]? _lastCapturedImage;
+    private CameraSettings _cameraSettings;
 
-    public McpCameraDevice(McpServer mcpServer, ILogger<McpCameraDevice>? logger = null)
+    public McpCameraDevice(McpServer mcpServer, ICameraService cameraService, ILogger<McpCameraDevice>? logger = null)
         : base(mcpServer, logger)
     {
         _deviceLogger = logger;
         _httpClient = new HttpClient();
+        _cameraService = cameraService ?? throw new ArgumentNullException(nameof(cameraService));
         DeviceId = "main_camera";
         Name = "Camera";
         Description = "智能相机设备 - 支持拍照和AI图像分析";
         Type = "camera";
 
+        // 初始化相机设置
+        _cameraSettings = new CameraSettings
+        {
+            Width = 1280,
+            Height = 720,
+            SkipFrames = 20,
+            JpegQuality = 85
+        };
+
         // 初始化设备状态
         SetState("available", true);
         SetState("last_capture_time", "");
         SetState("image_count", 0);
-        SetState("resolution", "640x480");
+        SetState("resolution", "1280x720");
         SetState("format", "JPEG");
     }
 
