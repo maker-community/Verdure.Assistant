@@ -57,7 +57,7 @@ public sealed class PortAudioManager : IDisposable
 
     /// <summary>
     /// 释放引用计数，当引用计数为 0 时终止 PortAudio
-    /// 优化版本：增强异常处理和状态检查
+    /// 树莓派优化版本：更强的异常处理和超时控制
     /// </summary>
     public void ReleaseReference()
     {
@@ -75,57 +75,42 @@ public sealed class PortAudioManager : IDisposable
                     {
                         Console.WriteLine("正在终止 PortAudio...");
                         
-                        // 增强的超时机制和重试逻辑
-                        var maxRetries = 2;
-                        var currentRetry = 0;
-                        bool terminateSuccess = false;
-
-                        while (currentRetry < maxRetries && !terminateSuccess)
+                        // 在树莓派上，使用更谨慎的终止策略
+                        var terminateTask = Task.Run(() =>
                         {
                             try
                             {
-                                var terminateTask = Task.Run(() => PortAudio.Terminate());
-                                var completed = terminateTask.Wait(5000); // 增加到5秒超时
-                                
-                                if (completed)
-                                {
-                                    terminateSuccess = true;
-                                    _isInitialized = false;
-                                    Console.WriteLine("PortAudio 已终止");
-                                }
-                                else
-                                {
-                                    currentRetry++;
-                                    Console.WriteLine($"PortAudio 终止超时，重试 {currentRetry}/{maxRetries}");
-                                    
-                                    if (currentRetry < maxRetries)
-                                    {
-                                        // 短暂等待后重试
-                                        Thread.Sleep(500);
-                                    }
-                                }
+                                PortAudio.Terminate();
+                                return true;
+                            }
+                            catch (PortAudioException paEx)
+                            {
+                                Console.WriteLine($"PortAudio 终止时的预期异常: {paEx.Message}");
+                                return true; // 对于 PortAudio 异常，认为是成功的
                             }
                             catch (Exception ex)
                             {
-                                currentRetry++;
-                                Console.WriteLine($"PortAudio 终止重试 {currentRetry}/{maxRetries} 时出现异常: {ex.Message}");
-                                
-                                if (currentRetry < maxRetries)
-                                {
-                                    Thread.Sleep(500);
-                                }
+                                Console.WriteLine($"PortAudio 终止时的意外异常: {ex.Message}");
+                                return false;
                             }
-                        }
+                        });
 
-                        if (!terminateSuccess)
+                        var completed = terminateTask.Wait(2000); // 缩短到2秒超时
+                        
+                        if (completed && terminateTask.Result)
                         {
-                            Console.WriteLine("PortAudio 终止失败，强制设置状态");
-                            _isInitialized = false; // 强制设置状态，避免资源泄漏
+                            _isInitialized = false;
+                            Console.WriteLine("PortAudio 已终止");
+                        }
+                        else
+                        {
+                            Console.WriteLine("PortAudio 终止超时或失败，强制重置状态");
+                            _isInitialized = false; // 强制重置状态
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"PortAudio 终止时出现严重错误: {ex.Message}");
+                        Console.WriteLine($"PortAudio 终止过程中出现严重错误: {ex.Message}");
                         _isInitialized = false; // 即使出错也要重置状态
                     }
                 }
@@ -133,6 +118,55 @@ public sealed class PortAudioManager : IDisposable
             else
             {
                 Console.WriteLine("PortAudio 引用计数已为 0，跳过释放操作");
+            }
+        }
+    }
+
+    /// <summary>
+    /// 强制清理 PortAudio（用于紧急情况下的资源恢复）
+    /// </summary>
+    public void ForceCleanup()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                Console.WriteLine("执行 PortAudio 强制清理...");
+                
+                // 强制重置引用计数
+                _referenceCount = 0;
+                
+                if (_isInitialized)
+                {
+                    try
+                    {
+                        // 尝试快速终止
+                        var terminateTask = Task.Run(() => PortAudio.Terminate());
+                        var completed = terminateTask.Wait(1000); // 1秒快速超时
+                        
+                        if (!completed)
+                        {
+                            Console.WriteLine("强制清理：PortAudio 终止超时");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"强制清理：PortAudio 终止异常: {ex.Message}");
+                    }
+                    finally
+                    {
+                        _isInitialized = false;
+                    }
+                }
+                
+                Console.WriteLine("PortAudio 强制清理完成");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"PortAudio 强制清理时出错: {ex.Message}");
+                // 确保状态重置
+                _isInitialized = false;
+                _referenceCount = 0;
             }
         }
     }
@@ -173,11 +207,42 @@ public sealed class PortAudioManager : IDisposable
 
             try
             {
+                Console.WriteLine("开始 Dispose PortAudioManager...");
+                
                 if (_isInitialized)
                 {
-                    PortAudio.Terminate();
+                    // 在 Dispose 中使用更快的超时
+                    var disposeTask = Task.Run(() =>
+                    {
+                        try
+                        {
+                            PortAudio.Terminate();
+                            return true;
+                        }
+                        catch (PortAudioException paEx)
+                        {
+                            Console.WriteLine($"Dispose 时的 PortAudio 异常: {paEx.Message}");
+                            return true; // 认为是成功的
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Dispose 时的意外异常: {ex.Message}");
+                            return false;
+                        }
+                    });
+
+                    var completed = disposeTask.Wait(1500); // 1.5秒超时
+                    
+                    if (completed)
+                    {
+                        Console.WriteLine("PortAudio 在 Dispose 中已终止");
+                    }
+                    else
+                    {
+                        Console.WriteLine("Dispose PortAudio 超时，强制完成");
+                    }
+                    
                     _isInitialized = false;
-                    Console.WriteLine("PortAudio 在 Dispose 中已终止");
                 }
             }
             catch (Exception ex)
@@ -188,8 +253,9 @@ public sealed class PortAudioManager : IDisposable
             {
                 _isDisposed = true;
                 _referenceCount = 0;
-                // 抑制终结器调用
+                // 抑制终结器调用，防止二次清理
                 GC.SuppressFinalize(this);
+                Console.WriteLine("PortAudioManager Dispose 完成");
             }
         }
     }

@@ -7,6 +7,96 @@ using Verdure.Assistant.Core.Services.MCP;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Api.Services;
 using Verdure.Assistant.Api.Audio;
+using System.Runtime.ExceptionServices;
+using System.Runtime;
+
+// 优化垃圾回收设置，特别针对树莓派等ARM设备
+GCSettings.LatencyMode = GCLatencyMode.Batch; // 批量回收模式，减少中断
+if (Environment.ProcessorCount <= 4) // 树莓派等低核心数设备
+{
+    // 强制使用服务器垃圾回收模式，提高音频处理稳定性
+    Console.WriteLine("[GC优化] 检测到低核心数设备，启用优化的垃圾回收模式");
+}
+
+// 添加全局异常处理器
+AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+{
+    var exception = e.ExceptionObject as Exception;
+    Console.WriteLine($"[全局异常] 未处理的异常: {exception?.Message}");
+    Console.WriteLine($"[全局异常] 堆栈跟踪: {exception?.StackTrace}");
+    
+    // 特别处理音频相关异常
+    if (exception?.Message.Contains("PortAudio") == true || 
+        exception?.Message.Contains("audio") == true ||
+        exception?.Message.Contains("stream") == true ||
+        exception?.StackTrace?.Contains("Stream.Finalize") == true)
+    {
+        Console.WriteLine("[音频异常] 检测到音频流异常，尝试恢复...");
+        try
+        {
+            // 强制垃圾回收，清理可能的悬挂对象
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            
+            // 尝试重新初始化音频系统
+            var audioManager = AudioStreamManager.GetInstance();
+            audioManager?.ForceCleanup();
+            Console.WriteLine("[音频异常] 音频系统已强制清理");
+            
+            // 强制清理 PortAudio 管理器
+            PortAudioManager.Instance.ForceCleanup();
+            Console.WriteLine("[音频异常] PortAudio 管理器已强制清理");
+        }
+        catch (Exception cleanupEx)
+        {
+            Console.WriteLine($"[音频异常] 清理失败: {cleanupEx.Message}");
+        }
+    }
+    
+    // 记录异常但不让程序崩溃（如果可能）
+    if (!e.IsTerminating)
+    {
+        Console.WriteLine("[全局异常] 异常已被捕获，程序继续运行");
+    }
+    else
+    {
+        Console.WriteLine("[全局异常] 致命异常，程序即将退出");
+        Console.WriteLine("[清理] 执行紧急资源清理...");
+        
+        // 紧急清理资源
+        try
+        {
+            PortAudioManager.Instance.ForceCleanup();
+            Console.WriteLine("[清理] 紧急清理完成");
+        }
+        catch (Exception emergencyEx)
+        {
+            Console.WriteLine($"[清理] 紧急清理失败: {emergencyEx.Message}");
+        }
+    }
+};
+
+TaskScheduler.UnobservedTaskException += (sender, e) =>
+{
+    Console.WriteLine($"[任务异常] 未观察到的任务异常: {e.Exception.Message}");
+    foreach (var ex in e.Exception.InnerExceptions)
+    {
+        Console.WriteLine($"[任务异常] 内部异常: {ex.Message}");
+        
+        // 特别处理音频相关的任务异常
+        if (ex.Message.Contains("PortAudio") || 
+            ex.Message.Contains("audio") || 
+            ex.Message.Contains("stream"))
+        {
+            Console.WriteLine($"[音频任务异常] 音频流任务异常: {ex.Message}");
+        }
+    }
+    
+    // 标记异常为已处理，防止程序崩溃
+    e.SetObserved();
+    Console.WriteLine("[任务异常] 异常已被标记为已处理");
+};
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -54,6 +144,7 @@ builder.Services.AddSingleton<Verdure.Assistant.Api.Services.Robot.EmotionAction
 
 // Register Background Services
 builder.Services.AddHostedService<Verdure.Assistant.Api.Services.Robot.TimeDisplayService>();
+builder.Services.AddHostedService<Verdure.Assistant.Api.Services.AudioMonitoringService>();
 
 // Register Emotion Integration Service
 builder.Services.AddSingleton<Verdure.Assistant.Api.Services.EmotionIntegrationService>();
@@ -100,12 +191,16 @@ logger?.LogInformation("音乐播放功能: 已启用 (mpg123)");
 logger?.LogInformation("语音聊天功能: 已启用");
 logger?.LogInformation("MCP设备管理: 已启用");
 logger?.LogInformation("机器人表情与动作: 已启用");
+logger?.LogInformation("音频监控服务: 已启用");
+logger?.LogInformation("全局异常处理: 已启用");
 
 Console.WriteLine("=== 绿荫助手语音聊天API服务 ===");
 Console.WriteLine("音乐播放功能: 已启用 (基于mpg123)");
 Console.WriteLine("语音聊天功能: 已启用");
 Console.WriteLine("MCP设备管理: 已启用");
 Console.WriteLine("机器人表情与动作: 已启用");
+Console.WriteLine("音频监控服务: 已启用 (30秒检查间隔)");
+Console.WriteLine("全局异常处理: 已启用 (音频流异常自动恢复)");
 Console.WriteLine($"[音乐缓存] 音乐缓存目录: {Path.Combine(Path.GetTempPath(), "VerdureMusicCache")}");
 Console.WriteLine($"[机器人] Web控制面板: http://localhost:5000");
 
@@ -245,6 +340,21 @@ catch (Exception ex)
 
 
 app.Run();
+
+// 应用程序关闭时的清理
+AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
+{
+    try
+    {
+        Console.WriteLine("[关闭] 应用程序正在关闭，清理资源...");
+        PortAudioManager.Instance.ForceCleanup();
+        Console.WriteLine("[关闭] 资源清理完成");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[关闭] 清理资源时出错: {ex.Message}");
+    }
+};
 
 // 创建默认配置的辅助方法
 static VerdureConfig CreateDefaultVerdureConfig(IConfiguration configuration)

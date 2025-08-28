@@ -516,6 +516,72 @@ public class VoiceChatService : IVoiceChatService
     /// <summary>
     /// Internal method to start listening (called by state machine)
     /// </summary>
+    /// <summary>
+    /// 音频流异常恢复机制
+    /// </summary>
+    public async Task<bool> RecoverFromAudioStreamErrorAsync(Exception audioException)
+    {
+        try
+        {
+            _logger?.LogWarning(audioException, "检测到音频流异常，开始恢复程序...");
+            
+            // 1. 停止当前的录音状态
+            _isVoiceChatActive = false;
+            VoiceChatStateChanged?.Invoke(this, false);
+            
+            // 2. 强制清理音频流管理器
+            try
+            {
+                _audioStreamManager?.ForceCleanup();
+                _logger?.LogInformation("音频流已强制清理");
+            }
+            catch (Exception cleanupEx)
+            {
+                _logger?.LogWarning(cleanupEx, "强制清理音频流时出错");
+            }
+            
+            // 3. 重置状态机到空闲状态
+            try
+            {
+                _stateMachine?.RequestTransition(ConversationTrigger.ForceIdle, "音频流异常恢复");
+                _logger?.LogInformation("状态机已重置到空闲状态");
+            }
+            catch (Exception stateEx)
+            {
+                _logger?.LogWarning(stateEx, "重置状态机时出错");
+            }
+            
+            // 4. 等待一段时间让系统稳定
+            await Task.Delay(2000);
+            
+            // 5. 尝试重新初始化音频系统
+            if (_config?.EnableVoice == true && _audioStreamManager != null)
+            {
+                try
+                {
+                    await _audioStreamManager.StartRecordingAsync(_config.AudioSampleRate, _config.AudioChannels);
+                    await Task.Delay(500); // 短暂延迟确保启动稳定
+                    await _audioStreamManager.StopRecordingAsync();
+                    
+                    _logger?.LogInformation("音频系统重新初始化成功");
+                    return true;
+                }
+                catch (Exception reinitEx)
+                {
+                    _logger?.LogError(reinitEx, "重新初始化音频系统失败");
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "音频流异常恢复过程失败");
+            return false;
+        }
+    }
+
     private async Task StartListeningInternalAsync()
     {
         if (!IsConnected) return;
@@ -559,6 +625,25 @@ public class VoiceChatService : IVoiceChatService
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to start listening");
+            
+            // 特殊处理音频流异常
+            if (ex.Message.Contains("PortAudio") || ex.Message.Contains("audio") || ex.Message.Contains("stream"))
+            {
+                _logger?.LogWarning("检测到音频流异常，启动恢复程序...");
+                _ = Task.Run(async () =>
+                {
+                    var recovered = await RecoverFromAudioStreamErrorAsync(ex);
+                    if (recovered)
+                    {
+                        _logger?.LogInformation("音频流异常恢复成功");
+                    }
+                    else
+                    {
+                        _logger?.LogError("音频流异常恢复失败");
+                    }
+                });
+            }
+            
             ErrorOccurred?.Invoke(this, $"Failed to start listening: {ex.Message}");
             // Transition back to idle on error
             _stateMachine?.RequestTransition(ConversationTrigger.ForceIdle, "Error in start listening");
@@ -617,6 +702,24 @@ public class VoiceChatService : IVoiceChatService
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to stop listening");
+            
+            // 特殊处理音频流异常
+            if (ex.Message.Contains("PortAudio") || ex.Message.Contains("audio") || ex.Message.Contains("stream"))
+            {
+                _logger?.LogWarning("停止监听时检测到音频流异常，启动恢复程序...");
+                _ = Task.Run(async () =>
+                {
+                    var recovered = await RecoverFromAudioStreamErrorAsync(ex);
+                    if (recovered)
+                    {
+                        _logger?.LogInformation("停止监听时的音频流异常恢复成功");
+                    }
+                    else
+                    {
+                        _logger?.LogError("停止监听时的音频流异常恢复失败");
+                    }
+                });
+            }
             
             // 确保即使出错也要重置状态
             _isVoiceChatActive = false;
@@ -789,6 +892,25 @@ public class VoiceChatService : IVoiceChatService
         catch (Exception ex)
         {
             _logger?.LogError(ex, "处理音频数据失败");
+            
+            // 特殊处理音频流异常
+            if (ex.Message.Contains("PortAudio") || ex.Message.Contains("audio") || ex.Message.Contains("stream"))
+            {
+                _logger?.LogWarning("音频数据处理时检测到音频流异常，启动恢复程序...");
+                _ = Task.Run(async () =>
+                {
+                    var recovered = await RecoverFromAudioStreamErrorAsync(ex);
+                    if (recovered)
+                    {
+                        _logger?.LogInformation("音频数据处理时的音频流异常恢复成功");
+                    }
+                    else
+                    {
+                        _logger?.LogError("音频数据处理时的音频流异常恢复失败");
+                    }
+                });
+            }
+            
             ErrorOccurred?.Invoke(this, $"处理音频数据失败: {ex.Message}");
         }
     }
