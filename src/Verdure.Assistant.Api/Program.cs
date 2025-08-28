@@ -125,6 +125,96 @@ try
                 await emotionActionService.InitializeRobotAsync();
                 logger?.LogInformation("机器人初始化完成");
                 Console.WriteLine("[机器人] 机器人位置初始化完成");
+
+
+
+                // Initialize MCP services if needed
+                try
+                {
+                    var mcpServer = app.Services.GetService<McpServer>();
+                    var mcpDeviceManager = app.Services.GetService<McpDeviceManager>();
+                    var mcpIntegrationService = app.Services.GetService<McpIntegrationService>();
+
+                    if (mcpServer != null && mcpDeviceManager != null && mcpIntegrationService != null)
+                    {
+                        await mcpServer.InitializeAsync();
+                        await mcpDeviceManager.InitializeAsync();
+                        await mcpIntegrationService.InitializeAsync();
+
+                        logger?.LogInformation("MCP服务初始化完成，注册了 {DeviceCount} 个设备", mcpDeviceManager.Devices.Count);
+                        Console.WriteLine($"MCP服务初始化完成，注册了 {mcpDeviceManager.Devices.Count} 个设备");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger?.LogError(ex, "MCP服务初始化失败");
+                    Console.WriteLine($"MCP服务初始化失败: {ex.Message}");
+                }
+
+                // 可选：自动初始化语音聊天服务（类似Console项目）
+                var autoStartVoiceChat = app.Configuration.GetValue<bool>("AutoStartVoiceChat", false);
+                if (autoStartVoiceChat)
+                {
+                    try
+                    {
+                        logger?.LogInformation("自动启动语音聊天功能...");
+                        Console.WriteLine("[语音聊天] 自动启动语音聊天功能...");
+
+                        var voiceChatService = app.Services.GetService<IVoiceChatService>();
+                        var interruptManager = app.Services.GetService<InterruptManager>();
+                        var keywordSpottingService = app.Services.GetService<IKeywordSpottingService>();
+                        var musicVoiceCoordinationService = app.Services.GetService<MusicVoiceCoordinationService>();
+                        var mcpIntegrationServiceForVoice = app.Services.GetService<McpIntegrationService>();
+                        var emotionIntegrationService = app.Services.GetService<Verdure.Assistant.Api.Services.EmotionIntegrationService>();
+
+                        if (voiceChatService != null && interruptManager != null && keywordSpottingService != null)
+                        {
+                            // 设置语音聊天服务的各种组件（类似Console项目）
+                            voiceChatService.SetInterruptManager(interruptManager);
+                            await interruptManager.InitializeAsync();
+
+                            voiceChatService.SetKeywordSpottingService(keywordSpottingService);
+                            Console.WriteLine("[语音聊天] 关键词唤醒功能已启用（基于Microsoft认知服务）");
+
+                            if (musicVoiceCoordinationService != null)
+                            {
+                                voiceChatService.SetMusicVoiceCoordinationService(musicVoiceCoordinationService);
+                                Console.WriteLine("[语音聊天] 音乐语音协调服务已启用");
+                            }
+
+                            if (mcpIntegrationServiceForVoice != null)
+                            {
+                                voiceChatService.SetMcpIntegrationService(mcpIntegrationServiceForVoice);
+                                Console.WriteLine("[语音聊天] MCP集成服务已连接");
+                            }
+
+                            // 连接机器人情感集成服务
+                            if (emotionIntegrationService != null)
+                            {
+                                emotionIntegrationService.SetVoiceChatService(voiceChatService);
+                                Console.WriteLine("[机器人] 情感集成服务已连接，支持语音情感表达");
+                            }
+
+                            // 创建默认配置并初始化
+                            var config = CreateDefaultVerdureConfig(app.Configuration);
+                            await voiceChatService.InitializeAsync(config);
+
+                            logger?.LogInformation("语音聊天服务自动启动完成");
+                            Console.WriteLine("[语音聊天] 语音聊天服务自动启动完成，开始监听关键词唤醒...");
+                            Console.WriteLine("[语音聊天] 语音情感将自动触发机器人表情与动作");
+                        }
+                        else
+                        {
+                            logger?.LogWarning("语音聊天服务组件不完整，跳过自动启动");
+                            Console.WriteLine("[语音聊天] 语音聊天服务组件不完整，跳过自动启动");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger?.LogError(ex, "自动启动语音聊天失败");
+                        Console.WriteLine($"[语音聊天] 自动启动失败: {ex.Message}");
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -152,93 +242,7 @@ catch (Exception ex)
     Console.WriteLine($"[机器人] 服务初始化失败: {ex.Message}");
 }
 
-// Initialize MCP services if needed
-try
-{
-    var mcpServer = app.Services.GetService<McpServer>();
-    var mcpDeviceManager = app.Services.GetService<McpDeviceManager>();
-    var mcpIntegrationService = app.Services.GetService<McpIntegrationService>();
 
-    if (mcpServer != null && mcpDeviceManager != null && mcpIntegrationService != null)
-    {
-        await mcpServer.InitializeAsync();
-        await mcpDeviceManager.InitializeAsync();
-        await mcpIntegrationService.InitializeAsync();
-        
-        logger?.LogInformation("MCP服务初始化完成，注册了 {DeviceCount} 个设备", mcpDeviceManager.Devices.Count);
-        Console.WriteLine($"MCP服务初始化完成，注册了 {mcpDeviceManager.Devices.Count} 个设备");
-    }
-}
-catch (Exception ex)
-{
-    logger?.LogError(ex, "MCP服务初始化失败");
-    Console.WriteLine($"MCP服务初始化失败: {ex.Message}");
-}
-
-// 可选：自动初始化语音聊天服务（类似Console项目）
-var autoStartVoiceChat = app.Configuration.GetValue<bool>("AutoStartVoiceChat", false);
-if (autoStartVoiceChat)
-{
-    try
-    {
-        logger?.LogInformation("自动启动语音聊天功能...");
-        Console.WriteLine("[语音聊天] 自动启动语音聊天功能...");
-        
-        var voiceChatService = app.Services.GetService<IVoiceChatService>();
-        var interruptManager = app.Services.GetService<InterruptManager>();
-        var keywordSpottingService = app.Services.GetService<IKeywordSpottingService>();
-        var musicVoiceCoordinationService = app.Services.GetService<MusicVoiceCoordinationService>();
-        var mcpIntegrationServiceForVoice = app.Services.GetService<McpIntegrationService>();
-        var emotionIntegrationService = app.Services.GetService<Verdure.Assistant.Api.Services.EmotionIntegrationService>();
-        
-        if (voiceChatService != null && interruptManager != null && keywordSpottingService != null)
-        {
-            // 设置语音聊天服务的各种组件（类似Console项目）
-            voiceChatService.SetInterruptManager(interruptManager);
-            await interruptManager.InitializeAsync();
-            
-            voiceChatService.SetKeywordSpottingService(keywordSpottingService);
-            Console.WriteLine("[语音聊天] 关键词唤醒功能已启用（基于Microsoft认知服务）");
-            
-            if (musicVoiceCoordinationService != null)
-            {
-                voiceChatService.SetMusicVoiceCoordinationService(musicVoiceCoordinationService);
-                Console.WriteLine("[语音聊天] 音乐语音协调服务已启用");
-            }
-            
-            if (mcpIntegrationServiceForVoice != null)
-            {
-                voiceChatService.SetMcpIntegrationService(mcpIntegrationServiceForVoice);
-                Console.WriteLine("[语音聊天] MCP集成服务已连接");
-            }
-            
-            // 连接机器人情感集成服务
-            if (emotionIntegrationService != null)
-            {
-                emotionIntegrationService.SetVoiceChatService(voiceChatService);
-                Console.WriteLine("[机器人] 情感集成服务已连接，支持语音情感表达");
-            }
-            
-            // 创建默认配置并初始化
-            var config = CreateDefaultVerdureConfig(app.Configuration);
-            await voiceChatService.InitializeAsync(config);
-            
-            logger?.LogInformation("语音聊天服务自动启动完成");
-            Console.WriteLine("[语音聊天] 语音聊天服务自动启动完成，开始监听关键词唤醒...");
-            Console.WriteLine("[语音聊天] 语音情感将自动触发机器人表情与动作");
-        }
-        else
-        {
-            logger?.LogWarning("语音聊天服务组件不完整，跳过自动启动");
-            Console.WriteLine("[语音聊天] 语音聊天服务组件不完整，跳过自动启动");
-        }
-    }
-    catch (Exception ex)
-    {
-        logger?.LogError(ex, "自动启动语音聊天失败");
-        Console.WriteLine($"[语音聊天] 自动启动失败: {ex.Message}");
-    }
-}
 
 app.Run();
 
