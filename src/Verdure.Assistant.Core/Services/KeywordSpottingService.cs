@@ -1,8 +1,8 @@
 using Microsoft.CognitiveServices.Speech;
 using Microsoft.CognitiveServices.Speech.Audio;
 using Microsoft.Extensions.Logging;
-using Verdure.Assistant.Core.Constants;
 using Verdure.Assistant.Core.Interfaces;
+using Verdure.Assistant.Core.Models;
 
 namespace Verdure.Assistant.Core.Services;
 
@@ -12,7 +12,8 @@ namespace Verdure.Assistant.Core.Services;
 /// 支持使用.table模型文件进行离线关键词识别，无需订阅密钥
 /// </summary>
 public class KeywordSpottingService : IKeywordSpottingService
-{    private readonly ILogger<KeywordSpottingService>? _logger;
+{
+    private readonly ILogger<KeywordSpottingService>? _logger;
     private readonly IVoiceChatService _voiceChatService;
     private readonly AudioStreamManager _audioStreamManager;
 
@@ -21,24 +22,22 @@ public class KeywordSpottingService : IKeywordSpottingService
     private KeywordRecognizer? _keywordRecognizer;
     private KeywordRecognitionModel? _keywordModel;
 
-    // 关键词模型配置
-    private readonly string[] _keywordModels = {
-        "keyword_xiaodian.table",  // 对应py-xiaozhi的"你好小天"等
-        "keyword_cortana.table"    // 对应"Cortana"关键词
-    };    
+    // 配置信息
+    private VerdureConfig? _config;
     // 状态管理
     private bool _isRunning = false;
     private bool _isPaused = false;
     private bool _isEnabled = true;
-    private DeviceState _lastDeviceState = DeviceState.Idle;    // 音频处理
+    // 音频处理
     private IAudioRecorder? _audioRecorder;
     private bool _useExternalAudioSource = false;
     private PushAudioInputStream? _pushStream;
     private Task? _audioPushTask;
-    private EventHandler<byte[]>? _audioDataHandler;    // 线程安全
+    private EventHandler<byte[]>? _audioDataHandler;
+    // 线程安全
     private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
     private CancellationTokenSource? _cancellationTokenSource;
-    
+
     // 状态同步 - 防止关键词检测和语音对话状态变化的竞争条件
     private readonly SemaphoreSlim _stateChangeSemaphore = new SemaphoreSlim(1, 1);
     private volatile bool _isProcessingKeywordDetection = false;
@@ -49,17 +48,24 @@ public class KeywordSpottingService : IKeywordSpottingService
 
     public bool IsRunning => _isRunning && !_isPaused;
     public bool IsPaused => _isPaused;
-    public bool IsEnabled => _isEnabled;    
-    public KeywordSpottingService(IVoiceChatService voiceChatService, AudioStreamManager audioStreamManager, ILogger<KeywordSpottingService>? logger = null)
+    public bool IsEnabled => _isEnabled;
+    public KeywordSpottingService(IVoiceChatService voiceChatService,
+        AudioStreamManager audioStreamManager, ILogger<KeywordSpottingService>? logger = null)
     {
         _voiceChatService = voiceChatService;
         _audioStreamManager = audioStreamManager;
         _logger = logger;
 
-        // 订阅设备状态变化，实现py-xiaozhi的状态协调逻辑
-        _voiceChatService.DeviceStateChanged += OnDeviceStateChanged;
-
         InitializeSpeechConfig();
+    }
+
+    /// <summary>
+    /// 设置配置信息（在启动前调用）
+    /// </summary>
+    public void SetConfig(VerdureConfig config)
+    {
+        _config = config;
+        _logger?.LogInformation("关键词检测服务配置已更新");
     }
 
     /// <summary>
@@ -164,7 +170,7 @@ public class KeywordSpottingService : IKeywordSpottingService
     }
 
     /// <summary>
-    /// 加载关键词模型（使用Assets目录中的.table文件）
+    /// 加载关键词模型（使用配置中的模型路径和文件）
     /// 每次调用都创建新的模型实例以避免句柄错误
     /// </summary>
     private bool LoadKeywordModels()
@@ -188,29 +194,18 @@ public class KeywordSpottingService : IKeywordSpottingService
                 }
             }
 
-            // 获取Assets目录路径
-            var assetsPath = GetAssetsPath();
-            var keywordsPath = Path.Combine(assetsPath, "keywords");
-
-            if (!Directory.Exists(keywordsPath))
+            // 获取模型文件路径
+            var modelPath = GetKeywordModelPath();
+            if (string.IsNullOrEmpty(modelPath) || !File.Exists(modelPath))
             {
-                _logger?.LogError($"关键词模型目录不存在: {keywordsPath}");
-                return false;
-            }
-
-            // 优先使用xiaodian模型（对应py-xiaozhi的主要唤醒词）
-            var primaryModelPath = Path.Combine(keywordsPath, "keyword_xiaodian.table");
-
-            if (!File.Exists(primaryModelPath))
-            {
-                _logger?.LogError($"主要关键词模型文件不存在: {primaryModelPath}");
+                _logger?.LogError($"关键词模型文件不存在: {modelPath}");
                 return false;
             }
 
             // 从.table文件创建关键词模型 - 每次都创建新实例
-            _keywordModel = KeywordRecognitionModel.FromFile(primaryModelPath);
+            _keywordModel = KeywordRecognitionModel.FromFile(modelPath);
 
-            _logger?.LogInformation($"成功加载关键词模型: {primaryModelPath}");
+            _logger?.LogInformation($"成功加载关键词模型: {modelPath}");
             return true;
         }
         catch (Exception ex)
@@ -221,14 +216,56 @@ public class KeywordSpottingService : IKeywordSpottingService
     }
 
     /// <summary>
-    /// 获取Assets目录路径
+    /// 获取关键词模型文件的完整路径
     /// </summary>
-    private string GetAssetsPath()
+    private string GetKeywordModelPath()
     {
-        // 从当前程序集位置推断Assets路径
-        var assemblyPath = AppDomain.CurrentDomain.BaseDirectory;
+        var modelsPath = GetModelsDirectoryPath();
+        var currentModel = _config?.KeywordModels.CurrentModel ?? "keyword_xiaodian.table";
+        
+        return Path.Combine(modelsPath, currentModel);
+    }
 
-        // 向上查找到解决方案根目录，然后定位到WinUI项目的Assets
+    /// <summary>
+    /// 获取模型文件目录路径
+    /// </summary>
+    private string GetModelsDirectoryPath()
+    {
+        // 如果配置中指定了路径，使用配置的路径
+        if (!string.IsNullOrEmpty(_config?.KeywordModels.ModelsPath))
+        {
+            var configPath = _config.KeywordModels.ModelsPath;
+            if (Path.IsPathRooted(configPath))
+            {
+                return configPath;
+            }
+            else
+            {
+                // 相对路径，基于当前程序目录
+                return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, configPath);
+            }
+        }
+
+        // 使用默认逻辑：根据当前项目类型自动检测
+        return GetDefaultModelsPath();
+    }
+
+    /// <summary>
+    /// 获取默认的模型文件路径（保持向后兼容）
+    /// </summary>
+    private string GetDefaultModelsPath()
+    {
+        var assemblyPath = AppDomain.CurrentDomain.BaseDirectory;
+        
+        // 首先尝试Console项目的ModelFiles目录
+        var consoleModelsPath = Path.Combine(assemblyPath, "ModelFiles");
+        if (Directory.Exists(consoleModelsPath))
+        {
+            _logger?.LogDebug("使用Console项目模型路径: {Path}", consoleModelsPath);
+            return consoleModelsPath;
+        }
+
+        // 然后尝试从解决方案根目录查找WinUI项目的Assets/keywords
         var currentDir = new DirectoryInfo(assemblyPath);
         while (currentDir != null && !File.Exists(Path.Combine(currentDir.FullName, "Verdure.Assistant.sln")))
         {
@@ -237,11 +274,60 @@ public class KeywordSpottingService : IKeywordSpottingService
 
         if (currentDir != null)
         {
-            return Path.Combine(currentDir.FullName, "src", "Verdure.Assistant.WinUI", "Assets");
+            var winuiModelsPath = Path.Combine(currentDir.FullName, "src", "Verdure.Assistant.WinUI", "Assets", "keywords");
+            if (Directory.Exists(winuiModelsPath))
+            {
+                _logger?.LogDebug("使用WinUI项目模型路径: {Path}", winuiModelsPath);
+                return winuiModelsPath;
+            }
         }
 
-        // 如果找不到解决方案目录，使用相对路径
-        return Path.Combine(assemblyPath, "..", "..", "..", "..", "Verdure.Assistant.WinUI", "Assets");
+        // 回退到相对路径
+        var fallbackPath = Path.Combine(assemblyPath, "..", "..", "..", "..", "Verdure.Assistant.WinUI", "Assets", "keywords");
+        _logger?.LogDebug("使用回退模型路径: {Path}", fallbackPath);
+        return fallbackPath;
+    }
+
+    /// <summary>
+    /// 切换关键词模型
+    /// </summary>
+    public async Task<bool> SwitchKeywordModelAsync(string modelFileName)
+    {
+        if (_config == null)
+        {
+            _logger?.LogWarning("配置未设置，无法切换关键词模型");
+            return false;
+        }
+
+        // 验证模型文件是否存在
+        var modelsPath = GetModelsDirectoryPath();
+        var modelPath = Path.Combine(modelsPath, modelFileName);
+        
+        if (!File.Exists(modelPath))
+        {
+            _logger?.LogError($"关键词模型文件不存在: {modelPath}");
+            return false;
+        }
+
+        // 更新配置
+        _config.KeywordModels.CurrentModel = modelFileName;
+        
+        // 如果当前正在运行，重新启动以使用新模型
+        if (_isRunning)
+        {
+            _logger?.LogInformation("正在切换关键词模型，重新启动检测服务");
+            
+            var audioRecorder = _audioRecorder;
+            await StopAsync();
+            
+            // 等待一小段时间确保完全停止
+            await Task.Delay(100);
+            
+            return await StartAsync(audioRecorder);
+        }
+
+        _logger?.LogInformation($"关键词模型已切换为: {modelFileName}");
+        return true;
     }
 
     /// <summary>
@@ -279,7 +365,7 @@ public class KeywordSpottingService : IKeywordSpottingService
                     catch (Exception ex)
                     {
                         _logger?.LogWarning(ex, "写入音频数据到推送流时出错");
-                        
+
                         // 在严重错误时触发错误事件
                         if (ex is InvalidOperationException || ex is ArgumentException)
                         {
@@ -329,8 +415,8 @@ public class KeywordSpottingService : IKeywordSpottingService
 
         _keywordRecognizer.Recognized += (s, e) => OnKeywordRecognized(s, e);
         _keywordRecognizer.Canceled += (s, e) => OnRecognitionCanceled(s, e);
-    }    
-    
+    }
+
     /// <summary>
     /// 关键词识别事件处理
     /// </summary>
@@ -355,11 +441,11 @@ public class KeywordSpottingService : IKeywordSpottingService
                 KeywordDetected?.Invoke(this, eventArgs);
 
                 // 实现py-xiaozhi的状态协调逻辑
-                HandleKeywordDetection(keyword);
+                //HandleKeywordDetection(keyword);
 
                 // 关键：重新启动关键词识别以实现连续检测
                 // KeywordRecognizer的RecognizeOnceAsync检测到关键词后会停止，需要手动重启
-                RestartContinuousRecognition();
+                //RestartContinuousRecognition();
             }
         }
         catch (Exception ex)
@@ -368,67 +454,8 @@ public class KeywordSpottingService : IKeywordSpottingService
             OnErrorOccurred($"关键词识别处理错误: {ex.Message}");
         }
     }
-      /// <summary>
-    /// 处理关键词检测（实现py-xiaozhi的状态协调逻辑）
-    /// 只负责状态管理和暂停/恢复逻辑，不直接调用业务操作
-    /// </summary>
-    private void HandleKeywordDetection(string keyword)
-    {
-        Task.Run(async () =>
-        {
-            // 防止并发处理关键词检测事件
-            if (_isProcessingKeywordDetection)
-            {
-                _logger?.LogDebug("关键词检测正在处理中，跳过当前检测");
-                return;
-            }
 
-            await _stateChangeSemaphore.WaitAsync();
-            try
-            {
-                _isProcessingKeywordDetection = true;
-
-                switch (_lastDeviceState)
-                {
-                    case DeviceState.Idle:
-                        // 在空闲状态检测到关键词，暂停检测避免干扰
-                        _logger?.LogInformation("在空闲状态检测到关键词，暂停关键词检测");
-                        Pause(); // 暂停检测避免干扰
-                        
-                        // 短暂延迟确保暂停操作完成
-                        await Task.Delay(100);
-                        // 注意：不在这里调用 StartVoiceChatAsync，让 VoiceChatService 的事件处理负责
-                        break;
-
-                    case DeviceState.Speaking:
-                        // 在AI说话时检测到关键词，准备中断对话
-                        _logger?.LogInformation("在AI说话时检测到关键词，准备中断当前对话");
-                        // 注意：不在这里调用 StopVoiceChatAsync，让 VoiceChatService 的事件处理负责
-                        break;
-
-                    case DeviceState.Listening:
-                        // 在监听状态检测到关键词，可能是误触发，忽略
-                        _logger?.LogDebug("在监听状态检测到关键词，忽略（可能是误触发）");
-                        break;
-
-                    default:
-                        _logger?.LogDebug($"在状态 {_lastDeviceState} 检测到关键词，暂不处理");
-                        break;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "处理关键词检测时发生错误");
-                OnErrorOccurred($"关键词检测处理错误: {ex.Message}");
-            }
-            finally
-            {
-                _isProcessingKeywordDetection = false;
-                _stateChangeSemaphore.Release();
-            }
-        });
-    }
-      /// <summary>
+    /// <summary>
     /// 识别取消事件处理
     /// </summary>
     private void OnRecognitionCanceled(object? sender, SpeechRecognitionCanceledEventArgs e)
@@ -440,7 +467,7 @@ public class KeywordSpottingService : IKeywordSpottingService
             _logger?.LogWarning($"识别错误: {e.ErrorDetails}");
             OnErrorOccurred($"识别错误: {e.ErrorDetails}");
         }
-        
+
         // 如果是因为错误被取消且服务仍在运行，尝试重启识别
         if (e.Reason == CancellationReason.Error && _isRunning && !_isPaused)
         {
@@ -455,7 +482,7 @@ public class KeywordSpottingService : IKeywordSpottingService
             });
         }
     }
-    
+
     /// <summary>
     /// 重启连续关键词识别（实现持续检测功能）
     /// 为了避免 SPXERR_INVALID_HANDLE 错误，每次重启都创建全新的识别器实例
@@ -474,7 +501,7 @@ public class KeywordSpottingService : IKeywordSpottingService
             {
                 // 增加延迟时间以确保SDK完全释放资源
                 await Task.Delay(500);
-                
+
                 // 再次检查状态，防止在延迟期间服务被停止
                 if (!_isRunning || _isPaused)
                 {
@@ -490,10 +517,10 @@ public class KeywordSpottingService : IKeywordSpottingService
                     if (_isRunning && !_isPaused)
                     {
                         _logger?.LogDebug("开始重新创建关键词识别器...");
-                        
+
                         // 完全重建识别器以避免句柄错误
                         await RecreateKeywordRecognizer();
-                        
+
                         _logger?.LogDebug("关键词识别器已重新创建并启动，继续监听");
                     }
                 }
@@ -505,13 +532,13 @@ public class KeywordSpottingService : IKeywordSpottingService
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "重启连续关键词识别时发生错误");
-                
+
                 // 如果重建失败，尝试再次重建
                 if (_isRunning && !_isPaused)
                 {
                     _logger?.LogInformation("重建失败，1秒后尝试再次重建...");
                     await Task.Delay(1000);
-                    
+
                     if (_isRunning && !_isPaused)
                     {
                         try
@@ -537,8 +564,8 @@ public class KeywordSpottingService : IKeywordSpottingService
             }
         });
     }
-    
-    
+
+
     /// <summary>
     /// 停止关键词检测（对应py-xiaozhi的stop方法）
     /// </summary>
@@ -585,8 +612,8 @@ public class KeywordSpottingService : IKeywordSpottingService
         {
             _semaphore.Release();
         }
-    }    
-    
+    }
+
     /// <summary>
     /// 暂停检测（对应py-xiaozhi的pause方法）
     /// </summary>
@@ -595,7 +622,7 @@ public class KeywordSpottingService : IKeywordSpottingService
         if (_isRunning && !_isPaused)
         {
             _isPaused = true;
-            
+
             // 停止Microsoft认知服务的关键词识别器
             _ = Task.Run(async () =>
             {
@@ -620,7 +647,7 @@ public class KeywordSpottingService : IKeywordSpottingService
                     _logger?.LogError(ex, "暂停关键词检测时发生错误");
                 }
             });
-            
+
             _logger?.LogInformation("关键词检测已暂停");
         }
     }
@@ -632,14 +659,42 @@ public class KeywordSpottingService : IKeywordSpottingService
     {
         if (_isRunning && _isPaused)
         {
-            _isPaused = false;
-            
-            // 重新启动Microsoft认知服务的关键词识别器
-            // 使用RestartContinuousRecognition方法重启关键词识别
-            // 这确保了正确的连续识别逻辑并避免句柄错误
-            RestartContinuousRecognition();
-            
-            _logger?.LogInformation("关键词检测已恢复");
+            try
+            {
+                _isPaused = false;
+
+                // 验证音频源是否可用
+                if (_useExternalAudioSource && _audioRecorder != null && !_audioRecorder.IsRecording)
+                {
+                    _logger?.LogWarning("外部音频源未录制，无法恢复关键词检测");
+                    _isPaused = true; // 回滚状态
+                    return;
+                }
+
+                // 重新启动Microsoft认知服务的关键词识别器
+                // 使用RestartContinuousRecognition方法重启关键词识别
+                // 这确保了正确的连续识别逻辑并避免句柄错误
+                RestartContinuousRecognition();
+
+                _logger?.LogInformation("关键词检测已恢复");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "恢复关键词检测时发生错误");
+                _isPaused = true; // 回滚状态
+                OnErrorOccurred($"恢复关键词检测失败: {ex.Message}");
+            }
+        }
+        else
+        {
+            if (!_isRunning)
+            {
+                _logger?.LogDebug("关键词检测器未运行，无法恢复");
+            }
+            else if (!_isPaused)
+            {
+                _logger?.LogDebug("关键词检测器未暂停，无需恢复");
+            }
         }
     }
 
@@ -675,45 +730,13 @@ public class KeywordSpottingService : IKeywordSpottingService
     }
 
     /// <summary>
-    /// 设备状态变化处理（实现py-xiaozhi的状态协调）
-    /// </summary>
-    private void OnDeviceStateChanged(object? sender, DeviceState newState)
-    {
-        _lastDeviceState = newState;
-        _logger?.LogDebug($"设备状态变化: {newState}");
-
-        // 实现py-xiaozhi的状态协调逻辑
-        switch (newState)
-        {
-            case DeviceState.Listening:
-                // 开始监听时暂停关键词检测，避免干扰
-                Pause();
-                break;
-
-            case DeviceState.Speaking:
-                // AI说话时保持检测，以便中断
-                Resume();
-                break;
-
-            case DeviceState.Idle:
-                // 空闲时恢复检测，等待下次唤醒
-                Resume();
-                break;
-
-            case DeviceState.Connecting:
-                // 连接时暂停检测
-                Pause();
-                break;
-        }
-    }
-
-    /// <summary>
     /// 触发错误事件
     /// </summary>
     private void OnErrorOccurred(string error)
     {
         ErrorOccurred?.Invoke(this, error);
-    }    public void Dispose()
+    }
+    public void Dispose()
     {
         // Use the async method but wait for completion during disposal
         try
@@ -725,21 +748,19 @@ public class KeywordSpottingService : IKeywordSpottingService
             _logger?.LogError(ex, "停止关键词检测时发生错误 (在Dispose中)");
         }
 
-        _voiceChatService.DeviceStateChanged -= OnDeviceStateChanged;
-
         _keywordModel?.Dispose();
 
         // SpeechConfig不实现IDisposable，无需手动释放
         _cancellationTokenSource?.Dispose();
         _semaphore.Dispose();
-        
+
         // 清理新添加的同步对象
         _stateChangeSemaphore?.Dispose();
 
         _logger?.LogInformation("关键词检测服务已释放");
     }
-    
-    
+
+
     /// <summary>
     /// 配置共享音频输入（类似 py-xiaozhi 的 AudioCodec 共享流模式）
     /// 每次调用都创建新的音频流实例以避免句柄错误

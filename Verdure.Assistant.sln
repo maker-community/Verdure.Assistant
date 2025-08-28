@@ -15,7 +15,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ApiCheck", "tests\ApiCheck\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CodecTest", "tests\CodecTest\CodecTest.csproj", "{734170A4-C4D3-4CCC-B2A4-745AC36977BE}"
 EndProject
-
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DecodeTest", "tests\DecodeTest\DecodeTest.csproj", "{864A6C89-4BC1-4726-99E9-A9945D5CEEE6}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpusApiTest", "tests\OpusApiTest\OpusApiTest.csproj", "{79F98AC1-0948-475B-9167-54A1977637E1}"
@@ -31,6 +30,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AudioStreamIntegrationTest", "tests\AudioStreamIntegrationTest\AudioStreamIntegrationTest.csproj", "{99A9FA13-9B82-4F39-BD4E-3E8264B2D404}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KeywordSpottingIntegrationTest", "tests\KeywordSpottingIntegrationTest\KeywordSpottingIntegrationTest.csproj", "{EF892F99-8A81-F30C-641F-D986E744B936}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Verdure.Assistant.Api", "src\Verdure.Assistant.Api\Verdure.Assistant.Api.csproj", "{F8176343-73F3-47AD-A0E8-3B9E077625C8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -244,6 +245,22 @@ Global
 		{EF892F99-8A81-F30C-641F-D986E744B936}.Release|x64.Build.0 = Release|Any CPU
 		{EF892F99-8A81-F30C-641F-D986E744B936}.Release|x86.ActiveCfg = Release|Any CPU
 		{EF892F99-8A81-F30C-641F-D986E744B936}.Release|x86.Build.0 = Release|Any CPU
+		{F8176343-73F3-47AD-A0E8-3B9E077625C8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F8176343-73F3-47AD-A0E8-3B9E077625C8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F8176343-73F3-47AD-A0E8-3B9E077625C8}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{F8176343-73F3-47AD-A0E8-3B9E077625C8}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{F8176343-73F3-47AD-A0E8-3B9E077625C8}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F8176343-73F3-47AD-A0E8-3B9E077625C8}.Debug|x64.Build.0 = Debug|Any CPU
+		{F8176343-73F3-47AD-A0E8-3B9E077625C8}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F8176343-73F3-47AD-A0E8-3B9E077625C8}.Debug|x86.Build.0 = Debug|Any CPU
+		{F8176343-73F3-47AD-A0E8-3B9E077625C8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F8176343-73F3-47AD-A0E8-3B9E077625C8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F8176343-73F3-47AD-A0E8-3B9E077625C8}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{F8176343-73F3-47AD-A0E8-3B9E077625C8}.Release|ARM64.Build.0 = Release|Any CPU
+		{F8176343-73F3-47AD-A0E8-3B9E077625C8}.Release|x64.ActiveCfg = Release|Any CPU
+		{F8176343-73F3-47AD-A0E8-3B9E077625C8}.Release|x64.Build.0 = Release|Any CPU
+		{F8176343-73F3-47AD-A0E8-3B9E077625C8}.Release|x86.ActiveCfg = Release|Any CPU
+		{F8176343-73F3-47AD-A0E8-3B9E077625C8}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -65,6 +65,19 @@ public interface IKeywordSpottingService : IDisposable
     /// <param name="audioRecorder">新的音频录制器</param>
     /// <returns>更新是否成功</returns>
     bool UpdateAudioSource(IAudioRecorder audioRecorder);
+
+    /// <summary>
+    /// 设置配置信息
+    /// </summary>
+    /// <param name="config">配置对象</param>
+    void SetConfig(VerdureConfig config);
+
+    /// <summary>
+    /// 切换关键词模型
+    /// </summary>
+    /// <param name="modelFileName">模型文件名</param>
+    /// <returns>切换是否成功</returns>
+    Task<bool> SwitchKeywordModelAsync(string modelFileName);
 }
 
 /// <summary>
