@@ -47,6 +47,17 @@ builder.Services.AddSingleton<AudioStreamManager>(provider =>
 // Music player service (using mpg123)
 builder.Services.AddSingleton<IMusicPlayerService, ApiMusicService>();
 
+// Register Robot Services
+builder.Services.AddSingleton<Verdure.Assistant.Api.Services.Robot.DisplayService>();
+builder.Services.AddSingleton<Verdure.Assistant.Api.Services.Robot.RobotActionService>();
+builder.Services.AddSingleton<Verdure.Assistant.Api.Services.Robot.EmotionActionService>();
+
+// Register Background Services
+builder.Services.AddHostedService<Verdure.Assistant.Api.Services.Robot.TimeDisplayService>();
+
+// Register Emotion Integration Service
+builder.Services.AddSingleton<Verdure.Assistant.Api.Services.EmotionIntegrationService>();
+
 // Register MCP services
 builder.Services.AddSingleton<McpServer>();
 builder.Services.AddSingleton<McpDeviceManager>(provider =>
@@ -66,6 +77,18 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+// Add static files support (for wwwroot)
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
+// Add CORS support
+app.UseCors(builder =>
+{
+    builder.AllowAnyOrigin()
+           .AllowAnyMethod()
+           .AllowAnyHeader();
+});
+
 app.UseAuthorization();
 
 app.MapControllers();
@@ -76,12 +99,58 @@ logger?.LogInformation("=== 绿荫助手语音聊天API服务启动 ===");
 logger?.LogInformation("音乐播放功能: 已启用 (mpg123)");
 logger?.LogInformation("语音聊天功能: 已启用");
 logger?.LogInformation("MCP设备管理: 已启用");
+logger?.LogInformation("机器人表情与动作: 已启用");
 
 Console.WriteLine("=== 绿荫助手语音聊天API服务 ===");
 Console.WriteLine("音乐播放功能: 已启用 (基于mpg123)");
 Console.WriteLine("语音聊天功能: 已启用");
 Console.WriteLine("MCP设备管理: 已启用");
+Console.WriteLine("机器人表情与动作: 已启用");
 Console.WriteLine($"[音乐缓存] 音乐缓存目录: {Path.Combine(Path.GetTempPath(), "VerdureMusicCache")}");
+Console.WriteLine($"[机器人] Web控制面板: http://localhost:5000");
+
+// Initialize Robot services if needed
+try
+{
+    var emotionActionService = app.Services.GetService<Verdure.Assistant.Api.Services.Robot.EmotionActionService>();
+    
+    if (emotionActionService != null)
+    {
+        // 在后台初始化机器人位置
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(3000); // 等待其他服务完全启动
+                await emotionActionService.InitializeRobotAsync();
+                logger?.LogInformation("机器人初始化完成");
+                Console.WriteLine("[机器人] 机器人位置初始化完成");
+            }
+            catch (Exception ex)
+            {
+                logger?.LogError(ex, "机器人初始化失败");
+                Console.WriteLine($"[机器人] 初始化失败: {ex.Message}");
+            }
+        });
+        
+        logger?.LogInformation("机器人服务初始化完成");
+        Console.WriteLine("[机器人] 机器人服务初始化完成");
+        Console.WriteLine("[机器人] API 端点:");
+        Console.WriteLine("  POST /api/emotion/play - 播放指定表情和动作");
+        Console.WriteLine("  POST /api/emotion/play-emotion/{type} - 仅播放表情");
+        Console.WriteLine("  POST /api/emotion/play-action/{type} - 仅播放动作");
+        Console.WriteLine("  POST /api/emotion/play-random - 随机播放");
+        Console.WriteLine("  POST /api/emotion/stop - 停止播放");
+        Console.WriteLine("  GET  /api/emotion/status - 获取状态");
+        Console.WriteLine("  POST /api/emotion/initialize - 初始化机器人");
+        Console.WriteLine("  POST /api/emotion/demo - 运行演示程序");
+    }
+}
+catch (Exception ex)
+{
+    logger?.LogError(ex, "机器人服务初始化失败");
+    Console.WriteLine($"[机器人] 服务初始化失败: {ex.Message}");
+}
 
 // Initialize MCP services if needed
 try
@@ -120,6 +189,7 @@ if (autoStartVoiceChat)
         var keywordSpottingService = app.Services.GetService<IKeywordSpottingService>();
         var musicVoiceCoordinationService = app.Services.GetService<MusicVoiceCoordinationService>();
         var mcpIntegrationServiceForVoice = app.Services.GetService<McpIntegrationService>();
+        var emotionIntegrationService = app.Services.GetService<Verdure.Assistant.Api.Services.EmotionIntegrationService>();
         
         if (voiceChatService != null && interruptManager != null && keywordSpottingService != null)
         {
@@ -142,12 +212,20 @@ if (autoStartVoiceChat)
                 Console.WriteLine("[语音聊天] MCP集成服务已连接");
             }
             
+            // 连接机器人情感集成服务
+            if (emotionIntegrationService != null)
+            {
+                emotionIntegrationService.SetVoiceChatService(voiceChatService);
+                Console.WriteLine("[机器人] 情感集成服务已连接，支持语音情感表达");
+            }
+            
             // 创建默认配置并初始化
             var config = CreateDefaultVerdureConfig(app.Configuration);
             await voiceChatService.InitializeAsync(config);
             
             logger?.LogInformation("语音聊天服务自动启动完成");
             Console.WriteLine("[语音聊天] 语音聊天服务自动启动完成，开始监听关键词唤醒...");
+            Console.WriteLine("[语音聊天] 语音情感将自动触发机器人表情与动作");
         }
         else
         {
