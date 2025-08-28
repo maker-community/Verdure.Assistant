@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Verdure.Assistant.Api.IoT.Interfaces;
 using Verdure.Assistant.Api.IoT.Services;
 using Verdure.Assistant.Api.Services;
@@ -104,11 +105,14 @@ var logger = app.Services.GetService<ILogger<Program>>();
 logger?.LogInformation("=== 绿荫助手语音聊天API服务启动 ===");
 
 // Start the web server in background and continue with initialization
-var webServerTask = app.RunAsync();
+//var webServerTask = app.RunAsync();
 
 Console.WriteLine($"📱 Web控制面板: http://localhost:5031");
 Console.WriteLine($"📚 API文档: http://localhost:5031/swagger");
 Console.WriteLine("🔧 开始初始化后台服务...");
+
+// 获取服务并进行初始化
+var emotionService = app.Services.GetRequiredService<IEmotionActionService>();
 
 // Initialize services in background after web server starts
 _ = Task.Run(async () =>
@@ -117,7 +121,9 @@ _ = Task.Run(async () =>
     {
         // Wait a moment for web server to start
         await Task.Delay(1000);
-        
+
+        await emotionService.InitializeRobotAsync();
+
         Console.WriteLine("音乐播放功能: 已启用 (基于mpg123)");
         Console.WriteLine("语音聊天功能: 已启用");
         Console.WriteLine("MCP设备管理: 已启用");
@@ -233,7 +239,8 @@ _ = Task.Run(async () =>
 });
 
 // Wait for the web server (this will block until the application is shut down)
-await webServerTask;
+//await webServerTask;
+app.Run();
 
 // 创建默认配置的辅助方法
 static VerdureConfig CreateDefaultVerdureConfig(IConfiguration configuration)
