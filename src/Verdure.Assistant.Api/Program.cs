@@ -45,16 +45,8 @@ builder.Services.AddSingleton<AudioStreamManager>(provider =>
 // Music player service (using mpg123)
 builder.Services.AddSingleton<IMusicPlayerService, ApiMusicService>();
 
-// Register MCP services
-builder.Services.AddSingleton<McpServer>();
-builder.Services.AddSingleton<McpDeviceManager>(provider =>
-{
-    var logger = provider.GetRequiredService<ILogger<McpDeviceManager>>();
-    var mcpServer = provider.GetRequiredService<McpServer>();
-    var musicService = provider.GetService<IMusicPlayerService>();
-    return new McpDeviceManager(logger, mcpServer, musicService);
-});
-builder.Services.AddSingleton<McpIntegrationService>();
+// Register simplified MCP services (new architecture based on xiaozhi-esp32)
+builder.Services.AddSimpleMcpServices();
 
 // Register IoT services for robot emotion and action control
 builder.Services.AddSingleton<IDisplayService, DisplayService>();
@@ -141,27 +133,33 @@ _ = Task.Run(async () =>
             Console.WriteLine($"❌ 情感集成服务初始化失败: {ex.Message}");
         }
 
-        // Initialize MCP services if needed
+        // Initialize simplified MCP services (new architecture based on xiaozhi-esp32)
         try
         {
-            var mcpServer = app.Services.GetService<McpServer>();
-            var mcpDeviceManager = app.Services.GetService<McpDeviceManager>();
-            var mcpIntegrationService = app.Services.GetService<McpIntegrationService>();
+            logger?.LogInformation("初始化简化MCP服务...");
+            Console.WriteLine("🔧 初始化简化MCP服务...");
 
-            if (mcpServer != null && mcpDeviceManager != null && mcpIntegrationService != null)
+            var mcpManager = app.Services.GetService<SimpleMcpManager>();
+            var mcpIntegration = app.Services.GetService<IMcpIntegration>();
+
+            if (mcpManager != null)
             {
-                await mcpServer.InitializeAsync();
-                await mcpDeviceManager.InitializeAsync();
-                await mcpIntegrationService.InitializeAsync();
-
-                logger?.LogInformation("MCP服务初始化完成，注册了 {DeviceCount} 个设备", mcpDeviceManager.Devices.Count);
-                Console.WriteLine($"✅ MCP服务初始化完成，注册了 {mcpDeviceManager.Devices.Count} 个设备");
+                // SimpleMcpManager 在构造函数中自动完成初始化，无需手动调用
+                var toolCount = mcpManager.GetAllTools().Count;
+                
+                logger?.LogInformation("简化MCP服务初始化完成，注册了 {ToolCount} 个工具", toolCount);
+                Console.WriteLine($"✅ 简化MCP服务初始化完成，注册了 {toolCount} 个工具");
+            }
+            else
+            {
+                logger?.LogWarning("SimpleMcpManager not found");
+                Console.WriteLine("⚠️ SimpleMcpManager 未找到");
             }
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex, "MCP服务初始化失败");
-            Console.WriteLine($"❌ MCP服务初始化失败: {ex.Message}");
+            logger?.LogError(ex, "简化MCP服务初始化失败");
+            Console.WriteLine($"❌ 简化MCP服务初始化失败: {ex.Message}");
         }
 
         // 可选：自动初始化语音聊天服务（在后台运行，不阻塞）
@@ -198,6 +196,16 @@ _ = Task.Run(async () =>
                     {
                         voiceChatService.SetMcpIntegrationService(mcpIntegrationServiceForVoice);
                         Console.WriteLine("✅ [语音聊天] MCP集成服务已连接");
+                    }
+                    else
+                    {
+                        // 尝试使用简化的MCP集成
+                        var simpleMcpIntegration = app.Services.GetService<IMcpIntegration>();
+                        if (simpleMcpIntegration != null)
+                        {
+                            voiceChatService.SetMcpIntegration(simpleMcpIntegration);
+                            Console.WriteLine("✅ [语音聊天] 简化MCP集成已连接");
+                        }
                     }
 
                     // 创建默认配置并初始化

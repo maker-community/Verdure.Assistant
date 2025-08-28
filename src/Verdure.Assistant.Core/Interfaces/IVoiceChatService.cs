@@ -131,9 +131,14 @@ public interface IVoiceChatService : IDisposable
     bool IsKeywordDetectionEnabled { get; }    
     
     /// <summary>
-    /// 设置MCP集成服务（新架构，基于xiaozhi-esp32的MCP实现）
+    /// 设置MCP集成服务（传统架构）
     /// </summary>
     void SetMcpIntegrationService(Services.MCP.McpIntegrationService mcpIntegrationService);
+    
+    /// <summary>
+    /// 设置MCP集成（简化架构，基于xiaozhi-esp32的MCP实现）
+    /// </summary>
+    void SetMcpIntegration(Services.MCP.IMcpIntegration mcpIntegration);
     
     /// <summary>
     /// 设置音乐语音协调服务

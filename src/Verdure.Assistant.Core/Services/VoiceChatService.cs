@@ -262,7 +262,7 @@ public class VoiceChatService : IVoiceChatService
 
         _logger?.LogInformation("关键词唤醒服务已设置");
     }    /// <summary>
-         /// 设置MCP集成服务（新架构，基于xiaozhi-esp32的MCP实现）
+         /// 设置MCP集成服务（传统架构）
          /// </summary>
     public void SetMcpIntegrationService(McpIntegrationService mcpIntegrationService)
     {
@@ -276,6 +276,20 @@ public class VoiceChatService : IVoiceChatService
             wsClient.SetMcpIntegrationService(mcpIntegrationService);
             _logger?.LogInformation("MCP集成服务已配置到现有WebSocketClient");
         }
+    }
+    
+    /// <summary>
+    /// 设置MCP集成（简化架构，基于xiaozhi-esp32的MCP实现）
+    /// </summary>
+    public void SetMcpIntegration(IMcpIntegration mcpIntegration)
+    {
+        // 将简化的MCP集成适配为传统的McpIntegrationService
+        // 这样可以重用现有的代码逻辑，只是通过适配器模式使用新架构
+        
+        var adaptedService = new McpIntegrationAdapter(mcpIntegration);
+        SetMcpIntegrationService(adaptedService);
+        
+        _logger?.LogInformation("简化MCP集成已设置并适配为传统架构");
     }
 
     /// <summary>

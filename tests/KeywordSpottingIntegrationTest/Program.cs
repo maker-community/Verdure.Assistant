@@ -317,6 +317,11 @@ public class MockVoiceChatService : IVoiceChatService
         // 模拟实现
     }
 
+    public void SetMcpIntegration(IMcpIntegration mcpIntegration)
+    {
+        // 模拟实现 - 用于新的简化MCP架构
+    }
+
     public void SetMusicVoiceCoordinationService(MusicVoiceCoordinationService musicVoiceCoordinationService)
     {
         // 模拟实现

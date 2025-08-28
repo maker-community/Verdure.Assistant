@@ -62,7 +62,7 @@ class Program
             System.Console.WriteLine("音乐语音协调服务已启用（自动暂停/恢复语音识别）");
 
             // Initialize MCP IoT devices (new architecture based on xiaozhi-esp32)
-            await InitializeMcpDevicesAsync(host.Services);
+            //await InitializeMcpDevicesAsync(host.Services);
 
             // Initialize MCP services (new architecture based on xiaozhi-esp32)
             await InitializeMcpServicesAsync(host.Services);
@@ -121,16 +121,9 @@ class Program
                 // Music player service (required for MCP music device)
                 services.AddSingleton<IMusicPlayerService, KugouMusicService>();
                 services.AddSingleton<IMusicAudioPlayer, ConsoleMusicAudioPlayer>();
-                // Register MCP services (new architecture based on xiaozhi-esp32)
-                services.AddSingleton<McpServer>();
-                services.AddSingleton<McpDeviceManager>(provider =>
-                {
-                    var logger = provider.GetRequiredService<ILogger<McpDeviceManager>>();
-                    var mcpServer = provider.GetRequiredService<McpServer>();
-                    var musicService = provider.GetService<IMusicPlayerService>();
-                    return new McpDeviceManager(logger, mcpServer, musicService);
-                });
-                services.AddSingleton<McpIntegrationService>();
+                
+                // Register simplified MCP services (new architecture based on xiaozhi-esp32)
+                services.AddSimpleMcpServices();
 
             });
 
@@ -212,44 +205,47 @@ class Program
             System.Console.WriteLine($"MCP IoT设备初始化失败: {ex.Message}");
         }
     }/// <summary>
-     /// Initialize MCP services (new architecture based on xiaozhi-esp32)
+     /// Initialize MCP services (simplified architecture based on xiaozhi-esp32)
      /// </summary>
-    static async Task InitializeMcpServicesAsync(IServiceProvider services)
+    static Task InitializeMcpServicesAsync(IServiceProvider services)
     {
         try
         {
             var logger = services.GetService<ILogger<Program>>();
-            logger?.LogInformation("开始初始化MCP服务...");
+            logger?.LogInformation("开始初始化简化MCP服务...");
 
-            // Get MCP services
-            var mcpServer = services.GetService<McpServer>();
-            var mcpDeviceManager = services.GetService<McpDeviceManager>();
-            var mcpIntegrationService = services.GetService<McpIntegrationService>();
+            // Get simplified MCP manager
+            var mcpManager = services.GetService<SimpleMcpManager>();
+            var mcpIntegration = services.GetService<IMcpIntegration>();
 
-            if (mcpServer == null || mcpDeviceManager == null || mcpIntegrationService == null)
+            if (mcpManager == null)
             {
-                logger?.LogWarning("MCP services not found, skipping MCP initialization");
-                return;
+                logger?.LogWarning("SimpleMcpManager not found, skipping MCP initialization");
+                return Task.CompletedTask;
             }
 
-            // Initialize MCP integration
-            await mcpIntegrationService.InitializeAsync();
+            // SimpleMcpManager 在构造函数中自动完成初始化，无需手动调用 InitializeAsync
+            // 这模仿了xiaozhi-esp32的设计模式
 
-            // Wire MCP integration service to VoiceChatService
-            if (_voiceChatService != null)
+            // Wire MCP integration to VoiceChatService
+            if (_voiceChatService != null && mcpIntegration != null)
             {
-                _voiceChatService.SetMcpIntegrationService(mcpIntegrationService);
-                logger?.LogInformation("MCP集成服务已连接到VoiceChatService");
+                // 使用适配器模式保持向后兼容
+                _voiceChatService.SetMcpIntegration(mcpIntegration);
+                logger?.LogInformation("MCP集成已连接到语音聊天服务");
             }
 
-            logger?.LogInformation("MCP服务初始化完成");
-            System.Console.WriteLine("MCP设备管理器已启用 (基于xiaozhi-esp32架构)");
+            var toolCount = mcpManager.GetAllTools().Count;
+            logger?.LogInformation("简化MCP服务初始化完成，注册了 {ToolCount} 个工具", toolCount);
+            System.Console.WriteLine($"✅ 简化MCP服务初始化完成，注册了 {toolCount} 个工具 (基于xiaozhi-esp32架构)");
+            return Task.CompletedTask;
         }
         catch (Exception ex)
         {
             var logger = services.GetService<ILogger<Program>>();
-            logger?.LogError(ex, "MCP服务初始化失败");
-            System.Console.WriteLine($"MCP服务初始化失败: {ex.Message}");
+            logger?.LogError(ex, "简化MCP服务初始化失败");
+            System.Console.WriteLine($"❌ 简化MCP服务初始化失败: {ex.Message}");
+            return Task.CompletedTask;
         }
     }
 
