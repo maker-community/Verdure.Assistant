@@ -89,6 +89,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// Enable static files
+app.UseStaticFiles();
+
 app.UseAuthorization();
 
 app.MapControllers();
@@ -204,7 +207,7 @@ if (autoStartVoiceChat)
     }
 }
 
-app.Run();
+await app.RunAsync();
 
 // 创建默认配置的辅助方法
 static VerdureConfig CreateDefaultVerdureConfig(IConfiguration configuration)

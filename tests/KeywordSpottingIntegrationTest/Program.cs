@@ -335,4 +335,9 @@ public class MockVoiceChatService : IVoiceChatService
     {
         // 模拟实现
     }
+
+    public Task<bool> SwitchKeywordModelAsync(string modelFileName)
+    {
+        throw new NotImplementedException();
+    }
 }

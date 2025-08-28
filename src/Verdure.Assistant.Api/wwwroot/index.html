@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verdure Assistant 控制面板</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        .container {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            margin-bottom: 20px;
+        }
+        .container h2 {
+            margin-top: 0;
+            color: #667eea;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .status-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        .status-card h4 {
+            margin: 0 0 10px 0;
+            color: #667eea;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        .status-connected { 
+            background-color: #28a745; 
+            animation: none;
+        }
+        .status-disconnected { 
+            background-color: #dc3545; 
+            animation: none;
+        }
+        .status-active { 
+            background-color: #ffc107; 
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .button-group {
+            margin-bottom: 20px;
+        }
+        .button-group h3 {
+            margin-bottom: 15px;
+            color: #495057;
+            font-size: 1.1em;
+        }
+        .button-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            min-width: 120px;
+            text-align: center;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+        }
+        .success {
+            background: linear-gradient(135deg, #5f27cd 0%, #00d2d3 100%);
+        }
+        .warning {
+            background: linear-gradient(135deg, #ff9ff3 0%, #f368e0 100%);
+        }
+        .input-group {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        .input-group h4 {
+            margin: 0 0 15px 0;
+            color: #495057;
+        }
+        .input-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .input-row label {
+            font-weight: 500;
+            color: #495057;
+        }
+        input, textarea, select {
+            padding: 8px 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .log {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            border: 2px solid #333;
+        }
+        .log::-webkit-scrollbar {
+            width: 8px;
+        }
+        .log::-webkit-scrollbar-track {
+            background: #2e2e2e;
+        }
+        .log::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+        .emoji-btn {
+            font-size: 1.2em;
+            min-width: 140px;
+        }
+        .connection-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) {
+            .connection-panel {
+                grid-template-columns: 1fr;
+            }
+            .input-row {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .button-row {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 Verdure Assistant</h1>
+        <p>机器人表情动作与语音对话控制面板</p>
+    </div>
+
+    <!-- 状态监控 -->
+    <div class="container">
+        <h2>📊 系统状态</h2>
+        <div class="status-grid">
+            <div class="status-card">
+                <h4>语音聊天服务</h4>
+                <div id="voiceChatStatus">
+                    <span class="status-indicator status-disconnected"></span>
+                    <span>未连接</span>
+                </div>
+            </div>
+            <div class="status-card">
+                <h4>表情动作系统</h4>
+                <div id="emotionStatus">
+                    <span class="status-indicator status-disconnected"></span>
+                    <span>检查中...</span>
+                </div>
+            </div>
+            <div class="status-card">
+                <h4>音乐播放器</h4>
+                <div id="musicStatus">
+                    <span class="status-indicator status-disconnected"></span>
+                    <span>检查中...</span>
+                </div>
+            </div>
+            <div class="status-card">
+                <h4>机器人关节</h4>
+                <div id="jointsStatus">
+                    <span class="status-indicator status-disconnected"></span>
+                    <span>检查中...</span>
+                </div>
+            </div>
+        </div>
+        <div class="button-row">
+            <button onclick="updateAllStatus()">🔄 刷新状态</button>
+            <button onclick="testAllConnections()">🔍 测试连接</button>
+        </div>
+    </div>
+
+    <!-- 语音对话控制 -->
+    <div class="container">
+        <h2>🎤 语音对话控制</h2>
+        <div class="connection-panel">
+            <div>
+                <h4>连接控制</h4>
+                <div class="button-row">
+                    <button class="success" onclick="initializeVoiceChat()">🔗 初始化服务</button>
+                    <button onclick="startVoiceChat()">▶️ 开始对话</button>
+                    <button class="warning" onclick="stopVoiceChat()">⏸️ 停止对话</button>
+                    <button onclick="toggleVoiceChat()">🔄 切换状态</button>
+                </div>
+                <div class="button-row">
+                    <button class="danger" onclick="disconnectVoiceChat()">❌ 断开连接</button>
+                </div>
+            </div>
+            <div>
+                <h4>模式设置</h4>
+                <div class="input-row">
+                    <label>
+                        <input type="checkbox" id="autoModeCheck"> 自动对话模式
+                    </label>
+                    <button onclick="toggleAutoMode()">应用设置</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="input-group">
+            <h4>💬 发送文本消息</h4>
+            <div class="input-row">
+                <textarea id="textMessage" placeholder="输入要发送的文本消息..." rows="3" style="flex: 1; min-width: 300px;"></textarea>
+                <button onclick="sendTextMessage()">📤 发送</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 表情动作控制 -->
+    <div class="container">
+        <h2>😊 表情动作控制</h2>
+        
+        <div class="button-group">
+            <h3>🎭 表情+动作同步播放</h3>
+            <div class="button-row">
+                <button class="emoji-btn" onclick="playEmotion('neutral', true, true)">😐 平静</button>
+                <button class="emoji-btn" onclick="playEmotion('happy', true, true)">😊 快乐</button>
+                <button class="emoji-btn" onclick="playEmotion('sad', true, true)">😢 悲伤</button>
+                <button class="emoji-btn" onclick="playEmotion('angry', true, true)">😠 愤怒</button>
+            </div>
+            <div class="button-row">
+                <button class="emoji-btn" onclick="playEmotion('surprised', true, true)">😲 惊讶</button>
+                <button class="emoji-btn" onclick="playEmotion('confused', true, true)">😕 困惑</button>
+                <button class="emoji-btn" onclick="playRandomEmotion(true, true)">🎲 随机播放</button>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <h3>🎪 仅表情播放</h3>
+            <div class="button-row">
+                <button onclick="playEmotionOnly('neutral')">😐 平静表情</button>
+                <button onclick="playEmotionOnly('happy')">😊 快乐表情</button>
+                <button onclick="playEmotionOnly('sad')">😢 悲伤表情</button>
+                <button onclick="playEmotionOnly('angry')">😠 愤怒表情</button>
+            </div>
+            <div class="button-row">
+                <button onclick="playEmotionOnly('surprised')">😲 惊讶表情</button>
+                <button onclick="playEmotionOnly('confused')">😕 困惑表情</button>
+                <button onclick="playRandomEmotion(false, true)">🎲 随机表情</button>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <h3>🤖 仅动作播放</h3>
+            <div class="button-row">
+                <button onclick="playActionOnly('neutral')">🤖 平静动作</button>
+                <button onclick="playActionOnly('happy')">🤖 快乐动作</button>
+                <button onclick="playActionOnly('sad')">🤖 悲伤动作</button>
+                <button onclick="playActionOnly('angry')">🤖 愤怒动作</button>
+            </div>
+            <div class="button-row">
+                <button onclick="playActionOnly('surprised')">🤖 惊讶动作</button>
+                <button onclick="playActionOnly('confused')">🤖 困惑动作</button>
+                <button onclick="playRandomEmotion(true, false)">🎲 随机动作</button>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <h3>⚙️ 控制命令</h3>
+            <div class="button-row">
+                <button class="danger" onclick="stopEmotionPlayback()">⏸️ 停止播放</button>
+                <button class="danger" onclick="clearEmotionScreen()">⏹️ 清除屏幕</button>
+                <button class="success" onclick="initializeRobot()">🔄 初始化机器人</button>
+                <button onclick="runEmotionDemo()">🎪 运行演示</button>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <h4>🎛️ 自定义播放参数</h4>
+            <div class="input-row">
+                <label>循环次数: <input type="number" id="loops" value="1" min="1" max="10" style="width: 80px;"></label>
+                <label>帧率: <input type="number" id="fps" value="30" min="10" max="60" style="width: 80px;"></label>
+                <button onclick="playCustomEmotion()">▶️ 自定义播放</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 音乐控制 -->
+    <div class="container">
+        <h2>🎵 音乐播放控制</h2>
+        
+        <div class="input-group">
+            <h4>🔍 搜索和播放</h4>
+            <div class="input-row">
+                <input type="text" id="songName" placeholder="输入歌曲名称..." style="flex: 1; min-width: 200px;">
+                <button onclick="searchSong()">🔍 搜索歌曲</button>
+                <button onclick="searchAndPlay()">🎵 搜索并播放</button>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <h4>🎚️ 播放控制</h4>
+            <div class="input-row">
+                <label>音量: <input type="range" id="volumeSlider" min="0" max="100" value="80" style="width: 150px;" onchange="setVolume()"></label>
+                <span id="volumeDisplay">80%</span>
+            </div>
+            <div class="input-row">
+                <label>跳转到: <input type="number" id="seekPosition" min="0" step="1" placeholder="秒" style="width: 80px;"></label>
+                <button onclick="seekToPosition()">⏭️ 跳转</button>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <h3>🎮 播放控制</h3>
+            <div class="button-row">
+                <button onclick="toggleMusic()">⏯️ 播放/暂停</button>
+                <button onclick="pauseMusic()">⏸️ 暂停</button>
+                <button onclick="resumeMusic()">▶️ 恢复</button>
+                <button class="danger" onclick="stopMusic()">⏹️ 停止</button>
+            </div>
+            <div class="button-row">
+                <button onclick="getLyrics()">📝 获取歌词</button>
+                <button onclick="clearMusicCache()">🗑️ 清理缓存</button>
+                <button onclick="getMusicStatus()">📊 播放状态</button>
+            </div>
+        </div>
+
+        <div class="input-group" id="currentTrackInfo" style="display: none;">
+            <h4>🎼 当前播放</h4>
+            <div id="trackDetails"></div>
+            <div id="playbackProgress" style="margin-top: 10px;">
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #666;">
+                    <span id="currentTime">0:00</span>
+                    <span id="totalTime">0:00</span>
+                </div>
+                <div style="width: 100%; height: 4px; background: #eee; border-radius: 2px; margin: 5px 0;">
+                    <div id="progressBar" style="width: 0%; height: 100%; background: #667eea; border-radius: 2px; transition: width 0.3s ease;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-group" id="lyricsDisplay" style="display: none;">
+            <h4>📝 歌词</h4>
+            <div id="lyricsContent" style="max-height: 200px; overflow-y: auto; white-space: pre-wrap; font-family: 'Courier New', monospace; background: #f8f9fa; padding: 15px; border-radius: 8px;"></div>
+        </div>
+    </div>
+
+    <!-- 机器人关节控制 -->
+    <div class="container">
+        <h2>🦾 机器人关节控制</h2>
+        
+        <div class="input-group">
+            <h4>🎛️ 单个关节控制</h4>
+            <div class="input-row">
+                <label>关节通道: <input type="number" id="jointChannel" value="4" min="1" max="15" style="width: 80px;"></label>
+                <label>角度: <input type="number" id="jointAngle" value="0" min="-180" max="180" style="width: 80px;"></label>
+                <button onclick="moveJoint()">🔧 移动关节</button>
+            </div>
+        </div>
+
+        <div class="button-row">
+            <button onclick="getJointStatuses()">📊 获取关节状态</button>
+            <button onclick="getDisplayStatuses()">📺 获取显示器状态</button>
+        </div>
+    </div>
+
+    <!-- 操作日志 -->
+    <div class="container">
+        <h2>📝 操作日志</h2>
+        <div class="log" id="log"></div>
+        <div class="button-row" style="margin-top: 15px;">
+            <button onclick="clearLog()">🗑️ 清空日志</button>
+            <button onclick="exportLog()">💾 导出日志</button>
+        </div>
+    </div>
+
+    <script>
+        // API基础URL
+        const API_BASE = `${window.location.origin}/api`;
+        
+        // 日志功能
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+            logDiv.innerHTML += `[${timestamp}] ${prefix} ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        function exportLog() {
+            const logContent = document.getElementById('log').innerHTML;
+            const blob = new Blob([logContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `verdure-log-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // 通用API调用函数
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            try {
+                const options = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                };
+                
+                if (body) {
+                    options.body = JSON.stringify(body);
+                }
+                
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || `HTTP ${response.status}`);
+                }
+                
+                log(`🌐 API调用成功: ${method} ${endpoint} (${response.status})`, 'success');
+                return data;
+            } catch (error) {
+                log(`❌ API调用失败: ${method} ${endpoint} - ${error.message}`, 'error');
+                return null;
+            }
+        }
+
+        // 状态更新函数
+        async function updateAllStatus() {
+            log('开始更新所有系统状态...', 'info');
+            await Promise.all([
+                updateVoiceChatStatus(),
+                updateEmotionStatus(),
+                updateMusicStatus(),
+                updateJointsStatus()
+            ]);
+            log('所有系统状态更新完成', 'success');
+        }
+
+        async function updateVoiceChatStatus() {
+            const status = await apiCall('/voicechat/status');
+            const statusDiv = document.getElementById('voiceChatStatus');
+            if (status) {
+                const isConnected = status.IsConnected;
+                const isActive = status.IsVoiceChatActive;
+                const indicator = isConnected ? (isActive ? 'status-active' : 'status-connected') : 'status-disconnected';
+                const text = isConnected ? (isActive ? '对话中' : '已连接') : '未连接';
+                statusDiv.innerHTML = `<span class="status-indicator ${indicator}"></span><span>${text}</span>`;
+                
+                // 更新自动模式复选框
+                document.getElementById('autoModeCheck').checked = status.KeepListening || false;
+            } else {
+                statusDiv.innerHTML = '<span class="status-indicator status-disconnected"></span><span>检查失败</span>';
+            }
+        }
+
+        async function updateEmotionStatus() {
+            const status = await apiCall('/emotion/status');
+            const statusDiv = document.getElementById('emotionStatus');
+            if (status) {
+                const isPlaying = status.status === 'Playing';
+                const indicator = isPlaying ? 'status-active' : 'status-connected';
+                const text = isPlaying ? `播放中: ${status.currentEmotion}` : '就绪';
+                statusDiv.innerHTML = `<span class="status-indicator ${indicator}"></span><span>${text}</span>`;
+            } else {
+                statusDiv.innerHTML = '<span class="status-indicator status-disconnected"></span><span>检查失败</span>';
+            }
+        }
+
+        async function updateMusicStatus() {
+            const status = await apiCall('/music/status');
+            const statusDiv = document.getElementById('musicStatus');
+            if (status) {
+                const isPlaying = status.IsPlaying;
+                const isPaused = status.IsPaused;
+                let indicator = 'status-connected';
+                let text = '就绪';
+                
+                if (isPlaying) {
+                    indicator = 'status-active';
+                    text = '播放中';
+                } else if (isPaused) {
+                    indicator = 'status-active';
+                    text = '已暂停';
+                }
+                
+                statusDiv.innerHTML = `<span class="status-indicator ${indicator}"></span><span>${text}</span>`;
+                
+                // 更新播放信息
+                updatePlaybackInfo(status);
+            } else {
+                statusDiv.innerHTML = '<span class="status-indicator status-disconnected"></span><span>检查失败</span>';
+            }
+        }
+
+        function updatePlaybackInfo(status) {
+            const trackInfoDiv = document.getElementById('currentTrackInfo');
+            const trackDetailsDiv = document.getElementById('trackDetails');
+            
+            if (status.CurrentTrack) {
+                trackInfoDiv.style.display = 'block';
+                trackDetailsDiv.innerHTML = `
+                    <strong>歌曲:</strong> ${status.CurrentTrack.Name || '未知'}<br>
+                    <strong>艺术家:</strong> ${status.CurrentTrack.Artist || '未知'}<br>
+                    <strong>专辑:</strong> ${status.CurrentTrack.Album || '未知'}
+                `;
+                
+                // 更新进度条
+                const currentTime = status.CurrentPosition || 0;
+                const totalTime = status.TotalDuration || 0;
+                const progress = status.Progress || 0;
+                
+                document.getElementById('currentTime').textContent = formatTime(currentTime);
+                document.getElementById('totalTime').textContent = formatTime(totalTime);
+                document.getElementById('progressBar').style.width = `${progress * 100}%`;
+            } else {
+                trackInfoDiv.style.display = 'none';
+            }
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        async function updateJointsStatus() {
+            const joints = await apiCall('/emotion/joints');
+            const statusDiv = document.getElementById('jointsStatus');
+            if (joints) {
+                statusDiv.innerHTML = '<span class="status-indicator status-connected"></span><span>就绪</span>';
+            } else {
+                statusDiv.innerHTML = '<span class="status-indicator status-disconnected"></span><span>检查失败</span>';
+            }
+        }
+
+        async function testAllConnections() {
+            log('开始测试所有连接...', 'info');
+            
+            // 测试API基础连接
+            const healthResult = await apiCall('/health/test');
+            if (healthResult) {
+                log('✅ API服务连接正常', 'success');
+            } else {
+                log('❌ API服务连接失败', 'error');
+            }
+            
+            // 更新所有状态
+            await updateAllStatus();
+            
+            log('连接测试完成', 'info');
+        }
+
+        // ===== 语音对话功能 =====
+        async function initializeVoiceChat() {
+            log('正在初始化语音聊天服务...', 'info');
+            const result = await apiCall('/voicechat/initialize', 'POST');
+            if (result) {
+                log('语音聊天服务初始化成功', 'success');
+                await updateVoiceChatStatus();
+            }
+        }
+
+        async function startVoiceChat() {
+            log('正在开始语音对话...', 'info');
+            const result = await apiCall('/voicechat/start', 'POST');
+            if (result) {
+                log('语音对话已开始', 'success');
+                await updateVoiceChatStatus();
+            }
+        }
+
+        async function stopVoiceChat() {
+            log('正在停止语音对话...', 'info');
+            const result = await apiCall('/voicechat/stop', 'POST');
+            if (result) {
+                log('语音对话已停止', 'success');
+                await updateVoiceChatStatus();
+            }
+        }
+
+        async function toggleVoiceChat() {
+            log('正在切换语音对话状态...', 'info');
+            const result = await apiCall('/voicechat/toggle', 'POST');
+            if (result) {
+                log(`语音对话状态已切换: ${result.CurrentState}`, 'success');
+                await updateVoiceChatStatus();
+            }
+        }
+
+        async function disconnectVoiceChat() {
+            log('正在断开语音聊天连接...', 'info');
+            const result = await apiCall('/voicechat/disconnect', 'POST');
+            if (result) {
+                log('语音聊天连接已断开', 'success');
+                await updateVoiceChatStatus();
+            }
+        }
+
+        async function toggleAutoMode() {
+            const enabled = document.getElementById('autoModeCheck').checked;
+            log(`正在设置自动对话模式: ${enabled ? '启用' : '禁用'}`, 'info');
+            const result = await apiCall('/voicechat/auto-mode', 'POST', { Enabled: enabled });
+            if (result) {
+                log(`自动对话模式已${enabled ? '启用' : '禁用'}`, 'success');
+                await updateVoiceChatStatus();
+            }
+        }
+
+        async function sendTextMessage() {
+            const message = document.getElementById('textMessage').value.trim();
+            if (!message) {
+                log('请输入要发送的消息', 'warning');
+                return;
+            }
+            
+            log(`正在发送文本消息: ${message}`, 'info');
+            const result = await apiCall('/voicechat/send-text', 'POST', { Message: message });
+            if (result) {
+                log('文本消息发送成功', 'success');
+                document.getElementById('textMessage').value = '';
+            }
+        }
+
+        // ===== 表情动作功能 =====
+        async function playEmotion(emotionType, includeAction, includeEmotion) {
+            const loops = parseInt(document.getElementById('loops').value) || 1;
+            const fps = parseInt(document.getElementById('fps').value) || 30;
+            
+            const request = {
+                EmotionType: emotionType,
+                IncludeAction: includeAction,
+                IncludeEmotion: includeEmotion,
+                Loops: loops,
+                Fps: fps
+            };
+            
+            log(`正在播放表情: ${emotionType} (动作:${includeAction}, 表情:${includeEmotion})`, 'info');
+            const result = await apiCall('/emotion/play', 'POST', request);
+            if (result) {
+                log(`表情播放成功: ${emotionType}`, 'success');
+                setTimeout(updateEmotionStatus, 500);
+            }
+        }
+
+        async function playEmotionOnly(emotionType) {
+            const loops = parseInt(document.getElementById('loops').value) || 1;
+            const fps = parseInt(document.getElementById('fps').value) || 30;
+            
+            log(`正在播放表情动画: ${emotionType}`, 'info');
+            const result = await apiCall(`/emotion/play-emotion/${emotionType}?loops=${loops}&fps=${fps}`, 'POST');
+            if (result) {
+                log(`表情动画播放成功: ${emotionType}`, 'success');
+                setTimeout(updateEmotionStatus, 500);
+            }
+        }
+
+        async function playActionOnly(emotionType) {
+            log(`正在播放动作: ${emotionType}`, 'info');
+            const result = await apiCall(`/emotion/play-action/${emotionType}`, 'POST');
+            if (result) {
+                log(`动作播放成功: ${emotionType}`, 'success');
+                setTimeout(updateEmotionStatus, 500);
+            }
+        }
+
+        async function playRandomEmotion(includeAction, includeEmotion) {
+            const loops = parseInt(document.getElementById('loops').value) || 1;
+            const fps = parseInt(document.getElementById('fps').value) || 30;
+            
+            const params = new URLSearchParams({
+                includeAction: includeAction.toString(),
+                includeEmotion: includeEmotion.toString(),
+                loops: loops.toString(),
+                fps: fps.toString()
+            });
+            
+            log(`正在播放随机表情 (动作:${includeAction}, 表情:${includeEmotion})`, 'info');
+            const result = await apiCall(`/emotion/play-random?${params}`, 'POST');
+            if (result) {
+                log('随机表情播放成功', 'success');
+                setTimeout(updateEmotionStatus, 500);
+            }
+        }
+
+        async function playCustomEmotion() {
+            const emotionType = 'happy'; // 默认使用快乐表情作为自定义播放
+            await playEmotion(emotionType, true, true);
+        }
+
+        async function stopEmotionPlayback() {
+            log('正在停止表情播放...', 'info');
+            const result = await apiCall('/emotion/stop', 'POST');
+            if (result) {
+                log('表情播放已停止', 'success');
+                setTimeout(updateEmotionStatus, 500);
+            }
+        }
+
+        async function clearEmotionScreen() {
+            log('正在清除表情屏幕...', 'info');
+            const result = await apiCall('/emotion/clear', 'POST');
+            if (result) {
+                log('表情屏幕已清除', 'success');
+                setTimeout(updateEmotionStatus, 500);
+            }
+        }
+
+        async function initializeRobot() {
+            log('正在初始化机器人...', 'info');
+            const result = await apiCall('/emotion/initialize', 'POST');
+            if (result) {
+                log('机器人初始化完成', 'success');
+                setTimeout(updateEmotionStatus, 500);
+            }
+        }
+
+        async function runEmotionDemo() {
+            log('正在启动表情演示程序...', 'info');
+            const result = await apiCall('/emotion/demo', 'POST');
+            if (result) {
+                log('表情演示程序已启动', 'success');
+                setTimeout(updateEmotionStatus, 500);
+            }
+        }
+
+        // ===== 音乐功能 =====
+        async function searchSong() {
+            const songName = document.getElementById('songName').value.trim();
+            if (!songName) {
+                log('请输入歌曲名称', 'warning');
+                return;
+            }
+            
+            log(`正在搜索歌曲: ${songName}`, 'info');
+            const result = await apiCall(`/music/search?songName=${encodeURIComponent(songName)}`);
+            if (result) {
+                log(`歌曲搜索完成: ${songName}`, 'success');
+                // 这里可以显示搜索结果
+                console.log('搜索结果:', result);
+            }
+        }
+
+        async function searchAndPlay() {
+            const songName = document.getElementById('songName').value.trim();
+            if (!songName) {
+                log('请输入歌曲名称', 'warning');
+                return;
+            }
+            
+            log(`正在搜索并播放歌曲: ${songName}`, 'info');
+            const result = await apiCall('/music/search-and-play', 'POST', { SongName: songName });
+            if (result) {
+                log(`歌曲播放成功: ${songName}`, 'success');
+                setTimeout(updateMusicStatus, 500);
+            }
+        }
+
+        async function toggleMusic() {
+            log('正在切换音乐播放状态...', 'info');
+            const result = await apiCall('/music/toggle', 'POST');
+            if (result) {
+                log('音乐播放状态已切换', 'success');
+                setTimeout(updateMusicStatus, 500);
+            }
+        }
+
+        async function pauseMusic() {
+            log('正在暂停音乐...', 'info');
+            const result = await apiCall('/music/pause', 'POST');
+            if (result) {
+                log('音乐已暂停', 'success');
+                setTimeout(updateMusicStatus, 500);
+            }
+        }
+
+        async function resumeMusic() {
+            log('正在恢复音乐播放...', 'info');
+            const result = await apiCall('/music/resume', 'POST');
+            if (result) {
+                log('音乐播放已恢复', 'success');
+                setTimeout(updateMusicStatus, 500);
+            }
+        }
+
+        async function stopMusic() {
+            log('正在停止音乐播放...', 'info');
+            const result = await apiCall('/music/stop', 'POST');
+            if (result) {
+                log('音乐播放已停止', 'success');
+                setTimeout(updateMusicStatus, 500);
+            }
+        }
+
+        async function setVolume() {
+            const volume = document.getElementById('volumeSlider').value;
+            document.getElementById('volumeDisplay').textContent = `${volume}%`;
+            
+            log(`正在设置音量: ${volume}%`, 'info');
+            const result = await apiCall('/music/volume', 'POST', { Volume: parseFloat(volume) });
+            if (result) {
+                log(`音量设置成功: ${volume}%`, 'success');
+            }
+        }
+
+        async function seekToPosition() {
+            const position = parseFloat(document.getElementById('seekPosition').value);
+            if (isNaN(position) || position < 0) {
+                log('请输入有效的跳转位置（秒）', 'warning');
+                return;
+            }
+            
+            log(`正在跳转到位置: ${position}秒`, 'info');
+            const result = await apiCall('/music/seek', 'POST', { Position: position });
+            if (result) {
+                log(`跳转成功: ${position}秒`, 'success');
+                setTimeout(updateMusicStatus, 500);
+            }
+        }
+
+        async function getLyrics() {
+            log('正在获取歌词...', 'info');
+            const result = await apiCall('/music/lyrics');
+            if (result && result.Lyrics) {
+                log('歌词获取成功', 'success');
+                const lyricsDiv = document.getElementById('lyricsDisplay');
+                const lyricsContent = document.getElementById('lyricsContent');
+                lyricsContent.textContent = result.Lyrics;
+                lyricsDiv.style.display = 'block';
+            } else {
+                log('暂无歌词信息', 'warning');
+                document.getElementById('lyricsDisplay').style.display = 'none';
+            }
+        }
+
+        async function clearMusicCache() {
+            log('正在清理音乐缓存...', 'info');
+            const result = await apiCall('/music/clear-cache', 'POST');
+            if (result) {
+                log('音乐缓存清理完成', 'success');
+            }
+        }
+
+        async function getMusicStatus() {
+            log('正在获取详细音乐状态...', 'info');
+            const result = await apiCall('/music/status');
+            if (result) {
+                log('音乐状态获取成功', 'success');
+                console.log('详细音乐状态:', result);
+                // 显示详细状态信息
+                updatePlaybackInfo(result);
+            }
+        }
+
+        // ===== 机器人关节功能 =====
+        async function moveJoint() {
+            const channel = parseInt(document.getElementById('jointChannel').value);
+            const angle = parseFloat(document.getElementById('jointAngle').value);
+            
+            if (isNaN(channel) || isNaN(angle)) {
+                log('请输入有效的关节通道和角度', 'warning');
+                return;
+            }
+            
+            log(`正在移动关节 ${channel} 到角度 ${angle}...`, 'info');
+            const result = await apiCall(`/emotion/joints/${channel}/move?angle=${angle}`, 'POST');
+            if (result) {
+                log(`关节 ${channel} 移动完成: ${angle}°`, 'success');
+                setTimeout(updateJointsStatus, 500);
+            }
+        }
+
+        async function getJointStatuses() {
+            log('正在获取关节状态...', 'info');
+            const result = await apiCall('/emotion/joints');
+            if (result) {
+                log('关节状态获取成功', 'success');
+                console.log('关节状态:', result);
+                // 可以在这里显示详细的关节状态信息
+            }
+        }
+
+        async function getDisplayStatuses() {
+            log('正在获取显示器状态...', 'info');
+            const result = await apiCall('/emotion/displays');
+            if (result) {
+                log('显示器状态获取成功', 'success');
+                console.log('显示器状态:', result);
+                // 可以在这里显示详细的显示器状态信息
+            }
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            log('Verdure Assistant 控制面板已加载', 'success');
+            log('开始初始化系统状态...', 'info');
+            updateAllStatus();
+            
+            // 设置定期状态更新（每30秒）
+            setInterval(updateAllStatus, 30000);
+            
+            // 设置音乐状态更频繁的更新（每5秒）
+            setInterval(updateMusicStatus, 5000);
+            
+            // 绑定回车键发送消息
+            document.getElementById('textMessage').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendTextMessage();
+                }
+            });
+            
+            // 绑定回车键搜索歌曲
+            document.getElementById('songName').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    searchAndPlay();
+                }
+            });
+            
+            // 初始化音量显示
+            const volumeSlider = document.getElementById('volumeSlider');
+            document.getElementById('volumeDisplay').textContent = `${volumeSlider.value}%`;
+        });
+    </script>
+</body>
+</html>
