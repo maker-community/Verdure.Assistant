@@ -1,12 +1,10 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using Verdure.Assistant.Api.IoT.Interfaces;
+using Verdure.Assistant.Api.IoT.Services;
+using Verdure.Assistant.Api.Services;
 using Verdure.Assistant.Core.Interfaces;
+using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Services;
 using Verdure.Assistant.Core.Services.MCP;
-using Verdure.Assistant.Core.Models;
-using Verdure.Assistant.Api.Services;
-using Verdure.Assistant.Api.Audio;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,12 +57,12 @@ builder.Services.AddSingleton<McpDeviceManager>(provider =>
 builder.Services.AddSingleton<McpIntegrationService>();
 
 // Register IoT services for robot emotion and action control
-builder.Services.AddSingleton<Verdure.Assistant.Api.IoT.Interfaces.IDisplayService, Verdure.Assistant.Api.IoT.Services.DisplayService>();
-builder.Services.AddSingleton<Verdure.Assistant.Api.IoT.Interfaces.IRobotActionService, Verdure.Assistant.Api.IoT.Services.RobotActionService>();
-builder.Services.AddSingleton<Verdure.Assistant.Api.IoT.Interfaces.IEmotionActionService, Verdure.Assistant.Api.IoT.Services.EmotionActionService>();
+builder.Services.AddSingleton<IDisplayService, DisplayService>();
+builder.Services.AddSingleton<IRobotActionService, RobotActionService>();
+builder.Services.AddSingleton<IEmotionActionService, EmotionActionService>();
 
 // Register emotion integration service
-builder.Services.AddSingleton<Verdure.Assistant.Api.Services.IEmotionIntegrationService, Verdure.Assistant.Api.Services.EmotionIntegrationService>();
+builder.Services.AddSingleton<IEmotionIntegrationService, EmotionIntegrationService>();
 
 // Register VoiceChatService with emotion handler
 builder.Services.AddSingleton<IVoiceChatService>(provider =>
@@ -72,13 +70,13 @@ builder.Services.AddSingleton<IVoiceChatService>(provider =>
     var configurationService = provider.GetRequiredService<IConfigurationService>();
     var audioStreamManager = provider.GetRequiredService<AudioStreamManager>();
     var logger = provider.GetService<ILogger<VoiceChatService>>();
-    var emotionHandler = provider.GetService<Verdure.Assistant.Api.Services.IEmotionIntegrationService>();
-    
+    var emotionHandler = provider.GetService<IEmotionIntegrationService>();
+
     return new VoiceChatService(configurationService, audioStreamManager, logger, emotionHandler);
 });
 
 // Register time display background service
-builder.Services.AddHostedService<Verdure.Assistant.Api.IoT.Services.TimeDisplayService>();
+builder.Services.AddHostedService<TimeDisplayService>();
 
 var app = builder.Build();
 
@@ -89,12 +87,16 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Enable static files
+// Enable static files with default files
+app.UseDefaultFiles();
 app.UseStaticFiles();
 
+app.UseRouting();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.RunAsync();
 
 // Initialize services on startup
 var logger = app.Services.GetService<ILogger<Program>>();
@@ -114,7 +116,7 @@ Console.WriteLine($"[音乐缓存] 音乐缓存目录: {Path.Combine(Path.GetTem
 // Initialize IoT emotion services
 try
 {
-    var emotionIntegrationService = app.Services.GetService<Verdure.Assistant.Api.Services.IEmotionIntegrationService>();
+    var emotionIntegrationService = app.Services.GetService<IEmotionIntegrationService>();
     if (emotionIntegrationService != null)
     {
         await emotionIntegrationService.InitializeAsync();
@@ -140,7 +142,7 @@ try
         await mcpServer.InitializeAsync();
         await mcpDeviceManager.InitializeAsync();
         await mcpIntegrationService.InitializeAsync();
-        
+
         logger?.LogInformation("MCP服务初始化完成，注册了 {DeviceCount} 个设备", mcpDeviceManager.Devices.Count);
         Console.WriteLine($"MCP服务初始化完成，注册了 {mcpDeviceManager.Devices.Count} 个设备");
     }
@@ -159,38 +161,38 @@ if (autoStartVoiceChat)
     {
         logger?.LogInformation("自动启动语音聊天功能...");
         Console.WriteLine("[语音聊天] 自动启动语音聊天功能...");
-        
+
         var voiceChatService = app.Services.GetService<IVoiceChatService>();
         var interruptManager = app.Services.GetService<InterruptManager>();
         var keywordSpottingService = app.Services.GetService<IKeywordSpottingService>();
         var musicVoiceCoordinationService = app.Services.GetService<MusicVoiceCoordinationService>();
         var mcpIntegrationServiceForVoice = app.Services.GetService<McpIntegrationService>();
-        
+
         if (voiceChatService != null && interruptManager != null && keywordSpottingService != null)
         {
             // 设置语音聊天服务的各种组件（类似Console项目）
             voiceChatService.SetInterruptManager(interruptManager);
             await interruptManager.InitializeAsync();
-            
+
             voiceChatService.SetKeywordSpottingService(keywordSpottingService);
             Console.WriteLine("[语音聊天] 关键词唤醒功能已启用（基于Microsoft认知服务）");
-            
+
             if (musicVoiceCoordinationService != null)
             {
                 voiceChatService.SetMusicVoiceCoordinationService(musicVoiceCoordinationService);
                 Console.WriteLine("[语音聊天] 音乐语音协调服务已启用");
             }
-            
+
             if (mcpIntegrationServiceForVoice != null)
             {
                 voiceChatService.SetMcpIntegrationService(mcpIntegrationServiceForVoice);
                 Console.WriteLine("[语音聊天] MCP集成服务已连接");
             }
-            
+
             // 创建默认配置并初始化
             var config = CreateDefaultVerdureConfig(app.Configuration);
             await voiceChatService.InitializeAsync(config);
-            
+
             logger?.LogInformation("语音聊天服务自动启动完成");
             Console.WriteLine("[语音聊天] 语音聊天服务自动启动完成，开始监听关键词唤醒...");
         }
@@ -207,14 +209,12 @@ if (autoStartVoiceChat)
     }
 }
 
-await app.RunAsync();
-
 // 创建默认配置的辅助方法
 static VerdureConfig CreateDefaultVerdureConfig(IConfiguration configuration)
 {
     var config = new VerdureConfig();
     configuration.Bind(config);
-    
+
     // 设置默认值
     if (string.IsNullOrEmpty(config.ServerUrl))
         config.ServerUrl = "wss://api.tenclass.net/xiaozhi/v1/";
@@ -222,7 +222,7 @@ static VerdureConfig CreateDefaultVerdureConfig(IConfiguration configuration)
         config.MqttClientId = "xiaozhi_api_client";
     if (string.IsNullOrEmpty(config.MqttTopic))
         config.MqttTopic = "xiaozhi/chat";
-    
+
     // API项目没有ModelFiles目录，可能需要调整
     if (config.KeywordModels == null)
     {
@@ -232,6 +232,6 @@ static VerdureConfig CreateDefaultVerdureConfig(IConfiguration configuration)
             CurrentModel = "keyword_xiaodian.table"
         };
     }
-    
+
     return config;
 }
