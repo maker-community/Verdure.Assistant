@@ -73,10 +73,10 @@ public class LottieRenderer : ILottieRenderer
 
             // 计算时间进度
             double progress = Math.Min(1.0, (double)frameIndex / Math.Max(1, FrameCount));
-            var time = TimeSpan.FromMilliseconds(progress * _animation.Duration.TotalMilliseconds);
+            var timeProgress = progress * _animation.Duration.TotalSeconds;
 
             // 渲染动画帧
-            _animation.SeekFrame(time);
+            _animation.SeekFrame(timeProgress);
             _animation.Render(canvas, new SKRect(0, 0, width, height));
 
             // 获取图像并转换为RGB565
@@ -101,7 +101,7 @@ public class LottieRenderer : ILottieRenderer
         {
             try
             {
-                _animation.SeekFrame(TimeSpan.Zero);
+                _animation.SeekFrame(0.0);
             }
             catch (Exception ex)
             {

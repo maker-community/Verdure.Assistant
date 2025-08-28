@@ -27,7 +27,6 @@ builder.Services.AddLogging(builder =>
 // Register core services
 builder.Services.AddSingleton<IVerificationService, VerificationService>();
 builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
-builder.Services.AddSingleton<IVoiceChatService, VoiceChatService>();
 
 // Add InterruptManager for wake word detector coordination
 builder.Services.AddSingleton<InterruptManager>();
@@ -59,6 +58,28 @@ builder.Services.AddSingleton<McpDeviceManager>(provider =>
 });
 builder.Services.AddSingleton<McpIntegrationService>();
 
+// Register IoT services for robot emotion and action control
+builder.Services.AddSingleton<Verdure.Assistant.Api.IoT.Interfaces.IDisplayService, Verdure.Assistant.Api.IoT.Services.DisplayService>();
+builder.Services.AddSingleton<Verdure.Assistant.Api.IoT.Interfaces.IRobotActionService, Verdure.Assistant.Api.IoT.Services.RobotActionService>();
+builder.Services.AddSingleton<Verdure.Assistant.Api.IoT.Interfaces.IEmotionActionService, Verdure.Assistant.Api.IoT.Services.EmotionActionService>();
+
+// Register emotion integration service
+builder.Services.AddSingleton<Verdure.Assistant.Api.Services.IEmotionIntegrationService, Verdure.Assistant.Api.Services.EmotionIntegrationService>();
+
+// Register VoiceChatService with emotion handler
+builder.Services.AddSingleton<IVoiceChatService>(provider =>
+{
+    var configurationService = provider.GetRequiredService<IConfigurationService>();
+    var audioStreamManager = provider.GetRequiredService<AudioStreamManager>();
+    var logger = provider.GetService<ILogger<VoiceChatService>>();
+    var emotionHandler = provider.GetService<Verdure.Assistant.Api.Services.IEmotionIntegrationService>();
+    
+    return new VoiceChatService(configurationService, audioStreamManager, logger, emotionHandler);
+});
+
+// Register time display background service
+builder.Services.AddHostedService<Verdure.Assistant.Api.IoT.Services.TimeDisplayService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -78,12 +99,31 @@ logger?.LogInformation("=== 绿荫助手语音聊天API服务启动 ===");
 logger?.LogInformation("音乐播放功能: 已启用 (mpg123)");
 logger?.LogInformation("语音聊天功能: 已启用");
 logger?.LogInformation("MCP设备管理: 已启用");
+logger?.LogInformation("机器人表情动作功能: 已启用");
 
 Console.WriteLine("=== 绿荫助手语音聊天API服务 ===");
 Console.WriteLine("音乐播放功能: 已启用 (基于mpg123)");
 Console.WriteLine("语音聊天功能: 已启用");
 Console.WriteLine("MCP设备管理: 已启用");
+Console.WriteLine("机器人表情动作功能: 已启用");
 Console.WriteLine($"[音乐缓存] 音乐缓存目录: {Path.Combine(Path.GetTempPath(), "VerdureMusicCache")}");
+
+// Initialize IoT emotion services
+try
+{
+    var emotionIntegrationService = app.Services.GetService<Verdure.Assistant.Api.Services.IEmotionIntegrationService>();
+    if (emotionIntegrationService != null)
+    {
+        await emotionIntegrationService.InitializeAsync();
+        logger?.LogInformation("情感集成服务初始化完成");
+        Console.WriteLine("情感集成服务初始化完成");
+    }
+}
+catch (Exception ex)
+{
+    logger?.LogError(ex, "情感集成服务初始化失败");
+    Console.WriteLine($"情感集成服务初始化失败: {ex.Message}");
+}
 
 // Initialize MCP services if needed
 try

@@ -48,6 +48,9 @@ public class VoiceChatService : IVoiceChatService
     // Music voice coordination service
     private MusicVoiceCoordinationService? _musicVoiceCoordinationService;
 
+    // Emotion handler for robot emotion and action integration
+    private IEmotionHandler? _emotionHandler;
+
 
     public event EventHandler<bool>? VoiceChatStateChanged;
     public event EventHandler<ChatMessage>? MessageReceived;
@@ -97,11 +100,13 @@ public class VoiceChatService : IVoiceChatService
 
     #region 构造函数和初始化
     public VoiceChatService(IConfigurationService configurationService,
-        AudioStreamManager audioStreamManager, ILogger<VoiceChatService>? logger = null)
+        AudioStreamManager audioStreamManager, ILogger<VoiceChatService>? logger = null,
+        IEmotionHandler? emotionHandler = null)
     {
         _configurationService = configurationService;
         _audioStreamManager = audioStreamManager;
         _logger = logger;
+        _emotionHandler = emotionHandler;
 
         // 初始化音频编解码器 - 使用OpusSharp
         _audioCodec = new OpusSharpAudioCodec();
@@ -1002,10 +1007,30 @@ public class VoiceChatService : IVoiceChatService
         SystemStatusMessageReceived?.Invoke(this, e.SystemStatusMessage!);
     }
 
-    private void HandleLlmEmotionEvent(LlmEmotionEventArgs e)
+    private async void HandleLlmEmotionEvent(LlmEmotionEventArgs e)
     {
         _logger?.LogDebug("收到LLM情感消息: {Emotion}", e.Emotion);
+        
+        // 触发原有的事件（保持向后兼容）
         LlmMessageReceived?.Invoke(this, e.LlmMessage!);
+        
+        // 如果有情感处理器，处理情感事件
+        if (_emotionHandler?.IsAvailable == true && !string.IsNullOrWhiteSpace(e.Emotion))
+        {
+            try
+            {
+                _logger?.LogInformation("处理LLM情感事件: {Emotion}", e.Emotion);
+                await _emotionHandler.HandleEmotionAsync(e.Emotion, "LLM情感事件");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "处理LLM情感事件时发生错误: {Emotion}", e.Emotion);
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(e.Emotion))
+        {
+            _logger?.LogDebug("情感处理器不可用，跳过情感处理: {Emotion}", e.Emotion);
+        }
     }
 
     private async void HandleMcpReadyForInitialization(McpEventArgs e)

@@ -66,11 +66,11 @@ public class DisplayService : IDisplayService
 
             // 创建2.4寸显示器 (表情显示)
             _display24Inch = new ST7789Display(settings1, _gpio, false, dcPin: 25, resetPin: 27, 
-                displayType: DisplayType.Display24Inch, logger: _logger);
+                displayType: DisplayType.Display24Inch);
             
             // 创建1.47寸显示器 (时间显示，横屏模式)
             _display147Inch = new ST7789Display(settings2, _gpio, false, dcPin: 25, resetPin: 27, 
-                displayType: DisplayType.Display147Inch, isLandscape: true, logger: _logger);
+                displayType: DisplayType.Display147Inch, isLandscape: true);
 
             // 清屏
             _display24Inch.FillScreen(0x0000);  // 黑色
@@ -110,7 +110,7 @@ public class DisplayService : IDisplayService
 
                 if (!string.IsNullOrEmpty(filePath))
                 {
-                    _lottieRenderers[emotionType] = new LottieRenderer(filePath, _logger);
+                    _lottieRenderers[emotionType] = new LottieRenderer(filePath);
                     _logger.LogInformation($"加载{emotionType}表情文件: {filePath}");
                 }
                 else
@@ -275,39 +275,42 @@ public class DisplayService : IDisplayService
         canvas.Clear(new SKColor(0, 50, 100));
 
         // 设置时间字体
+        using var timeFont = new SKFont
+        {
+            Size = 48,
+            Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
+        };
         using var timePaint = new SKPaint
         {
             Color = SKColors.White,
-            TextSize = 48,
-            IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
+            IsAntialias = true
         };
 
         // 设置日期字体
+        using var dateFont = new SKFont
+        {
+            Size = 24,
+            Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Normal)
+        };
         using var datePaint = new SKPaint
         {
             Color = SKColors.LightGray,
-            TextSize = 24,
-            IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Normal)
+            IsAntialias = true
         };
 
         // 计算文本位置
-        var timeTextBounds = new SKRect();
-        timePaint.MeasureText(timeText, ref timeTextBounds);
-        
-        var dateTextBounds = new SKRect();
-        datePaint.MeasureText(dateText, ref dateTextBounds);
+        var timeTextBounds = timeFont.MeasureText(timeText);
+        var dateTextBounds = dateFont.MeasureText(dateText);
 
         // 绘制时间 (居中显示)
-        float timeX = (width - timeTextBounds.Width) / 2;
-        float timeY = (height - timeTextBounds.Height) / 2 + timeTextBounds.Height;
-        canvas.DrawText(timeText, timeX, timeY, timePaint);
+        float timeX = (width - timeTextBounds) / 2;
+        float timeY = (height / 2) + (timeFont.Size / 2);
+        canvas.DrawText(timeText, timeX, timeY, SKTextAlign.Left, timeFont, timePaint);
 
         // 绘制日期 (在时间下方)
-        float dateX = (width - dateTextBounds.Width) / 2;
+        float dateX = (width - dateTextBounds) / 2;
         float dateY = timeY + 40;
-        canvas.DrawText(dateText, dateX, dateY, datePaint);
+        canvas.DrawText(dateText, dateX, dateY, SKTextAlign.Left, dateFont, datePaint);
 
         // 获取图像并转换为RGB565
         using var image = surface.Snapshot();

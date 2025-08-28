@@ -118,6 +118,11 @@ public interface IEmotionActionService : IDisposable
     /// 获取可用的表情配置
     /// </summary>
     IEnumerable<EmotionConfig> GetAvailableEmotionConfigs();
+    
+    /// <summary>
+    /// 运行演示程序
+    /// </summary>
+    Task RunDemoAsync();
 }
 
 /// <summary>
