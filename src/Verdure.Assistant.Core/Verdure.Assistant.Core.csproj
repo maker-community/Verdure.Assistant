@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>  <ItemGroup>
@@ -10,11 +10,11 @@
     <PackageReference Include="OpusSharp" Version="1.5.6" />
     <PackageReference Include="PortAudio.Native" Version="19.7.0-build20240827150131" />
     <PackageReference Include="PortAudioSharp2" Version="1.0.4" />
-    <PackageReference Include="System.Text.Json" Version="8.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.8" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.8" />
+    <PackageReference Include="System.Text.Json" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.8" />
     <PackageReference Include="Microsoft.CognitiveServices.Speech" Version="1.45.0" />
   </ItemGroup>
 
