@@ -111,8 +111,7 @@ public class VoiceChatService : IVoiceChatService
         _audioPlayer.PlaybackStopped += OnAudioPlaybackStopped;
         // 初始化通信客户端
         _communicationClient = new WebSocketClient(_configurationService, _logger);
-        _communicationClient.MessageReceived += OnMessageReceived;
-        _communicationClient.ConnectionStateChanged += OnConnectionStateChanged;
+
         // 订阅WebSocket专有的事件
         if (_communicationClient is WebSocketClient wsClient)
         {
@@ -973,6 +972,10 @@ public class VoiceChatService : IVoiceChatService
 
             switch (e.Trigger)
             {
+                case WebSocketEventTrigger.ConnectionEstablished:
+                    if (e is ConnectionEventArgs connectionEstablished)
+                        OnConnectionStateChanged(this, true);
+                    break;
                 case WebSocketEventTrigger.TtsStarted:
                     if (e is TtsEventArgs ttsStarted)
                         HandleTtsStarted(ttsStarted);
@@ -1309,8 +1312,6 @@ public class VoiceChatService : IVoiceChatService
             {
                 try
                 {
-                    _communicationClient.MessageReceived -= OnMessageReceived;
-                    _communicationClient.ConnectionStateChanged -= OnConnectionStateChanged;
                     // 如果是WebSocket客户端，取消订阅统一事件
                     if (_communicationClient is WebSocketClient webSocketClient)
                     {
