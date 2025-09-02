@@ -112,8 +112,6 @@ public partial class App : Application
           // Register MCP services (new architecture based on xiaozhi-esp32)
         services.AddSingleton<McpServer>();
         services.AddSingleton<McpDeviceManager>();
-        services.AddSingleton<McpIntegrationService>();
-
         // Interrupt manager and related services
         services.AddSingleton<InterruptManager>();        
         
@@ -148,13 +146,12 @@ public partial class App : Application
             // Get required services
             var mcpServer = GetService<McpServer>();
             var mcpDeviceManager = GetService<McpDeviceManager>();
-            var mcpIntegrationService = GetService<McpIntegrationService>();
             var voiceChatService = GetService<IVoiceChatService>();
             var interruptManager = GetService<InterruptManager>();
             var keywordSpottingService = GetService<IKeywordSpottingService>();
             var musicVoiceCoordinationService = GetService<MusicVoiceCoordinationService>();
 
-            if (mcpServer == null || mcpDeviceManager == null || mcpIntegrationService == null)
+            if (mcpServer == null || mcpDeviceManager == null)
             {
                 logger?.LogError("Required MCP services not found");
                 return;
@@ -187,10 +184,9 @@ public partial class App : Application
                 logger?.LogInformation("音乐语音协调服务已设置");
             }// Initialize MCP server and device manager
             await mcpServer.InitializeAsync();
+            await mcpDeviceManager.InitializeAsync();
             logger?.LogInformation("MCP服务器已初始化");
 
-            // Set MCP integration service on VoiceChatService
-            voiceChatService.SetMcpIntegrationService(mcpIntegrationService);
             logger?.LogInformation("MCP集成服务已设置到语音聊天服务");
 
             logger?.LogInformation("MCP设备初始化完成");

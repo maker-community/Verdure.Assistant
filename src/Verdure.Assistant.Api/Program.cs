@@ -158,7 +158,6 @@ builder.Services.AddSingleton<McpDeviceManager>(provider =>
     var musicService = provider.GetService<IMusicPlayerService>();
     return new McpDeviceManager(logger, mcpServer, musicService);
 });
-builder.Services.AddSingleton<McpIntegrationService>();
 
 var app = builder.Build();
 
@@ -228,13 +227,11 @@ try
                 {
                     var mcpServer = app.Services.GetService<McpServer>();
                     var mcpDeviceManager = app.Services.GetService<McpDeviceManager>();
-                    var mcpIntegrationService = app.Services.GetService<McpIntegrationService>();
 
-                    if (mcpServer != null && mcpDeviceManager != null && mcpIntegrationService != null)
+                    if (mcpServer != null && mcpDeviceManager != null)
                     {
                         await mcpServer.InitializeAsync();
                         await mcpDeviceManager.InitializeAsync();
-                        await mcpIntegrationService.InitializeAsync();
 
                         logger?.LogInformation("MCP服务初始化完成，注册了 {DeviceCount} 个设备", mcpDeviceManager.Devices.Count);
                         Console.WriteLine($"MCP服务初始化完成，注册了 {mcpDeviceManager.Devices.Count} 个设备");
@@ -259,7 +256,6 @@ try
                         var interruptManager = app.Services.GetService<InterruptManager>();
                         var keywordSpottingService = app.Services.GetService<IKeywordSpottingService>();
                         var musicVoiceCoordinationService = app.Services.GetService<MusicVoiceCoordinationService>();
-                        var mcpIntegrationServiceForVoice = app.Services.GetService<McpIntegrationService>();
                         var emotionIntegrationService = app.Services.GetService<Verdure.Assistant.Api.Services.EmotionIntegrationService>();
 
                         if (voiceChatService != null && interruptManager != null && keywordSpottingService != null)
@@ -275,12 +271,6 @@ try
                             {
                                 voiceChatService.SetMusicVoiceCoordinationService(musicVoiceCoordinationService);
                                 Console.WriteLine("[语音聊天] 音乐语音协调服务已启用");
-                            }
-
-                            if (mcpIntegrationServiceForVoice != null)
-                            {
-                                voiceChatService.SetMcpIntegrationService(mcpIntegrationServiceForVoice);
-                                Console.WriteLine("[语音聊天] MCP集成服务已连接");
                             }
 
                             // 连接机器人情感集成服务

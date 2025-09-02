@@ -1,10 +1,10 @@
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using Verdure.Assistant.Core.Constants;
+using Verdure.Assistant.Core.Events;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Services.MCP;
-using Verdure.Assistant.Core.Events;
 
 namespace Verdure.Assistant.Core.Services;
 
@@ -42,8 +42,7 @@ public class VoiceChatService : IVoiceChatService
     private IKeywordSpottingService? _keywordSpottingService;
     private bool _keywordDetectionEnabled = false;
 
-    // MCP integration service (new architecture based on xiaozhi-esp32)
-    private McpIntegrationService? _mcpIntegrationService;
+    private readonly McpServer _mcpServer;
 
     // Music voice coordination service
     private MusicVoiceCoordinationService? _musicVoiceCoordinationService;
@@ -97,7 +96,7 @@ public class VoiceChatService : IVoiceChatService
 
     #region 构造函数和初始化
     public VoiceChatService(IConfigurationService configurationService,
-        AudioStreamManager audioStreamManager, ILogger<VoiceChatService>? logger = null)
+        AudioStreamManager audioStreamManager, ILogger<VoiceChatService>? logger = null, McpServer mcpServer = null)
     {
         _configurationService = configurationService;
         _audioStreamManager = audioStreamManager;
@@ -119,16 +118,10 @@ public class VoiceChatService : IVoiceChatService
         {
             // 使用新的统一事件系统
             wsClient.WebSocketEventOccurred += OnWebSocketEventOccurred;
-
-            // 如果已有MCP集成服务，立即配置到WebSocketClient
-            if (_mcpIntegrationService != null)
-            {
-                wsClient.SetMcpIntegrationService(_mcpIntegrationService);
-                _logger?.LogInformation("MCP集成服务已配置到WebSocketClient");
-            }
         }
         // Initialize state machine
         InitializeStateMachine();
+        _mcpServer = mcpServer;
     }
 
     private void InitializeStateMachine()
@@ -256,22 +249,8 @@ public class VoiceChatService : IVoiceChatService
         _keywordSpottingService.ErrorOccurred += OnKeywordDetectionError;
 
         _logger?.LogInformation("关键词唤醒服务已设置");
-    }    /// <summary>
-         /// 设置MCP集成服务（新架构，基于xiaozhi-esp32的MCP实现）
-         /// </summary>
-    public void SetMcpIntegrationService(McpIntegrationService mcpIntegrationService)
-    {
-        _mcpIntegrationService = mcpIntegrationService;
-
-        _logger?.LogInformation("MCP集成服务已设置");
-
-        // 如果WebSocketClient已经存在，立即配置MCP集成服务
-        if (_communicationClient is WebSocketClient wsClient)
-        {
-            wsClient.SetMcpIntegrationService(mcpIntegrationService);
-            _logger?.LogInformation("MCP集成服务已配置到现有WebSocketClient");
-        }
     }
+
 
     /// <summary>
     /// 设置音乐语音协调服务（用于音乐播放时暂停语音识别）
@@ -296,9 +275,9 @@ public class VoiceChatService : IVoiceChatService
         }
 
         _logger?.LogInformation("正在切换关键词模型为: {ModelFileName}", modelFileName);
-        
+
         var result = await _keywordSpottingService.SwitchKeywordModelAsync(modelFileName);
-        
+
         if (result)
         {
             _logger?.LogInformation("关键词模型切换成功");
@@ -307,7 +286,7 @@ public class VoiceChatService : IVoiceChatService
         {
             _logger?.LogError("关键词模型切换失败");
         }
-        
+
         return result;
     }
 
@@ -524,11 +503,11 @@ public class VoiceChatService : IVoiceChatService
         try
         {
             _logger?.LogWarning(audioException, "检测到音频流异常，开始恢复程序...");
-            
+
             // 1. 停止当前的录音状态
             _isVoiceChatActive = false;
             VoiceChatStateChanged?.Invoke(this, false);
-            
+
             // 2. 强制清理音频流管理器
             try
             {
@@ -539,7 +518,7 @@ public class VoiceChatService : IVoiceChatService
             {
                 _logger?.LogWarning(cleanupEx, "强制清理音频流时出错");
             }
-            
+
             // 3. 重置状态机到空闲状态
             try
             {
@@ -550,10 +529,10 @@ public class VoiceChatService : IVoiceChatService
             {
                 _logger?.LogWarning(stateEx, "重置状态机时出错");
             }
-            
+
             // 4. 等待一段时间让系统稳定
             await Task.Delay(2000);
-            
+
             // 5. 尝试重新初始化音频系统
             if (_config?.EnableVoice == true && _audioStreamManager != null)
             {
@@ -562,7 +541,7 @@ public class VoiceChatService : IVoiceChatService
                     await _audioStreamManager.StartRecordingAsync(_config.AudioSampleRate, _config.AudioChannels);
                     await Task.Delay(500); // 短暂延迟确保启动稳定
                     await _audioStreamManager.StopRecordingAsync();
-                    
+
                     _logger?.LogInformation("音频系统重新初始化成功");
                     return true;
                 }
@@ -572,7 +551,7 @@ public class VoiceChatService : IVoiceChatService
                     return false;
                 }
             }
-            
+
             return true;
         }
         catch (Exception ex)
@@ -603,7 +582,7 @@ public class VoiceChatService : IVoiceChatService
                 // 检查当前录音状态
                 var wasRecording = _audioStreamManager.IsRecording;
                 _logger?.LogDebug("当前录音状态: {IsRecording}", wasRecording);
-                
+
                 if (!wasRecording)
                 {
                     _logger?.LogDebug("启动音频录制...");
@@ -616,7 +595,7 @@ public class VoiceChatService : IVoiceChatService
                     // 即使已经在录音，也要确保参数正确
                     await _audioStreamManager.StartRecordingAsync(_config.AudioSampleRate, _config.AudioChannels);
                 }
-                
+
                 _isVoiceChatActive = true;
                 VoiceChatStateChanged?.Invoke(this, true);
                 _logger?.LogInformation("Started listening");
@@ -625,7 +604,7 @@ public class VoiceChatService : IVoiceChatService
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to start listening");
-            
+
             // 特殊处理音频流异常
             if (ex.Message.Contains("PortAudio") || ex.Message.Contains("audio") || ex.Message.Contains("stream"))
             {
@@ -643,7 +622,7 @@ public class VoiceChatService : IVoiceChatService
                     }
                 });
             }
-            
+
             ErrorOccurred?.Invoke(this, $"Failed to start listening: {ex.Message}");
             // Transition back to idle on error
             _stateMachine?.RequestTransition(ConversationTrigger.ForceIdle, "Error in start listening");
@@ -671,13 +650,13 @@ public class VoiceChatService : IVoiceChatService
                 if (_audioStreamManager.IsRecording)
                 {
                     _logger?.LogDebug("Stop Recording");
-                    
+
                     // 添加超时保护，避免在树莓派等平台上卡死
                     var stopTask = _audioStreamManager.StopRecordingAsync();
                     var timeoutTask = Task.Delay(10000); // 10秒超时
-                    
+
                     var completedTask = await Task.WhenAny(stopTask, timeoutTask);
-                    
+
                     if (completedTask == timeoutTask)
                     {
                         _logger?.LogWarning("停止音频录制超时，可能存在平台兼容性问题");
@@ -702,7 +681,7 @@ public class VoiceChatService : IVoiceChatService
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to stop listening");
-            
+
             // 特殊处理音频流异常
             if (ex.Message.Contains("PortAudio") || ex.Message.Contains("audio") || ex.Message.Contains("stream"))
             {
@@ -720,11 +699,11 @@ public class VoiceChatService : IVoiceChatService
                     }
                 });
             }
-            
+
             // 确保即使出错也要重置状态
             _isVoiceChatActive = false;
             VoiceChatStateChanged?.Invoke(this, false);
-            
+
             ErrorOccurred?.Invoke(this, $"Failed to stop listening: {ex.Message}");
         }
     }
@@ -892,7 +871,7 @@ public class VoiceChatService : IVoiceChatService
         catch (Exception ex)
         {
             _logger?.LogError(ex, "处理音频数据失败");
-            
+
             // 特殊处理音频流异常
             if (ex.Message.Contains("PortAudio") || ex.Message.Contains("audio") || ex.Message.Contains("stream"))
             {
@@ -910,7 +889,7 @@ public class VoiceChatService : IVoiceChatService
                     }
                 });
             }
-            
+
             ErrorOccurred?.Invoke(this, $"处理音频数据失败: {ex.Message}");
         }
     }
@@ -1038,11 +1017,6 @@ public class VoiceChatService : IVoiceChatService
                         HandleLlmEmotionEvent(llmEmotion);
                     break;
 
-                case WebSocketEventTrigger.McpReadyForInitialization:
-                    if (e is McpEventArgs mcpReady)
-                        HandleMcpReadyForInitialization(mcpReady);
-                    break;
-
                 case WebSocketEventTrigger.McpResponseReceived:
                     if (e is McpEventArgs mcpResponse)
                         HandleMcpResponseReceived(mcpResponse);
@@ -1130,28 +1104,6 @@ public class VoiceChatService : IVoiceChatService
         LlmMessageReceived?.Invoke(this, e.LlmMessage!);
     }
 
-    private async void HandleMcpReadyForInitialization(McpEventArgs e)
-    {
-        _logger?.LogInformation("设备已准备好MCP初始化，开始自动初始化MCP协议");
-
-        if (_communicationClient is WebSocketClient wsClient && wsClient.IsConnected && _mcpIntegrationService != null)
-        {
-            try
-            {
-                await wsClient.InitializeMcpAsync();
-                _logger?.LogInformation("MCP协议自动初始化完成");
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "MCP自动初始化过程中发生错误");
-            }
-        }
-        else
-        {
-            _logger?.LogWarning("无法自动初始化MCP：WebSocketClient或MCP集成服务未设置");
-        }
-    }
-
     private void HandleMcpResponseReceived(McpEventArgs e)
     {
         if (string.IsNullOrEmpty(e.ResponseJson)) return;
@@ -1219,7 +1171,7 @@ public class VoiceChatService : IVoiceChatService
         {
             _logger?.LogInformation("设备已准备好MCP初始化，开始自动初始化MCP协议");
 
-            if (_communicationClient is WebSocketClient wsClient && _mcpIntegrationService != null)
+            if (_communicationClient is WebSocketClient wsClient)
             {
                 // 在后台线程执行MCP初始化
                 _ = Task.Run(async () =>
@@ -1254,33 +1206,40 @@ public class VoiceChatService : IVoiceChatService
     {
         try
         {
-            // 如果有MCP集成服务，注册工具
-            if (_mcpIntegrationService != null)
+            var tools = new List<SimpleMcpTool>();
+            var toolList = _mcpServer.GetTools();
+
+            foreach (var tool in toolList)
             {
-                var tools = _mcpIntegrationService.GetAllSimpleMcpTools();
-                _logger?.LogInformation("响应mcp 工具列表");
-
-                if (_communicationClient is WebSocketClient wsClient && _mcpIntegrationService != null)
+                tools.Add(new SimpleMcpTool
                 {
-                    // 在后台线程执行MCP初始化
-                    _ = Task.Run(async () =>
+                    Name = tool.Name,
+                    Description = tool.Description,
+                    InputSchema = tool.InputSchema,
+                });
+            }
+
+            _logger?.LogInformation("响应mcp 工具列表");
+
+            if (_communicationClient is WebSocketClient wsClient)
+            {
+                // 在后台线程执行MCP初始化
+                _ = Task.Run(async () =>
+                {
+                    try
                     {
-                        try
-                        {
-                            await wsClient.SendMcpToolsListResponseAsync(2, tools, null);
-                            _logger?.LogInformation("mcp 工具列表已发送");
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger?.LogError(ex, "mcp 工具列表发生错误");
-                        }
-                    });
-                }
-                else
-                {
-                    _logger?.LogWarning("无法自动初始化MCP：WebSocketClient或MCP集成服务未设置");
-                }
-
+                        await wsClient.SendMcpToolsListResponseAsync(2, tools, null);
+                        _logger?.LogInformation("mcp 工具列表已发送");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "mcp 工具列表发生错误");
+                    }
+                });
+            }
+            else
+            {
+                _logger?.LogWarning("无法自动初始化MCP：WebSocketClient或MCP集成服务未设置");
             }
         }
         catch (Exception ex)
@@ -1296,7 +1255,7 @@ public class VoiceChatService : IVoiceChatService
     {
         try
         {
-            if (_communicationClient is WebSocketClient wsClient && _mcpIntegrationService != null)
+            if (_communicationClient is WebSocketClient wsClient)
             {
                 // 在后台线程执行MCP初始化
                 _ = Task.Run(async () =>
@@ -1305,7 +1264,7 @@ public class VoiceChatService : IVoiceChatService
                     {
                         // 如果有MCP集成服务，注册工具调用结果
                         _logger?.LogInformation("响应mcp 工具调用结果");
-                        var content = await _mcpIntegrationService.HandleMcpRequestAsync(resultJson);
+                        var content = await _mcpServer.HandleRequestAsync(resultJson);
                         await wsClient.SendMcpMessageAsync(JsonDocument.Parse(content));
                     }
                     catch (Exception ex)
@@ -1431,18 +1390,6 @@ public class VoiceChatService : IVoiceChatService
                 catch (Exception ex)
                 {
                     _logger?.LogWarning(ex, "释放关键词检测服务时出错");
-                }
-            }            // 7. 释放MCP集成服务
-            if (_mcpIntegrationService != null)
-            {
-                try
-                {
-                    _mcpIntegrationService.Dispose();
-                    _mcpIntegrationService = null;
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogWarning(ex, "释放MCP集成服务时出错");
                 }
             }
 
