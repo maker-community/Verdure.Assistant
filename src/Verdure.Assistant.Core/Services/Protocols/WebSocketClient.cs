@@ -177,7 +177,11 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     public async Task SendTextAsync(string message)
     {
         if (!_isConnected || _webSocket?.State != WebSocketState.Open)
-            throw new InvalidOperationException("WebSocket未连接");
+        {
+            _logger?.LogWarning("WebSocket未连接");
+            return;
+        }
+            //throw new InvalidOperationException("WebSocket未连接");
 
         try
         {

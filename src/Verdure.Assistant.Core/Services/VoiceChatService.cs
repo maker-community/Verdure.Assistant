@@ -976,6 +976,14 @@ public class VoiceChatService : IVoiceChatService
                     if (e is ConnectionEventArgs connectionEstablished)
                         OnConnectionStateChanged(this, true);
                     break;
+                case WebSocketEventTrigger.ConnectionLost:
+                    if (e is ConnectionEventArgs connectionLost)
+                        OnConnectionStateChanged(this, false);
+                    break;
+                case WebSocketEventTrigger.ConnectionError:
+                    if (e is ConnectionEventArgs connectionError)
+                        OnConnectionStateChanged(this, false);
+                    break;
                 case WebSocketEventTrigger.TtsStarted:
                     if (e is TtsEventArgs ttsStarted)
                         HandleTtsStarted(ttsStarted);
