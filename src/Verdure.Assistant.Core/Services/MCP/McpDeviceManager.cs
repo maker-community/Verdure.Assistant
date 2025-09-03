@@ -51,8 +51,6 @@ namespace Verdure.Assistant.Core.Services.MCP
                 // Initialize default devices based on xiaozhi-esp32 pattern
                 await InitializeDefaultDevicesAsync();
 
-                // Register all device tools with MCP server
-                await RegisterDeviceToolsAsync();
 
                 _logger.LogInformation($"MCP device manager initialized with {_devices.Count} devices and {_deviceTools.Count} tools");
             }
@@ -67,8 +65,8 @@ namespace Verdure.Assistant.Core.Services.MCP
         private async Task InitializeDefaultDevicesAsync()
         {
             // Create basic IoT devices with real services
-            var lamp = new McpLampDevice(_mcpServer, null);
-            var speaker = new McpSpeakerDevice(_mcpServer, null);
+            //var lamp = new McpLampDevice(_mcpServer, null);
+            //var speaker = new McpSpeakerDevice(_mcpServer, null);
             var musicPlayer = new McpMusicPlayerDevice(_mcpServer, _musicPlayerService, null);
             var camera = new McpCameraDevice(_mcpServer, null);
 
@@ -233,16 +231,6 @@ namespace Verdure.Assistant.Core.Services.MCP
                     }
                 };
             }
-        }
-
-        /// <summary>
-        /// Register all device tools with the MCP server
-        /// </summary>
-        private async Task RegisterDeviceToolsAsync()
-        {
-            var allTools = GetAllTools();
-            await _mcpServer.RegisterToolsAsync();
-            _logger.LogInformation($"Registered {allTools.Count} tools with MCP server");
         }
 
         /// <summary>

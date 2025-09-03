@@ -64,9 +64,6 @@ class Program
             // Initialize MCP IoT devices (new architecture based on xiaozhi-esp32)
             await InitializeMcpDevicesAsync(host.Services);
 
-            // Initialize MCP services (new architecture based on xiaozhi-esp32)
-            await InitializeMcpServicesAsync(host.Services);
-
             // 初始化服务 (this will establish WebSocket connection and trigger IoT initialization)
             await _voiceChatService.InitializeAsync(_config);
 
@@ -130,8 +127,6 @@ class Program
                     var musicService = provider.GetService<IMusicPlayerService>();
                     return new McpDeviceManager(logger, mcpServer, musicService);
                 });
-                services.AddSingleton<McpIntegrationService>();
-
             });
 
     static VerdureConfig LoadConfiguration()
@@ -168,7 +163,6 @@ class Program
             // Get required services
             var mcpServer = services.GetService<McpServer>();
             var mcpDeviceManager = services.GetService<McpDeviceManager>();
-            var mcpIntegrationService = services.GetService<McpIntegrationService>();
             var voiceChatService = services.GetService<IVoiceChatService>();
 
             if (mcpServer == null)
@@ -181,11 +175,6 @@ class Program
                 logger?.LogError("McpDeviceManager service not found");
                 return;
             }
-            if (mcpIntegrationService == null)
-            {
-                logger?.LogError("McpIntegrationService service not found");
-                return;
-            }
             if (voiceChatService == null)
             {
                 logger?.LogError("VoiceChatService not found");
@@ -195,10 +184,6 @@ class Program
             // Initialize MCP server and device manager (similar to xiaozhi-esp32 MCP initialization)
             await mcpServer.InitializeAsync();
             await mcpDeviceManager.InitializeAsync();
-            await mcpIntegrationService.InitializeAsync();
-
-            // Set MCP integration service on VoiceChatService (new MCP-based integration)
-            voiceChatService.SetMcpIntegrationService(mcpIntegrationService);
 
             logger?.LogInformation("MCP IoT设备初始化完成，共注册了 {DeviceCount} 个设备",
                 mcpDeviceManager.Devices.Count);
@@ -211,216 +196,8 @@ class Program
             logger?.LogError(ex, "MCP IoT设备初始化失败");
             System.Console.WriteLine($"MCP IoT设备初始化失败: {ex.Message}");
         }
-    }/// <summary>
-     /// Initialize MCP services (new architecture based on xiaozhi-esp32)
-     /// </summary>
-    static async Task InitializeMcpServicesAsync(IServiceProvider services)
-    {
-        try
-        {
-            var logger = services.GetService<ILogger<Program>>();
-            logger?.LogInformation("开始初始化MCP服务...");
-
-            // Get MCP services
-            var mcpServer = services.GetService<McpServer>();
-            var mcpDeviceManager = services.GetService<McpDeviceManager>();
-            var mcpIntegrationService = services.GetService<McpIntegrationService>();
-
-            if (mcpServer == null || mcpDeviceManager == null || mcpIntegrationService == null)
-            {
-                logger?.LogWarning("MCP services not found, skipping MCP initialization");
-                return;
-            }
-
-            // Initialize MCP integration
-            await mcpIntegrationService.InitializeAsync();
-
-            // Wire MCP integration service to VoiceChatService
-            if (_voiceChatService != null)
-            {
-                _voiceChatService.SetMcpIntegrationService(mcpIntegrationService);
-                logger?.LogInformation("MCP集成服务已连接到VoiceChatService");
-            }
-
-            logger?.LogInformation("MCP服务初始化完成");
-            System.Console.WriteLine("MCP设备管理器已启用 (基于xiaozhi-esp32架构)");
-        }
-        catch (Exception ex)
-        {
-            var logger = services.GetService<ILogger<Program>>();
-            logger?.LogError(ex, "MCP服务初始化失败");
-            System.Console.WriteLine($"MCP服务初始化失败: {ex.Message}");
-        }
     }
-
-    static async Task ShowMenu()
-    {
-        while (true)
-        {
-            System.Console.WriteLine("\n请选择操作:");
-            System.Console.WriteLine("1. 开始语音对话");
-            System.Console.WriteLine("2. 停止语音对话");
-            System.Console.WriteLine("3. 切换对话状态 (自动模式)");
-            System.Console.WriteLine("4. 切换自动对话模式");
-            System.Console.WriteLine("5. 发送文本消息");
-            System.Console.WriteLine("6. 查看连接状态");
-            System.Console.WriteLine("7. 退出");
-            System.Console.Write("请输入选项 (1-7): ");
-
-            var input = System.Console.ReadLine();
-            switch (input)
-            {
-                case "1":
-                    await StartVoiceChat();
-                    break;
-                case "2":
-                    await StopVoiceChat();
-                    break;
-                case "3":
-                    await ToggleChatState();
-                    break;
-                case "4":
-                    await ToggleAutoDialogueMode();
-                    break;
-                case "5":
-                    await SendTextMessage();
-                    break;
-                case "6":
-                    ShowConnectionStatus();
-                    break;
-                case "7":
-                    System.Console.WriteLine("再见!");
-                    return;
-                default:
-                    System.Console.WriteLine("无效选项，请重新输入。");
-                    break;
-            }
-        }
-    }
-
-    static async Task StartVoiceChat()
-    {
-        if (_voiceChatService == null)
-        {
-            System.Console.WriteLine("服务未初始化");
-            return;
-        }
-
-        if (!_voiceChatService.IsConnected)
-        {
-            System.Console.WriteLine("未连接到服务器");
-            return;
-        }
-
-        if (_voiceChatService.IsVoiceChatActive)
-        {
-            System.Console.WriteLine("语音对话已经在进行中");
-            return;
-        }
-
-        try
-        {
-            await _voiceChatService.StartVoiceChatAsync();
-            System.Console.WriteLine("语音对话已开始，按任意键停止...");
-            System.Console.ReadKey();
-            await _voiceChatService.StopVoiceChatAsync();
-        }
-        catch (Exception ex)
-        {
-            System.Console.WriteLine($"启动语音对话失败: {ex.Message}");
-        }
-    }
-
-    static async Task StopVoiceChat()
-    {
-        if (_voiceChatService?.IsVoiceChatActive == true)
-        {
-            await _voiceChatService.StopVoiceChatAsync();
-            System.Console.WriteLine("语音对话已停止");
-        }
-        else
-        {
-            System.Console.WriteLine("语音对话未在进行中");
-        }
-    }
-
-    static async Task SendTextMessage()
-    {
-        if (_voiceChatService == null || !_voiceChatService.IsConnected)
-        {
-            System.Console.WriteLine("未连接到服务器");
-            return;
-        }
-
-        System.Console.Write("请输入消息: ");
-        var message = System.Console.ReadLine();
-
-        if (!string.IsNullOrWhiteSpace(message))
-        {
-            await _voiceChatService.SendTextMessageAsync(message);
-            System.Console.WriteLine("消息已发送");
-        }
-    }
-    static void ShowConnectionStatus()
-    {
-        if (_voiceChatService == null)
-        {
-            System.Console.WriteLine("服务未初始化");
-            return;
-        }
-
-        System.Console.WriteLine($"连接状态: {(_voiceChatService.IsConnected ? "已连接" : "未连接")}");
-        System.Console.WriteLine($"语音对话状态: {(_voiceChatService.IsVoiceChatActive ? "进行中" : "未开始")}");
-        System.Console.WriteLine($"设备状态: {_voiceChatService.CurrentState}");
-        System.Console.WriteLine($"监听模式: {_voiceChatService.CurrentListeningMode}");
-        System.Console.WriteLine($"自动对话模式: {(_voiceChatService.KeepListening ? "启用" : "禁用")}");
-        System.Console.WriteLine($"通信协议: {(_config?.UseWebSocket == true ? "WebSocket" : "MQTT")}");
-        System.Console.WriteLine($"语音功能: {(_config?.EnableVoice == true ? "启用" : "禁用")}");
-    }
-
-    static async Task ToggleChatState()
-    {
-        if (_voiceChatService == null)
-        {
-            System.Console.WriteLine("服务未初始化");
-            return;
-        }
-
-        if (!_voiceChatService.IsConnected)
-        {
-            System.Console.WriteLine("未连接到服务器");
-            return;
-        }
-
-        try
-        {
-            await _voiceChatService.ToggleChatStateAsync();
-            System.Console.WriteLine($"对话状态已切换，当前状态: {_voiceChatService.CurrentState}");
-        }
-        catch (Exception ex)
-        {
-            System.Console.WriteLine($"切换对话状态失败: {ex.Message}");
-        }
-    }
-    static Task ToggleAutoDialogueMode()
-    {
-        if (_voiceChatService == null)
-        {
-            System.Console.WriteLine("服务未初始化");
-            return Task.CompletedTask;
-        }
-
-        _voiceChatService.KeepListening = !_voiceChatService.KeepListening;
-        System.Console.WriteLine($"自动对话模式: {(_voiceChatService.KeepListening ? "已启用" : "已禁用")}");
-
-        if (_voiceChatService.KeepListening)
-        {
-            System.Console.WriteLine("设备将在对话结束后自动开始下一轮监听");
-        }
-
-        return Task.CompletedTask;
-    }
-
+ 
     static void OnMessageReceived(object? sender, ChatMessage message)
     {
         System.Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] 收到消息 ({message.Role}): {message.Content}");

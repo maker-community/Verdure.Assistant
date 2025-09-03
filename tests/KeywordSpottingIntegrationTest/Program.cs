@@ -312,11 +312,7 @@ public class MockVoiceChatService : IVoiceChatService
     }    public void SetKeywordSpottingService(IKeywordSpottingService keywordSpottingService)
     {
         // 模拟实现
-    }    public void SetMcpIntegrationService(McpIntegrationService mcpIntegrationService)
-    {
-        // 模拟实现
     }
-
     public void SetMusicVoiceCoordinationService(MusicVoiceCoordinationService musicVoiceCoordinationService)
     {
         // 模拟实现
@@ -334,5 +330,10 @@ public class MockVoiceChatService : IVoiceChatService
     public void Dispose()
     {
         // 模拟实现
+    }
+
+    public Task<bool> SwitchKeywordModelAsync(string modelFileName)
+    {
+        throw new NotImplementedException();
     }
 }

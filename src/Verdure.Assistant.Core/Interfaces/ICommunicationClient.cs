@@ -8,16 +8,6 @@ namespace Verdure.Assistant.Core.Interfaces;
 public interface ICommunicationClient : IDisposable
 {
     /// <summary>
-    /// 消息接收事件
-    /// </summary>
-    event EventHandler<ChatMessage>? MessageReceived;
-
-    /// <summary>
-    /// 连接状态变化事件
-    /// </summary>
-    event EventHandler<bool>? ConnectionStateChanged;
-
-    /// <summary>
     /// 连接到服务器
     /// </summary>
     Task ConnectAsync();
