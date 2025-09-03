@@ -109,12 +109,6 @@ public interface IVoiceChatService : IDisposable
     void SetInterruptManager(InterruptManager interruptManager);
 
     /// <summary>
-    /// 设置关键词唤醒服务
-    /// 对应py-xiaozhi的wake_word_detector集成
-    /// </summary>
-    void SetKeywordSpottingService(IKeywordSpottingService keywordSpottingService);
-
-    /// <summary>
     /// 启动关键词唤醒检测
     /// 对应py-xiaozhi的_start_wake_word_detector方法
     /// </summary>
@@ -129,12 +123,6 @@ public interface IVoiceChatService : IDisposable
     /// 关键词唤醒是否启用
     /// </summary>
     bool IsKeywordDetectionEnabled { get; }    
-    
-    /// <summary>
-    /// 设置音乐语音协调服务
-    /// 实现音乐播放时自动暂停语音识别的同步机制
-    /// </summary>
-    void SetMusicVoiceCoordinationService(Services.MusicVoiceCoordinationService musicVoiceCoordinationService);
     
     /// <summary>
     /// 切换关键词模型

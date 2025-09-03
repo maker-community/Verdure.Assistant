@@ -241,7 +241,7 @@ class Program
             var voiceChatService = provider.GetRequiredService<IVoiceChatService>();
             var audioStreamManager = provider.GetRequiredService<AudioStreamManager>();
             var logger = provider.GetService<ILogger<KeywordSpottingService>>();
-            return new KeywordSpottingService(voiceChatService, audioStreamManager, logger);
+            return new KeywordSpottingService(audioStreamManager, logger);
         });
     }
 }
@@ -313,15 +313,11 @@ public class MockVoiceChatService : IVoiceChatService
     {
         // 模拟实现
     }
-    public void SetMusicVoiceCoordinationService(MusicVoiceCoordinationService musicVoiceCoordinationService)
-    {
-        // 模拟实现
-    }
-
     public Task<bool> StartKeywordDetectionAsync()
     {
         return Task.FromResult(true);
-    }public Task StopKeywordDetectionAsync()
+    }
+    public Task StopKeywordDetectionAsync()
     {
         // 模拟实现
         return Task.CompletedTask;

@@ -7,14 +7,14 @@ using Verdure.Assistant.Core.Interfaces;
 namespace AudioStreamIntegrationTest;
 
 /// <summary>
-/// 集成测试：验证 PortAudio 单例管理器和共享音频流修复关键词唤醒问题
+/// 集成测试：验证共享音频流简化架构
 /// </summary>
 class Program
 {
     static async Task Main(string[] args)
     {
-        Console.WriteLine("=== PortAudio 单例管理器和共享音频流集成测试 ===");
-        Console.WriteLine("本测试验证关键词检测和语音录制的 PortAudio 资源管理修复");
+        Console.WriteLine("=== 简化音频架构集成测试 ===");
+        Console.WriteLine("本测试验证移除 PortAudioManager 后的音频组件工作状态");
         Console.WriteLine();
 
         // 配置服务（模拟 WinUI 项目的配置）
@@ -30,28 +30,8 @@ class Program
 
         try
         {
-            // 测试 1: PortAudio 单例管理器基本功能
-            Console.WriteLine("测试 1: PortAudio 单例管理器");
-            var portAudioManager = PortAudioManager.Instance;
-            
-            // 模拟多个组件获取 PortAudio 引用
-            Console.WriteLine("组件 1 获取 PortAudio 引用...");
-            portAudioManager.AcquireReference();
-            
-            Console.WriteLine("组件 2 获取 PortAudio 引用...");
-            portAudioManager.AcquireReference();
-            
-            Console.WriteLine("组件 1 释放 PortAudio 引用...");
-            portAudioManager.ReleaseReference();
-            
-            Console.WriteLine("组件 2 释放 PortAudio 引用...");
-            portAudioManager.ReleaseReference();
-            
-            Console.WriteLine("✓ PortAudio 单例管理器测试成功");
-            Console.WriteLine();
-
-            // 测试 2: 共享音频流管理器
-            Console.WriteLine("测试 2: 共享音频流管理器");
+            // 测试 1: 简化的音频流管理器
+            Console.WriteLine("测试 1: 简化的音频流管理器");
             
             // 启动共享音频流
             Console.WriteLine("启动共享音频流...");
@@ -88,36 +68,85 @@ class Program
             // 停止共享音频流
             await audioStreamManager.StopRecordingAsync();
             Console.WriteLine("已停止共享音频流");
-            Console.WriteLine("✓ 共享音频流管理器测试成功");
+            Console.WriteLine("✓ 简化音频流管理器测试成功");
             Console.WriteLine();
 
-            // 测试 3: 模拟关键词检测和语音录制同时使用
-            Console.WriteLine("测试 3: 模拟关键词检测和语音录制同时使用的场景");
-              // 第一个录制器（模拟关键词检测）
-            var recorder1 = new PortAudioRecorder();
-            Console.WriteLine("录制器 1 (关键词检测) 开始录制...");
-            await recorder1.StartRecordingAsync(16000, 1);
+            // 测试 2: 模拟多个组件同时使用共享音频流
+            Console.WriteLine("测试 2: 模拟多个组件同时使用共享音频流的场景");
             
-            // 第二个录制器（模拟语音聊天）
-            var recorder2 = new PortAudioRecorder();
-            Console.WriteLine("录制器 2 (语音聊天) 开始录制...");
-            await recorder2.StartRecordingAsync(16000, 1);
+            // 创建两个共享音频流管理器实例（应该返回同一个单例）
+            var sharedRecorder1 = AudioStreamManager.GetInstance();
+            var sharedRecorder2 = AudioStreamManager.GetInstance();
             
-            Console.WriteLine("两个录制器同时运行 2 秒...");
+            Console.WriteLine($"检查单例模式: recorder1 == recorder2: {ReferenceEquals(sharedRecorder1, sharedRecorder2)}");
+            
+            // 模拟关键词检测订阅
+            bool keywordAudioReceived = false;
+            EventHandler<byte[]> keywordHandler = (sender, data) =>
+            {
+                keywordAudioReceived = true;
+                Console.WriteLine($"关键词检测接收到音频数据: {data.Length} 字节");
+            };
+            
+            // 模拟语音聊天订阅
+            bool voiceChatAudioReceived = false;
+            EventHandler<byte[]> voiceChatHandler = (sender, data) =>
+            {
+                voiceChatAudioReceived = true;
+                Console.WriteLine($"语音聊天接收到音频数据: {data.Length} 字节");
+            };
+            
+            sharedRecorder1.SubscribeToAudioData(keywordHandler);
+            sharedRecorder2.SubscribeToAudioData(voiceChatHandler);
+            
+            Console.WriteLine("两个组件都已订阅共享音频流");
+            
+            // 启动共享录制（应该只创建一个音频流）
+            await sharedRecorder1.StartRecordingAsync(16000, 1);
+            
+            Console.WriteLine("共享音频流运行 2 秒...");
             await Task.Delay(2000);
             
-            Console.WriteLine("停止录制器 1...");
-            await recorder1.StopRecordingAsync();
-            recorder1.Dispose();
+            // 清理订阅
+            sharedRecorder1.UnsubscribeFromAudioData(keywordHandler);
+            sharedRecorder2.UnsubscribeFromAudioData(voiceChatHandler);
             
-            Console.WriteLine("停止录制器 2...");
-            await recorder2.StopRecordingAsync();
-            recorder2.Dispose();
+            await sharedRecorder1.StopRecordingAsync();
             
-            Console.WriteLine("✓ 多录制器资源管理测试成功");
+            Console.WriteLine($"关键词检测接收数据: {keywordAudioReceived}");
+            Console.WriteLine($"语音聊天接收数据: {voiceChatAudioReceived}");
+            Console.WriteLine("✓ 共享音频流多组件测试成功");
             Console.WriteLine();
 
-            Console.WriteLine("🎉 所有测试完成！PortAudio 资源冲突问题已修复。");
+            // 测试 3: 播放器测试
+            Console.WriteLine("测试 3: 简化播放器测试");
+            
+            var audioPlayer = new PortAudioPlayer();
+            
+            // 模拟播放一些音频数据
+            var testAudioData = new byte[1600]; // 100ms 的 16kHz 单声道音频
+            for (int i = 0; i < testAudioData.Length; i += 2)
+            {
+                // 生成简单的正弦波测试音调
+                var sample = (short)(Math.Sin(2.0 * Math.PI * 440.0 * i / (16000.0 * 2)) * 16383);
+                testAudioData[i] = (byte)(sample & 0xFF);
+                testAudioData[i + 1] = (byte)((sample >> 8) & 0xFF);
+            }
+            
+            Console.WriteLine("播放测试音调...");
+            await audioPlayer.PlayAsync(testAudioData, 16000, 1);
+            
+            // 等待播放完成
+            await Task.Delay(1000);
+            
+            await audioPlayer.StopAsync();
+            audioPlayer.Dispose();
+            
+            Console.WriteLine("✓ 播放器测试完成");
+            Console.WriteLine();
+
+            Console.WriteLine("🎉 所有测试完成！简化音频架构工作正常。");
+            Console.WriteLine("✅ 已成功移除 PortAudioManager，简化了架构");
         }
         catch (Exception ex)
         {
@@ -145,13 +174,17 @@ class Program
             builder.SetMinimumLevel(LogLevel.Information);
         });
 
-        // 音频服务（使用与 WinUI 项目相同的配置）
+        // 音频服务（使用共享音频流管理器）
         services.AddSingleton<AudioStreamManager>(provider =>
         {
             var logger = provider.GetService<ILogger<AudioStreamManager>>();
             return AudioStreamManager.GetInstance(logger);
         });
         
+        // 注册为 ISharedAudioRecorder 接口
+        services.AddSingleton<ISharedAudioRecorder>(provider => provider.GetService<AudioStreamManager>()!);
+        
+        // 保持向后兼容的 IAudioRecorder 接口
         services.AddSingleton<IAudioRecorder>(provider => provider.GetService<AudioStreamManager>()!);
     }
 }

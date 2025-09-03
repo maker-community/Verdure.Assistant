@@ -51,14 +51,6 @@ class Program
             // Set up wake word detector coordination (matches py-xiaozhi behavior)
             _voiceChatService.SetInterruptManager(interruptManager);
             await interruptManager.InitializeAsync();
-
-            // Set up Microsoft Cognitive Services keyword spotting (matches py-xiaozhi wake word detector)
-            _voiceChatService.SetKeywordSpottingService(keywordSpottingService);
-            System.Console.WriteLine("关键词唤醒功能已启用（基于Microsoft认知服务）");
-
-            // Set up Music-Voice Coordination Service for automatic synchronization
-            var musicVoiceCoordinationService = host.Services.GetRequiredService<MusicVoiceCoordinationService>();
-            _voiceChatService.SetMusicVoiceCoordinationService(musicVoiceCoordinationService);
             System.Console.WriteLine("音乐语音协调服务已启用（自动暂停/恢复语音识别）");
 
             // Initialize MCP IoT devices (new architecture based on xiaozhi-esp32)
@@ -110,7 +102,7 @@ class Program
                 services.AddSingleton<MusicVoiceCoordinationService>();
 
                 // 注册 AudioStreamManager 单例（使用正确的方式）
-                services.AddSingleton<AudioStreamManager>(provider =>
+                services.AddSingleton(provider =>
                 {
                     var logger = provider.GetService<ILogger<AudioStreamManager>>();
                     return AudioStreamManager.GetInstance(logger);
@@ -120,7 +112,7 @@ class Program
                 services.AddSingleton<IMusicAudioPlayer, ConsoleMusicAudioPlayer>();
                 // Register MCP services (new architecture based on xiaozhi-esp32)
                 services.AddSingleton<McpServer>();
-                services.AddSingleton<McpDeviceManager>(provider =>
+                services.AddSingleton(provider =>
                 {
                     var logger = provider.GetRequiredService<ILogger<McpDeviceManager>>();
                     var mcpServer = provider.GetRequiredService<McpServer>();

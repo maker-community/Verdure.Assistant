@@ -43,10 +43,6 @@ AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
             var audioManager = AudioStreamManager.GetInstance();
             audioManager?.ForceCleanup();
             Console.WriteLine("[音频异常] 音频系统已强制清理");
-            
-            // 强制清理 PortAudio 管理器
-            PortAudioManager.Instance.ForceCleanup();
-            Console.WriteLine("[音频异常] PortAudio 管理器已强制清理");
         }
         catch (Exception cleanupEx)
         {
@@ -67,7 +63,8 @@ AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
         // 紧急清理资源
         try
         {
-            PortAudioManager.Instance.ForceCleanup();
+            var audioManager = AudioStreamManager.GetInstance();
+            audioManager?.ForceCleanup();
             Console.WriteLine("[清理] 紧急清理完成");
         }
         catch (Exception emergencyEx)
@@ -262,16 +259,8 @@ try
                         {
                             // 设置语音聊天服务的各种组件（类似Console项目）
                             voiceChatService.SetInterruptManager(interruptManager);
+
                             await interruptManager.InitializeAsync();
-
-                            voiceChatService.SetKeywordSpottingService(keywordSpottingService);
-                            Console.WriteLine("[语音聊天] 关键词唤醒功能已启用（基于Microsoft认知服务）");
-
-                            if (musicVoiceCoordinationService != null)
-                            {
-                                voiceChatService.SetMusicVoiceCoordinationService(musicVoiceCoordinationService);
-                                Console.WriteLine("[语音聊天] 音乐语音协调服务已启用");
-                            }
 
                             // 连接机器人情感集成服务
                             if (emotionIntegrationService != null)
@@ -337,7 +326,8 @@ AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
     try
     {
         Console.WriteLine("[关闭] 应用程序正在关闭，清理资源...");
-        PortAudioManager.Instance.ForceCleanup();
+        var audioManager = AudioStreamManager.GetInstance();
+        audioManager?.ForceCleanup();
         Console.WriteLine("[关闭] 资源清理完成");
     }
     catch (Exception ex)

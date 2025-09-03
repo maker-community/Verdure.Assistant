@@ -25,7 +25,8 @@ public class InterruptManager : IDisposable
 
     public bool IsVADEnabled { get; private set; } = true;
     public bool IsHotkeyEnabled { get; private set; } = true;
-    public AbortReason LastAbortReason => _lastAbortReason;    public InterruptManager(
+    public AbortReason LastAbortReason => _lastAbortReason;    
+    public InterruptManager(
         IVoiceChatService voiceChatService,
         ILogger<InterruptManager>? logger = null)
     {
