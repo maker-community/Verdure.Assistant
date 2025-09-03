@@ -53,6 +53,11 @@ class Program
             await interruptManager.InitializeAsync();
             System.Console.WriteLine("音乐语音协调服务已启用（自动暂停/恢复语音识别）");
 
+            // Set up music voice coordination service (resolve circular dependency)
+            var musicVoiceCoordinationService = host.Services.GetRequiredService<MusicVoiceCoordinationService>();
+            musicVoiceCoordinationService.SetVoiceChatService(_voiceChatService);
+            musicVoiceCoordinationService.SetInterruptManager(interruptManager);
+
             // Initialize MCP IoT devices (new architecture based on xiaozhi-esp32)
             await InitializeMcpDevicesAsync(host.Services);
 

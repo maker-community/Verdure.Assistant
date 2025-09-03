@@ -133,6 +133,10 @@ public class VoiceChatService : IVoiceChatService
 
         _musicVoiceCoordinationService = musicVoiceCoordinationService;
         _mcpServer = mcpServer;
+        
+        // 设置循环引用（打破循环依赖）
+        _musicVoiceCoordinationService?.SetVoiceChatService(this);
+        
         // Initialize state machine
         InitializeStateMachine();     
     }
@@ -247,6 +251,10 @@ public class VoiceChatService : IVoiceChatService
     public void SetInterruptManager(InterruptManager interruptManager)
     {
         _interruptManager = interruptManager;
+        
+        // Set circular reference to break dependency injection cycle
+        _interruptManager.SetVoiceChatService(this);
+        
         _logger?.LogInformation("InterruptManager set for wake word detector coordination");
     }
 

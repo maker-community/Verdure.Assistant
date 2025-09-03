@@ -172,6 +172,17 @@ public partial class App : Application
                 logger?.LogInformation("中断管理器已设置并初始化");
             }
 
+            // Set up music voice coordination service (resolve circular dependency)
+            if (musicVoiceCoordinationService != null)
+            {
+                musicVoiceCoordinationService.SetVoiceChatService(voiceChatService);
+                if (interruptManager != null)
+                {
+                    musicVoiceCoordinationService.SetInterruptManager(interruptManager);
+                }
+                logger?.LogInformation("音乐语音协调服务已设置语音聊天服务引用");
+            }
+
             // Initialize MCP server and device manager
             await mcpServer.InitializeAsync();
             await mcpDeviceManager.InitializeAsync();

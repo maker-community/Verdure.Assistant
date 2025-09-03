@@ -11,9 +11,9 @@ namespace Verdure.Assistant.Core.Services;
 public class InterruptManager : IDisposable
 {
     private readonly ILogger<InterruptManager>? _logger;
-    private readonly IVoiceChatService _voiceChatService;
-    private readonly VADDetectorService _vadDetector;
-    private readonly GlobalHotkeyService _hotkeyService;
+    private IVoiceChatService? _voiceChatService;
+    private VADDetectorService? _vadDetector;
+    private GlobalHotkeyService? _hotkeyService;
     
     // Interrupt state tracking
     private bool _isInitialized = false;
@@ -27,12 +27,19 @@ public class InterruptManager : IDisposable
     public bool IsHotkeyEnabled { get; private set; } = true;
     public AbortReason LastAbortReason => _lastAbortReason;    
     public InterruptManager(
-        IVoiceChatService voiceChatService,
         ILogger<InterruptManager>? logger = null)
     {
-        _voiceChatService = voiceChatService;
         _logger = logger;
-          // Initialize interrupt services
+    }
+
+    /// <summary>
+    /// 设置语音聊天服务（用于打破循环依赖）
+    /// </summary>
+    public void SetVoiceChatService(IVoiceChatService voiceChatService)
+    {
+        _voiceChatService = voiceChatService;
+        
+        // Initialize interrupt services
         // Pass null for audioRecorder since voice interruption is disabled
         _vadDetector = new VADDetectorService(_voiceChatService, null);
         _hotkeyService = new GlobalHotkeyService(_voiceChatService);
@@ -40,12 +47,21 @@ public class InterruptManager : IDisposable
         // Subscribe to interrupt events
         _vadDetector.VoiceInterruptDetected += OnVADInterrupt;
         _hotkeyService.HotkeyPressed += OnHotkeyInterrupt;
+        
+        _logger?.LogInformation("语音聊天服务已设置到中断管理器");
     }
 
     public Task InitializeAsync()
-    {        if (_isInitialized)
+    {        
+        if (_isInitialized)
         {
             _logger?.LogWarning("Interrupt manager is already initialized");
+            return Task.CompletedTask;
+        }
+
+        if (_voiceChatService == null || _vadDetector == null || _hotkeyService == null)
+        {
+            _logger?.LogError("VoiceChatService must be set before initialization");
             return Task.CompletedTask;
         }
 
@@ -71,7 +87,9 @@ public class InterruptManager : IDisposable
             {
                 _vadDetector.Start();
                 _logger?.LogInformation("VAD interrupt detection enabled");
-            }            _isInitialized = true;
+            }            
+
+            _isInitialized = true;
             _logger?.LogInformation("Interrupt manager initialized successfully");
             return Task.CompletedTask;
         }
@@ -88,10 +106,10 @@ public class InterruptManager : IDisposable
         try
         {
             // Stop VAD
-            _vadDetector.Stop();
+            _vadDetector?.Stop();
             
             // Unregister hotkey
-            _hotkeyService.UnregisterHotkey();
+            _hotkeyService?.UnregisterHotkey();
             
             _isInitialized = false;
             _logger?.LogInformation("Interrupt manager shut down");
@@ -125,12 +143,12 @@ public class InterruptManager : IDisposable
         {
             if (enabled)
             {
-                _vadDetector.Start();
+                _vadDetector?.Start();
                 _logger?.LogInformation("VAD interrupt detection enabled");
             }
             else
             {
-                _vadDetector.Stop();
+                _vadDetector?.Stop();
                 _logger?.LogInformation("VAD interrupt detection disabled");
             }
         }
@@ -141,7 +159,7 @@ public class InterruptManager : IDisposable
     /// </summary>
     public void PauseVAD()
     {
-        if (IsVADEnabled && _vadDetector.IsRunning)
+        if (IsVADEnabled && _vadDetector?.IsRunning == true)
         {
             _vadDetector.Pause();
             _logger?.LogDebug("VAD detection paused");
@@ -153,7 +171,7 @@ public class InterruptManager : IDisposable
     /// </summary>
     public void ResumeVAD()
     {
-        if (IsVADEnabled && _vadDetector.IsPaused)
+        if (IsVADEnabled && _vadDetector?.IsPaused == true)
         {
             _vadDetector.Resume();
             _logger?.LogDebug("VAD detection resumed");
@@ -198,7 +216,7 @@ public class InterruptManager : IDisposable
             InterruptTriggered?.Invoke(this, eventArgs);
 
             // Stop voice chat if active
-            if (_voiceChatService.IsVoiceChatActive)
+            if (_voiceChatService?.IsVoiceChatActive == true)
             {
                 await _voiceChatService.StopVoiceChatAsync();
                 _logger?.LogInformation("Voice chat stopped due to {Reason}", reason);
