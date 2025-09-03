@@ -30,6 +30,13 @@ internal class Program
     private static float _originalVolume = 1.0f;
     private static readonly object _volumeLock = new();
 
+    // 调试统计信息
+    private static int _audioFrameCount = 0;
+    private static int _vadTriggerCount = 0;
+    private static DateTime _lastAudioFrameTime = DateTime.Now;
+    private static DateTime _lastVadTriggerTime = DateTime.Now;
+    private static VoiceActivityDetector? _vad;
+
     // 设备配置
     private static readonly DeviceConfig DeviceConfig = new MiniAudioDeviceConfig
     {
@@ -82,6 +89,11 @@ internal class Program
         _outputDevice.Start();
         _inputDevice.Start();
 
+        Console.WriteLine($"✓ 音频设备启动成功");
+        Console.WriteLine($"  输出设备状态: {_outputDevice.IsRunning}");
+        Console.WriteLine($"  输入设备状态: {_inputDevice.IsRunning}");
+        Console.WriteLine($"  音频格式: {Format.SampleRate}Hz, {Format.Channels}声道");
+
         // 4. 设置音乐播放
         SetupMusicPlayer();
 
@@ -92,6 +104,9 @@ internal class Program
         Console.WriteLine("开始播放音乐和监听人声...");
         _musicPlayer?.Play();
         _micRecorder?.StartRecording();
+
+        Console.WriteLine($"✓ 音乐播放状态: {_musicPlayer?.State}");
+        Console.WriteLine($"✓ 录音状态: {_micRecorder?.State}");
 
         // 7. 用户交互
         await HandleUserInteraction();
@@ -184,27 +199,127 @@ internal class Program
         _micRecorder = new Recorder(_inputDevice, memoryStream);
 
         // 2. 添加VAD进行人声检测
-        var vad = new VoiceActivityDetector(
+        _vad = new VoiceActivityDetector(
             format: Format,
             fftSize: 1024,              // FFT大小
-            energyThreshold: 0.02f      // 调整阈值以适应你的环境
+            energyThreshold: 0.001f     // 降低阈值以便更容易触发
         );
 
-        // 设置VAD参数
-        vad.ActivationTimeMs = 200f;    // 200ms确认是人声
-        vad.HangoverTimeMs = 800f;      // 800ms延迟关闭
-        vad.SpeechLowBand = 300;        // 人声频带下限
-        vad.SpeechHighBand = 3400;      // 人声频带上限
+        // 设置VAD参数 - 使用更宽松的设置便于调试
+        _vad.ActivationTimeMs = 100f;   // 100ms确认是人声（更快响应）
+        _vad.HangoverTimeMs = 500f;     // 500ms延迟关闭（更短延迟）
+        _vad.SpeechLowBand = 200;       // 人声频带下限（更宽范围）
+        _vad.SpeechHighBand = 4000;     // 人声频带上限（更宽范围）
+
+        Console.WriteLine($"VAD配置:");
+        Console.WriteLine($"  能量阈值: {_vad.EnergyThreshold}");
+        Console.WriteLine($"  激活时间: {_vad.ActivationTimeMs}ms");
+        Console.WriteLine($"  保持时间: {_vad.HangoverTimeMs}ms");
+        Console.WriteLine($"  频带范围: {_vad.SpeechLowBand}Hz - {_vad.SpeechHighBand}Hz");
 
         // 绑定人声检测事件
-        vad.SpeechDetected += OnVoiceActivityDetected;
-        _micRecorder.AddAnalyzer(vad);
+        _vad.SpeechDetected += OnVoiceActivityDetected;
+
+        // 创建一个定时器来监控音频数据
+        var audioMonitorTimer = new System.Timers.Timer(1000); // 每秒检查一次
+        audioMonitorTimer.Elapsed += (sender, e) => 
+        {
+            if (_micRecorder != null && _inputDevice?.IsRunning == true)
+            {
+                var timeSinceLastFrame = DateTime.Now - _lastAudioFrameTime;
+                if (timeSinceLastFrame.TotalSeconds > 5)
+                {
+                    Console.WriteLine($"⚠️ 警告: 已经 {timeSinceLastFrame.TotalSeconds:F1} 秒没有检测到音频活动");
+                }
+            }
+        };
+        audioMonitorTimer.Start();
+
+        _micRecorder.AddAnalyzer(_vad);
+
+        // 启动音频监控
+        MonitorAudioData();
 
         Console.WriteLine("麦克风和处理器设置完成");
     }
 
+    // 创建一个简单的音频数据监控方法
+    private static void MonitorAudioData()
+    {
+        // 由于Recorder可能没有直接的音频数据事件，我们通过其他方式监控
+        Task.Run(async () =>
+        {
+            int monitorCount = 0;
+            while (_micRecorder != null && _inputDevice?.IsRunning == true)
+            {
+                await Task.Delay(1000);
+                monitorCount++;
+                _lastAudioFrameTime = DateTime.Now; // 更新时间戳
+                
+                if (monitorCount % 10 == 0)
+                {
+                    Console.WriteLine($"🎙️ 录音监控 - 运行时间: {monitorCount} 秒，VAD触发次数: {_vadTriggerCount}");
+                    
+                    // 如果长时间没有VAD触发，给出提示
+                    if (_vadTriggerCount == 0 && monitorCount > 10)
+                    {
+                        Console.WriteLine($"💡 提示: 已运行 {monitorCount} 秒但未检测到声音，请检查:");
+                        Console.WriteLine("   1. 麦克风是否正常工作");
+                        Console.WriteLine("   2. 音量是否足够大");
+                        Console.WriteLine("   3. 是否选择了正确的输入设备");
+                        Console.WriteLine("   4. 尝试按 't' 调整VAD阈值");
+                    }
+                }
+            }
+        });
+    }
+
+    private static void OnAudioDataReceived(object? sender, byte[] audioData)
+    {
+        _audioFrameCount++;
+        _lastAudioFrameTime = DateTime.Now;
+
+        // 每100帧打印一次统计信息
+        if (_audioFrameCount % 100 == 0)
+        {
+            Console.WriteLine($"🎙️ 音频数据接收正常 - 已处理 {_audioFrameCount} 帧，最新帧大小: {audioData.Length} 字节");
+
+            // 简单的音量检测
+            var samples = new float[audioData.Length / 4]; // 假设是32位浮点格式
+            Buffer.BlockCopy(audioData, 0, samples, 0, audioData.Length);
+
+            var rms = CalculateRMS(samples);
+            var db = 20 * Math.Log10(rms + 1e-10); // 避免log(0)
+
+            Console.WriteLine($"📊 音频统计 - RMS: {rms:F6}, dB: {db:F2}");
+
+            if (rms > 0.001f)
+            {
+                Console.WriteLine($"🔊 检测到音频信号 (RMS > 0.001)");
+            }
+        }
+    }
+
+    private static float CalculateRMS(float[] samples)
+    {
+        if (samples.Length == 0) return 0;
+
+        double sum = 0;
+        for (int i = 0; i < samples.Length; i++)
+        {
+            sum += samples[i] * samples[i];
+        }
+
+        return (float)Math.Sqrt(sum / samples.Length);
+    }
+
     private static void OnVoiceActivityDetected(bool isVoiceActive)
     {
+        _vadTriggerCount++;
+        _lastVadTriggerTime = DateTime.Now;
+        
+        Console.WriteLine($"🎯 VAD事件触发 #{_vadTriggerCount} - 人声活动: {isVoiceActive} (时间: {DateTime.Now:HH:mm:ss.fff})");
+        
         lock (_volumeLock)
         {
             if (isVoiceActive && !_isMusicPaused)
@@ -240,6 +355,8 @@ internal class Program
         Console.WriteLine("- 按 'q' 退出演示");
         Console.WriteLine("- 按 's' 查看当前状态");
         Console.WriteLine("- 按 'v' 手动调整音量");
+        Console.WriteLine("- 按 'd' 查看调试信息");
+        Console.WriteLine("- 按 't' 测试VAD阈值");
         Console.WriteLine();
 
         bool running = true;
@@ -261,6 +378,16 @@ internal class Program
                 case 'v':
                 case 'V':
                     AdjustVolume();
+                    break;
+
+                case 'd':
+                case 'D':
+                    ShowDebugInfo();
+                    break;
+
+                case 't':
+                case 'T':
+                    TestVadThreshold();
                     break;
 
                 default:
@@ -299,7 +426,61 @@ internal class Program
         Console.WriteLine($"录音状态: {(_micRecorder?.State.ToString() ?? "未知")}");
         Console.WriteLine($"输出设备运行: {(_outputDevice?.IsRunning == true ? "是" : "否")}");
         Console.WriteLine($"输入设备运行: {(_inputDevice?.IsRunning == true ? "是" : "否")}");
+        Console.WriteLine($"音频帧计数: {_audioFrameCount}");
+        Console.WriteLine($"VAD触发计数: {_vadTriggerCount}");
         Console.WriteLine();
+    }
+
+    private static void ShowDebugInfo()
+    {
+        Console.WriteLine("\n=== 调试信息 ===");
+        Console.WriteLine($"音频帧计数: {_audioFrameCount}");
+        Console.WriteLine($"VAD触发计数: {_vadTriggerCount}");
+        Console.WriteLine($"最后音频帧时间: {_lastAudioFrameTime:HH:mm:ss.fff}");
+        Console.WriteLine($"最后VAD触发时间: {_lastVadTriggerTime:HH:mm:ss.fff}");
+
+        var timeSinceLastAudio = DateTime.Now - _lastAudioFrameTime;
+        var timeSinceLastVad = DateTime.Now - _lastVadTriggerTime;
+
+        Console.WriteLine($"距离最后音频帧: {timeSinceLastAudio.TotalSeconds:F1}秒");
+        Console.WriteLine($"距离最后VAD触发: {timeSinceLastVad.TotalSeconds:F1}秒");
+
+        if (_vad != null)
+        {
+            Console.WriteLine($"VAD当前配置:");
+            Console.WriteLine($"  能量阈值: {_vad.EnergyThreshold}");
+            Console.WriteLine($"  激活时间: {_vad.ActivationTimeMs}ms");
+            Console.WriteLine($"  保持时间: {_vad.HangoverTimeMs}ms");
+            Console.WriteLine($"  频带: {_vad.SpeechLowBand}-{_vad.SpeechHighBand}Hz");
+        }
+
+        Console.WriteLine($"麦克风录音器状态: {_micRecorder?.State}");
+        Console.WriteLine($"输入设备运行状态: {_inputDevice?.IsRunning}");
+        Console.WriteLine();
+    }
+
+    private static void TestVadThreshold()
+    {
+        if (_vad == null)
+        {
+            Console.WriteLine("VAD未初始化");
+            return;
+        }
+
+        Console.WriteLine("\n=== VAD阈值测试 ===");
+        Console.WriteLine("当前阈值: " + _vad.EnergyThreshold);
+        Console.WriteLine("请输入新的阈值 (0.0001 - 1.0，推荐 0.001 - 0.1):");
+
+        if (float.TryParse(Console.ReadLine(), out float threshold) && threshold > 0 && threshold <= 1.0f)
+        {
+            _vad.EnergyThreshold = threshold;
+            Console.WriteLine($"✓ VAD阈值已设置为: {threshold}");
+            Console.WriteLine("现在尝试说话测试效果...");
+        }
+        else
+        {
+            Console.WriteLine("无效的阈值");
+        }
     }
 
     private static void Cleanup()
