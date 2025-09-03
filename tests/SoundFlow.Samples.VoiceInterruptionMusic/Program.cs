@@ -17,7 +17,8 @@ namespace SoundFlow.Samples.VoiceInterruptionMusic;
 /// <summary>
 /// 演示如何实现音乐播放时的人声打断功能
 /// 使用VAD检测人声，智能控制音乐播放
-/// 从MP3文件播放音乐
+/// 使用SoundFlow的StreamDataProvider从MP3文件播放真实音乐
+/// 不依赖额外的解码库，直接利用SoundFlow内置的音频支持
 /// </summary>
 internal class Program
 {
@@ -25,6 +26,7 @@ internal class Program
     private static Recorder? _micRecorder;
     private static AudioPlaybackDevice? _outputDevice;
     private static AudioCaptureDevice? _inputDevice;
+    private static FileStream? _musicFileStream;
     private static readonly AudioEngine Engine = new MiniAudioEngine();
     private static readonly AudioFormat Format = AudioFormat.DvdHq; // 48kHz, 2 channels, F32
     private static bool _isMusicPaused;
@@ -51,7 +53,8 @@ internal class Program
     static async Task Main()
     {
         Console.WriteLine("=== SoundFlow MP3音乐人声打断演示 ===");
-        Console.WriteLine("此演示展示如何在播放MP3音乐时检测人声并智能打断");
+        Console.WriteLine("此演示展示如何在播放真实MP3音乐时检测人声并智能打断");
+        Console.WriteLine("使用SoundFlow的StreamDataProvider直接播放MP3文件");
         Console.WriteLine();
 
         try
@@ -194,8 +197,10 @@ internal class Program
 
         try
         {
-            // 使用SoundFlow的MiniAudio引擎创建文件数据提供者
-            var musicProvider = CreateMp3FileProvider(_musicFilePath);
+            // 使用SoundFlow的StreamDataProvider来播放MP3文件
+            // 这是官方推荐的方式，可以直接支持MP3等多种音频格式
+            _musicFileStream = new FileStream(_musicFilePath, FileMode.Open, FileAccess.Read);
+            var musicProvider = new StreamDataProvider(Engine, Format, _musicFileStream);
 
             _musicPlayer = new SoundPlayer(Engine, Format, musicProvider);
 
@@ -206,102 +211,19 @@ internal class Program
             }
 
             Console.WriteLine($"✓ MP3音乐播放器设置完成");
+            Console.WriteLine($"  使用StreamDataProvider直接播放MP3文件");
+            Console.WriteLine($"  文件: {Path.GetFileName(_musicFilePath)}");
+            
+            var fileInfo = new FileInfo(_musicFilePath);
+            Console.WriteLine($"  大小: {fileInfo.Length / 1024.0:F1} KB");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"❌ 设置音乐播放器失败: {ex.Message}");
+            _musicFileStream?.Dispose();
+            _musicFileStream = null;
             throw;
         }
-    }
-
-    private static ISoundDataProvider CreateMp3FileProvider(string filePath)
-    {
-        try
-        {
-            Console.WriteLine($"正在加载MP3文件: {Path.GetFileName(filePath)}");
-            
-            // 创建一个自定义的MP3文件数据提供者
-            // 注意：由于SoundFlow的ISoundDataProvider接口比较复杂，我们使用RawDataProvider
-            var audioData = LoadMp3AsRawData(filePath);
-            var fileProvider = new RawDataProvider(audioData);
-            
-            return fileProvider;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"加载MP3文件失败: {ex.Message}");
-            throw;
-        }
-    }
-
-    private static float[] LoadMp3AsRawData(string filePath)
-    {
-        try
-        {
-            // 读取文件但不进行真实的MP3解码
-            // 为了演示目的，我们生成一个与文件大小相关的音频信号
-            var fileBytes = File.ReadAllBytes(filePath);
-            Console.WriteLine($"MP3文件大小: {fileBytes.Length} 字节");
-            
-            // 生成一个示例音乐信号来替代真实的MP3解码
-            var audioData = GenerateMusicFromFileSize(fileBytes.Length);
-            
-            Console.WriteLine($"✓ MP3文件处理完成，生成了 {audioData.Length} 个样本");
-            return audioData;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ 处理MP3文件失败: {ex.Message}");
-            // 生成一个默认的音频信号作为后备
-            return GenerateMusicFromFileSize(1024 * 1024); // 1MB默认大小
-        }
-    }
-
-    private static float[] GenerateMusicFromFileSize(int fileSize)
-    {
-        // 基于文件大小生成一个合理时长的音乐信号
-        var sampleRate = Format.SampleRate;
-        var channels = Format.Channels;
-        
-        // 估计时长：假设MP3压缩比为1:10，每样本4字节
-        var estimatedDurationSeconds = Math.Max(10, Math.Min(60, fileSize / (sampleRate * channels * 4 / 10)));
-        
-        var samples = new List<float>();
-
-        Console.WriteLine($"⚠️ 使用占位符音频信号替代MP3解码");
-        Console.WriteLine($"   估计时长: {estimatedDurationSeconds} 秒");
-        Console.WriteLine($"   如需真实MP3播放，需要集成音频解码库");
-
-        for (int i = 0; i < sampleRate * estimatedDurationSeconds; i++)
-        {
-            var t = (float)i / sampleRate;
-
-            // 创建更丰富的音乐效果，基于文件内容产生变化
-            var phase1 = 2 * MathF.PI * 220 * t; // A3
-            var phase2 = 2 * MathF.PI * 330 * t; // E4  
-            var phase3 = 2 * MathF.PI * 440 * t; // A4
-            var phase4 = 2 * MathF.PI * 660 * t; // E5
-
-            // 使用文件大小作为随机种子来产生变化
-            var fileSeed = (fileSize % 1000) / 1000.0f;
-            
-            var music = 0.4f * MathF.Sin(phase1 + fileSeed) +
-                       0.3f * MathF.Sin(phase2 + fileSeed * 2) +
-                       0.2f * MathF.Sin(phase3 + fileSeed * 3) +
-                       0.1f * MathF.Sin(phase4 + fileSeed * 4);
-
-            // 添加一些动态变化
-            var envelope = MathF.Sin(2 * MathF.PI * t / 4) * 0.3f + 0.7f; // 4秒周期的包络
-            music *= envelope;
-
-            // 为每个声道添加信号
-            for (int ch = 0; ch < channels; ch++)
-            {
-                samples.Add(music * 0.4f); // 适当的音量
-            }
-        }
-
-        return samples.ToArray();
     }
 
     private static void SetupMicrophoneWithVad()
@@ -426,7 +348,7 @@ internal class Program
     private static async Task HandleUserInteraction()
     {
         Console.WriteLine("\n=== 使用说明 ===");
-        Console.WriteLine("- MP3音乐正在播放");
+        Console.WriteLine("- 使用SoundFlow的StreamDataProvider播放真实的MP3音乐");
         Console.WriteLine("- 对着麦克风说话，音乐音量会自动降低");
         Console.WriteLine("- 停止说话后，音乐音量会恢复");
         Console.WriteLine("- 按 'q' 退出演示");
@@ -505,8 +427,27 @@ internal class Program
         try
         {
             Console.WriteLine("重新开始播放MP3音乐...");
+            
             _musicPlayer?.Stop();
-            Thread.Sleep(100); // 短暂等待停止完成
+            
+            // 如果音乐播放器存在，需要重新初始化
+            if (_musicPlayer != null && _outputDevice != null)
+            {
+                _outputDevice.MasterMixer.RemoveComponent(_musicPlayer);
+                _musicPlayer.Dispose();
+                
+                // 重新设置文件流和播放器
+                _musicFileStream?.Dispose();
+                if (!string.IsNullOrEmpty(_musicFilePath))
+                {
+                    _musicFileStream = new FileStream(_musicFilePath, FileMode.Open, FileAccess.Read);
+                    var musicProvider = new StreamDataProvider(Engine, Format, _musicFileStream);
+                    _musicPlayer = new SoundPlayer(Engine, Format, musicProvider);
+                    _outputDevice.MasterMixer.AddComponent(_musicPlayer);
+                }
+            }
+            
+            Thread.Sleep(100); // 短暂等待初始化完成
             _musicPlayer?.Play();
             Console.WriteLine("✓ MP3音乐重新开始播放");
         }
@@ -522,10 +463,12 @@ internal class Program
         Console.WriteLine($"音乐文件: {Path.GetFileName(_musicFilePath ?? "未知")}");
         Console.WriteLine($"音乐播放: {(_musicPlayer?.State.ToString() ?? "未知")}");
         Console.WriteLine($"音乐音量: {(_musicPlayer?.Volume ?? 0):P0}");
+        Console.WriteLine($"播放时间: {TimeSpan.FromSeconds(_musicPlayer?.Time ?? 0):mm\\:ss} / {TimeSpan.FromSeconds(_musicPlayer?.Duration ?? 0):mm\\:ss}");
         Console.WriteLine($"人声打断: {(_isMusicPaused ? "是" : "否")}");
         Console.WriteLine($"录音状态: {(_micRecorder?.State.ToString() ?? "未知")}");
         Console.WriteLine($"输出设备运行: {(_outputDevice?.IsRunning == true ? "是" : "否")}");
         Console.WriteLine($"输入设备运行: {(_inputDevice?.IsRunning == true ? "是" : "否")}");
+        Console.WriteLine($"文件流状态: {(_musicFileStream != null && _musicFileStream.CanRead ? "正常" : "异常")}");
         Console.WriteLine($"音频帧计数: {_audioFrameCount}");
         Console.WriteLine($"VAD触发计数: {_vadTriggerCount}");
         Console.WriteLine();
@@ -597,6 +540,10 @@ internal class Program
             _outputDevice.MasterMixer.RemoveComponent(_musicPlayer);
         }
         _musicPlayer?.Dispose();
+
+        // 清理音乐文件流
+        _musicFileStream?.Dispose();
+        _musicFileStream = null;
 
         _outputDevice?.Stop();
         _outputDevice?.Dispose();
