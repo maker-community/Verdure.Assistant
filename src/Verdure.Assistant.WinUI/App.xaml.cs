@@ -73,15 +73,14 @@ public partial class App : Application
         // Core services
         services.AddSingleton<IVerificationService, VerificationService>();
         services.AddSingleton<IConfigurationService, ConfigurationService>();
-        // Audio services
+        // Audio services - Register AudioStreamManager as singleton using factory pattern
         services.AddSingleton<AudioStreamManager>(provider =>
         {
             var logger = provider.GetService<ILogger<AudioStreamManager>>();
             return AudioStreamManager.GetInstance(logger);
         });
+        services.AddSingleton<ISharedAudioRecorder>(provider => provider.GetRequiredService<AudioStreamManager>());
 
-
-        services.AddSingleton<IAudioRecorder>(provider => provider.GetService<AudioStreamManager>()!);
         services.AddSingleton<IAudioPlayer, PortAudioPlayer>();
         services.AddSingleton<IAudioCodec, OpusSharpAudioCodec>();
 

@@ -14,7 +14,7 @@ namespace Verdure.Assistant.Core.Services;
 public class KeywordSpottingService : IKeywordSpottingService
 {
     private readonly ILogger<KeywordSpottingService>? _logger;
-    private readonly AudioStreamManager _audioStreamManager;
+    private readonly ISharedAudioRecorder _audioStreamManager;
 
     // Microsoft认知服务相关
     private SpeechConfig? _speechConfig;
@@ -46,7 +46,7 @@ public class KeywordSpottingService : IKeywordSpottingService
     public bool IsRunning => _isRunning && !_isPaused;
     public bool IsPaused => _isPaused;
     public bool IsEnabled => _isEnabled;
-    public KeywordSpottingService(AudioStreamManager audioStreamManager, ILogger<KeywordSpottingService>? logger = null)
+    public KeywordSpottingService(ISharedAudioRecorder audioStreamManager, ILogger<KeywordSpottingService>? logger = null)
     {
         _audioStreamManager = audioStreamManager;
         _logger = logger;
@@ -328,7 +328,7 @@ public class KeywordSpottingService : IKeywordSpottingService
     /// <summary>
     /// 从共享音频流推送数据到语音服务（参考 py-xiaozhi 的 AudioCodec 集成模式）
     /// </summary>    
-    private async Task PushSharedAudioDataAsync(AudioStreamManager audioStreamManager, CancellationToken cancellationToken)
+    private async Task PushSharedAudioDataAsync(ISharedAudioRecorder audioStreamManager, CancellationToken cancellationToken)
     {
         if (_pushStream == null)
             return;

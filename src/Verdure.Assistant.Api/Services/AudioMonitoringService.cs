@@ -11,7 +11,7 @@ namespace Verdure.Assistant.Api.Services;
 public class AudioMonitoringService : BackgroundService
 {
     private readonly ILogger<AudioMonitoringService> _logger;
-    private readonly AudioStreamManager _audioStreamManager;
+    private readonly ISharedAudioRecorder _audioStreamManager;
     private readonly IVoiceChatService? _voiceChatService;
     private DateTime _lastSuccessfulCheck = DateTime.Now;
     private int _consecutiveFailures = 0;
@@ -20,7 +20,7 @@ public class AudioMonitoringService : BackgroundService
 
     public AudioMonitoringService(
         ILogger<AudioMonitoringService> logger,
-        AudioStreamManager audioStreamManager,
+        ISharedAudioRecorder audioStreamManager,
         IVoiceChatService? voiceChatService = null)
     {
         _logger = logger;

@@ -15,7 +15,7 @@ public class VoiceChatService : IVoiceChatService
 {
     private readonly ILogger<VoiceChatService>? _logger;
     private readonly IConfigurationService _configurationService;
-    private readonly AudioStreamManager _audioStreamManager;
+    private readonly ISharedAudioRecorder _audioStreamManager;
     private readonly ICommunicationClient? _communicationClient;
     private readonly IAudioPlayer? _audioPlayer;
     private readonly IAudioCodec? _audioCodec;
@@ -97,7 +97,7 @@ public class VoiceChatService : IVoiceChatService
     #region 构造函数和初始化
     public VoiceChatService(IConfigurationService configurationService,
         IKeywordSpottingService keywordSpottingService,
-        AudioStreamManager audioStreamManager,
+        ISharedAudioRecorder audioStreamManager,
         McpServer mcpServer,
         MusicVoiceCoordinationService musicVoiceCoordinationService,
         ILogger<VoiceChatService>? logger = null)

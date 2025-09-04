@@ -134,17 +134,6 @@ public class AudioStreamManager : ISharedAudioRecorder, IDisposable
     }
 
     /// <summary>
-    /// 获取共享输入流（对应 py-xiaozhi 的 audio_codec.input_stream）
-    /// </summary>
-    public PortAudioSharp.Stream? GetSharedInputStream()
-    {
-        lock (_streamLock)
-        {
-            return _sharedInputStream;
-        }
-    }
-
-    /// <summary>
     /// 订阅音频数据（参考 py-xiaozhi 的多组件共享模式）
     /// </summary>
     public void SubscribeToAudioData(EventHandler<byte[]> handler)

@@ -21,13 +21,6 @@ public interface ISharedAudioRecorder : IAudioRecorder
     void UnsubscribeFromAudioData(EventHandler<byte[]> handler);
 
     /// <summary>
-    /// 获取共享的音频输入流实例
-    /// 主要用于高级集成场景（如关键词检测服务的直接集成）
-    /// </summary>
-    /// <returns>共享的 PortAudio 输入流，如果未初始化则返回 null</returns>
-    PortAudioSharp.Stream? GetSharedInputStream();
-
-    /// <summary>
     /// 强制清理音频系统资源
     /// 用于全局异常恢复和紧急资源释放场景
     /// </summary>

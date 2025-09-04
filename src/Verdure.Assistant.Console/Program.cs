@@ -106,12 +106,15 @@ class Program
                 // Add Music-Voice Coordination Service for automatic pause/resume synchronization
                 services.AddSingleton<MusicVoiceCoordinationService>();
 
-                // 注册 AudioStreamManager 单例（使用正确的方式）
-                services.AddSingleton(provider =>
+                // Register AudioStreamManager as singleton using factory pattern
+                services.AddSingleton<AudioStreamManager>(provider =>
                 {
                     var logger = provider.GetService<ILogger<AudioStreamManager>>();
                     return AudioStreamManager.GetInstance(logger);
                 });
+                services.AddSingleton<IAudioRecorder>(provider => provider.GetRequiredService<AudioStreamManager>());
+                services.AddSingleton<ISharedAudioRecorder>(provider => provider.GetRequiredService<AudioStreamManager>());
+
                 // Music player service (required for MCP music device)
                 services.AddSingleton<IMusicPlayerService, KugouMusicService>();
                 services.AddSingleton<IMusicAudioPlayer, ConsoleMusicAudioPlayer>();

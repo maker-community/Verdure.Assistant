@@ -40,8 +40,8 @@ AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
             GC.Collect();
             
             // 尝试重新初始化音频系统
-            var audioManager = AudioStreamManager.GetInstance();
-            audioManager?.ForceCleanup();
+            //var audioManager = AudioStreamManager.GetInstance();
+            //audioManager?.ForceCleanup();
             Console.WriteLine("[音频异常] 音频系统已强制清理");
         }
         catch (Exception cleanupEx)
@@ -63,8 +63,8 @@ AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
         // 紧急清理资源
         try
         {
-            var audioManager = AudioStreamManager.GetInstance();
-            audioManager?.ForceCleanup();
+            //var audioManager = AudioStreamManager.GetInstance();
+            //audioManager?.ForceCleanup();
             Console.WriteLine("[清理] 紧急清理完成");
         }
         catch (Exception emergencyEx)
@@ -124,12 +124,13 @@ builder.Services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>()
 // Add Music-Voice Coordination Service for automatic pause/resume synchronization
 builder.Services.AddSingleton<MusicVoiceCoordinationService>();
 
-// 注册 AudioStreamManager 单例
+// Register AudioStreamManager as singleton using factory pattern
 builder.Services.AddSingleton<AudioStreamManager>(provider =>
 {
     var logger = provider.GetService<ILogger<AudioStreamManager>>();
     return AudioStreamManager.GetInstance(logger);
 });
+builder.Services.AddSingleton<ISharedAudioRecorder>(provider => provider.GetRequiredService<AudioStreamManager>());
 
 // Music player service (using mpg123)
 builder.Services.AddSingleton<IMusicPlayerService, ApiMusicService>();
@@ -326,8 +327,8 @@ AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
     try
     {
         Console.WriteLine("[关闭] 应用程序正在关闭，清理资源...");
-        var audioManager = AudioStreamManager.GetInstance();
-        audioManager?.ForceCleanup();
+        //var audioManager = AudioStreamManager.GetInstance();
+        //audioManager?.ForceCleanup();
         Console.WriteLine("[关闭] 资源清理完成");
     }
     catch (Exception ex)
