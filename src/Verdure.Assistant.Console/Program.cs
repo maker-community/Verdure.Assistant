@@ -112,7 +112,9 @@ class Program
                     var logger = provider.GetService<ILogger<SoundFlowAudioRecorder>>();
                     return SoundFlowAudioRecorder.GetInstance(logger);
                 });
-                services.AddSingleton<IAudioPlayer>(provider => provider.GetRequiredService<SoundFlowAudioPlayer>());
+
+
+                services.AddSingleton<IAudioPlayer, SoundFlowAudioPlayer>();
                 services.AddSingleton<ISharedAudioRecorder>(provider => provider.GetRequiredService<SoundFlowAudioRecorder>());
 
                 // Music player service (required for MCP music device)

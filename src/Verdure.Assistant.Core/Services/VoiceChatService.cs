@@ -98,6 +98,7 @@ public class VoiceChatService : IVoiceChatService
     public VoiceChatService(IConfigurationService configurationService,
         IKeywordSpottingService keywordSpottingService,
         ISharedAudioRecorder audioStreamManager,
+        IAudioPlayer audioPlayer,
         McpServer mcpServer,
         MusicVoiceCoordinationService musicVoiceCoordinationService,
         ILogger<VoiceChatService>? logger = null)
@@ -109,7 +110,7 @@ public class VoiceChatService : IVoiceChatService
         // 初始化音频编解码器 - 使用OpusSharp
         _audioCodec = new OpusSharpAudioCodec();
         // 初始化音频录制和播放
-        _audioPlayer = new PortAudioPlayer();
+        _audioPlayer = audioPlayer;
 
         _audioStreamManager.DataAvailable += OnAudioDataReceived;
         _audioPlayer.PlaybackStopped += OnAudioPlaybackStopped;
