@@ -95,13 +95,28 @@ internal class Program
         var hotkeySource = new HotkeyInterruptSource();
         _interruptService.RegisterInterruptSource(hotkeySource);
 
-        // 3. 简化的关键字打断源（用于演示）
-        var keywordSource = new SimpleKeywordInterruptSource();
-        keywordSource.AddKeyword("测试");
-        keywordSource.AddKeyword("停止");
-        _interruptService.RegisterInterruptSource(keywordSource);
+        // 3. 真实的关键字打断源（基于Microsoft认知服务）
+        try
+        {
+            var keywordSource = new KeywordInterruptSource();
+            keywordSource.AddKeyword("小点");
+            keywordSource.AddKeyword("停止");
+            keywordSource.AddKeyword("暂停");
+            _interruptService.RegisterInterruptSource(keywordSource);
+            _logger?.LogInformation("已注册真实关键字打断源");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "无法注册真实关键字打断源，使用简化版本");
+            
+            // 4. 简化的关键字打断源（用于演示）
+            var keywordSource = new SimpleKeywordInterruptSource();
+            keywordSource.AddKeyword("测试");
+            keywordSource.AddKeyword("停止");
+            _interruptService.RegisterInterruptSource(keywordSource);
+        }
 
-        // 4. 真实的语音活动打断源（基于SoundFlow VAD）
+        // 5. 真实的语音活动打断源（基于SoundFlow VAD）
         var vadConfig = new RealVoiceActivityInterruptSource.VadConfiguration
         {
             EnergyThreshold = 0.001f,      // 降低阈值以便更容易触发
@@ -115,11 +130,11 @@ internal class Program
         var realVadSource = new RealVoiceActivityInterruptSource(vadConfig);
         _interruptService.RegisterInterruptSource(realVadSource);
 
-        // 5. 简化的语音活动打断源（用于备份演示）
+        // 6. 简化的语音活动打断源（用于备份演示）
         var simpleVadSource = new SimpleVoiceActivityInterruptSource();
         _interruptService.RegisterInterruptSource(simpleVadSource);
 
-        // 6. 定时器打断源（每30秒触发一次）
+        // 7. 定时器打断源（每30秒触发一次）
         var timerSource = new TimerInterruptSource(
             TimeSpan.FromSeconds(30), 
             "定时器自动触发");
@@ -143,9 +158,10 @@ internal class Program
         Console.WriteLine("6. 输入 'vad' 查看VAD详细状态");
         Console.WriteLine("7. 输入 'adjust' 调整VAD参数");
         Console.WriteLine("8. 输入 'quit' 退出程序");
-        Console.WriteLine("9. 关键字和语音活动检测会自动模拟触发");
-        Console.WriteLine("10. 真实VAD会监听麦克风并检测人声");
-        Console.WriteLine("11. 定时器每30秒自动触发一次");
+        Console.WriteLine("9. 真实关键字检测会监听麦克风并识别'小点'、'停止'、'暂停'等关键词");
+        Console.WriteLine("10. 简化关键字和语音活动检测会自动模拟触发");
+        Console.WriteLine("11. 真实VAD会监听麦克风并检测人声");
+        Console.WriteLine("12. 定时器每30秒自动触发一次");
         Console.WriteLine();
         Console.WriteLine("等待打断事件或输入命令...");
     }
