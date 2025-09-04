@@ -198,6 +198,14 @@ public class VoiceChatService : IVoiceChatService
                 _keywordSpottingService.SetConfig(config);
             }
 
+            // 启动连续音频录制（程序启动后立即开始，直到程序关闭才停止）
+            if (_config?.EnableVoice == true && _audioStreamManager != null)
+            {
+                _logger?.LogInformation("启动连续音频录制模式...");
+                await _audioStreamManager.StartRecordingAsync(_config.AudioSampleRate, _config.AudioChannels);
+                _logger?.LogInformation("连续音频录制已启动，音频数据将根据状态机决定是否传输");
+            }
+
             // 启动关键词唤醒检测（对应py-xiaozhi的_start_wake_word_detector调用）
             if (_keywordSpottingService != null)
             {
@@ -500,7 +508,7 @@ public class VoiceChatService : IVoiceChatService
 
         try
         {
-            // Send start listen message first before starting audio recording
+            // Send start listen message first
             if (_communicationClient is WebSocketClient wsClient)
             {
                 // Determine listening mode based on KeepListening setting
@@ -512,15 +520,19 @@ public class VoiceChatService : IVoiceChatService
 
             if (_config?.EnableVoice == true && _audioStreamManager != null)
             {
-                // 简化逻辑：Speaking状态期间录音应该一直保持，避免不必要的重建
-                _logger?.LogDebug("确保音频录制正常运行...");
+                // 新逻辑：不启动/停止录制，而是订阅音频数据流来控制数据传输
+                _logger?.LogDebug("订阅音频数据流用于WebSocket传输...");
                 
-                // 使用智能检查，如果参数相同且已在录制，AudioStreamManager会直接返回
-                await _audioStreamManager.StartRecordingAsync(_config.AudioSampleRate, _config.AudioChannels);
+                // 确保音频流正在运行（应该在初始化时已经启动）
+                if (!_audioStreamManager.IsRecording)
+                {
+                    _logger?.LogWarning("发现音频流未运行，尝试重新启动连续录制模式");
+                    await _audioStreamManager.StartRecordingAsync(_config.AudioSampleRate, _config.AudioChannels);
+                }
                 
                 _isVoiceChatActive = true;
                 VoiceChatStateChanged?.Invoke(this, true);
-                _logger?.LogInformation("Started listening");
+                _logger?.LogInformation("Started listening - audio data will be transmitted to WebSocket");
             }
         }
         catch (Exception ex)
@@ -566,61 +578,18 @@ public class VoiceChatService : IVoiceChatService
                 _logger?.LogDebug("Sent stop listen message");
             }
 
-            if (_audioStreamManager != null)
-            {
-                // 只有在确实正在录音时才尝试停止
-                if (_audioStreamManager.IsRecording)
-                {
-                    _logger?.LogDebug("Stop Recording");
-
-                    // 添加超时保护，避免在树莓派等平台上卡死
-                    var stopTask = _audioStreamManager.StopRecordingAsync();
-                    var timeoutTask = Task.Delay(10000); // 10秒超时
-
-                    var completedTask = await Task.WhenAny(stopTask, timeoutTask);
-
-                    if (completedTask == timeoutTask)
-                    {
-                        _logger?.LogWarning("停止音频录制超时，可能存在平台兼容性问题");
-                    }
-                    else
-                    {
-                        await stopTask; // 等待正常完成
-                        _logger?.LogDebug("Stop Record ok");
-                    }
-                }
-                else
-                {
-                    _logger?.LogDebug("音频录制未运行，跳过停止操作");
-                }
-            }
+            // 新逻辑：不停止录制，只是停止将音频数据发送到WebSocket
+            // 音频流继续运行，供关键词检测等其他功能使用
+            _logger?.LogDebug("停止音频数据传输到WebSocket，但保持录制运行");
 
             _isVoiceChatActive = false;
             VoiceChatStateChanged?.Invoke(this, false);
 
-            _logger?.LogInformation("Stopped listening");
+            _logger?.LogInformation("Stopped listening - audio recording continues for other services");
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to stop listening");
-
-            // 特殊处理音频流异常
-            if (ex.Message.Contains("PortAudio") || ex.Message.Contains("audio") || ex.Message.Contains("stream"))
-            {
-                _logger?.LogWarning("停止监听时检测到音频流异常，启动恢复程序...");
-                _ = Task.Run(async () =>
-                {
-                    var recovered = await RecoverFromAudioStreamErrorAsync(ex);
-                    if (recovered)
-                    {
-                        _logger?.LogInformation("停止监听时的音频流异常恢复成功");
-                    }
-                    else
-                    {
-                        _logger?.LogError("停止监听时的音频流异常恢复失败");
-                    }
-                });
-            }
 
             // 确保即使出错也要重置状态
             _isVoiceChatActive = false;
@@ -766,8 +735,13 @@ public class VoiceChatService : IVoiceChatService
     }
     private async void OnAudioDataReceived(object? sender, byte[] audioData)
     {
+        // 新逻辑：只有在语音聊天激活状态下才发送音频数据到WebSocket
+        // 音频录制始终在运行，但数据传输由状态机控制
         if (!_isVoiceChatActive || _communicationClient == null || _audioCodec == null || _config == null)
+        {
+            // 音频数据被丢弃，但录制继续运行，供关键词检测等功能使用
             return;
+        }
 
         try
         {
@@ -1224,18 +1198,16 @@ public class VoiceChatService : IVoiceChatService
         {
             _logger?.LogInformation("开始释放VoiceChatService资源");
 
-            // 1. 停止语音聊天并等待完成
+            // 1. 停止语音聊天状态，但不停止录制
             try
             {
-                var stopTask = StopVoiceChatAsync();
-                if (!stopTask.Wait(3000)) // 最多等待3秒
-                {
-                    _logger?.LogWarning("停止语音聊天超时");
-                }
+                _isVoiceChatActive = false;
+                VoiceChatStateChanged?.Invoke(this, false);
+                _logger?.LogDebug("语音聊天状态已停止");
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "停止语音聊天时出错");
+                _logger?.LogWarning(ex, "停止语音聊天状态时出错");
             }
 
             // 2. 释放通信客户端
@@ -1257,21 +1229,26 @@ public class VoiceChatService : IVoiceChatService
                 }
             }
 
-            // 3. 释放音频录制器
+            // 3. 释放音频录制器 - 新逻辑：只在程序最终关闭时停止录制
             if (_audioStreamManager != null)
             {
                 try
                 {
                     _audioStreamManager.DataAvailable -= OnAudioDataReceived;
 
-                    if (_audioStreamManager is IDisposable disposableRecorder)
-                    {
-                        disposableRecorder.Dispose();
-                    }
+                    // 只有在程序完全关闭时才停止录制，这里不停止录制
+                    // 录制会在程序退出时由单例的Dispose方法处理
+                    _logger?.LogDebug("取消订阅音频数据事件，但保持录制运行");
+
+                    // 不调用 StopRecordingAsync() 和 Dispose()
+                    // if (_audioStreamManager is IDisposable disposableRecorder)
+                    // {
+                    //     disposableRecorder.Dispose();
+                    // }
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogWarning(ex, "释放音频录制器时出错");
+                    _logger?.LogWarning(ex, "取消订阅音频录制器时出错");
                 }
             }
 
@@ -1316,7 +1293,7 @@ public class VoiceChatService : IVoiceChatService
                     _keywordSpottingService.KeywordDetected -= OnKeywordDetected;
                     _keywordSpottingService.ErrorOccurred -= OnKeywordDetectionError;
                     _keywordSpottingService.Dispose();
-                    _keywordSpottingService = null;
+                    // _keywordSpottingService = null;  // 修复编译错误：不能赋值null给非可空引用类型
                     _keywordDetectionEnabled = false;
                 }
                 catch (Exception ex)
@@ -1366,10 +1343,10 @@ public class VoiceChatService : IVoiceChatService
                 }
             }
 
-            // 10. 重置状态 - 不再需要重置_currentState，因为已经移除
+            // 10. 重置状态
             _isVoiceChatActive = false;
 
-            _logger?.LogInformation("VoiceChatService资源释放完成");
+            _logger?.LogInformation("VoiceChatService资源释放完成 - 音频录制保持运行直到程序退出");
         }
         catch (Exception ex)
         {

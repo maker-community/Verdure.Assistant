@@ -78,7 +78,28 @@ class Program
         }
         finally
         {
-            _voiceChatService?.Dispose();
+            try
+            {
+                // 先释放VoiceChatService，但不停止音频录制
+                _voiceChatService?.Dispose();
+                
+                // 最后释放音频录制器，停止连续录制
+                var audioRecorder = host.Services.GetService<SoundFlowAudioRecorder>();
+                if (audioRecorder != null)
+                {
+                    _logger?.LogInformation("程序退出，停止连续音频录制...");
+                    audioRecorder.Dispose();
+                    _logger?.LogInformation("连续音频录制已停止");
+                }
+                
+                // 释放主机服务
+                host?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "释放资源时出错");
+                System.Console.WriteLine($"释放资源时出错: {ex.Message}");
+            }
         }
     }
 

@@ -124,13 +124,15 @@ builder.Services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>()
 // Add Music-Voice Coordination Service for automatic pause/resume synchronization
 builder.Services.AddSingleton<MusicVoiceCoordinationService>();
 
+builder.Services.AddSingleton<IAudioPlayer, PortAudioPlayer>();
+
 // Register AudioStreamManager as singleton using factory pattern
-builder.Services.AddSingleton<AudioStreamManager>(provider =>
+builder.Services.AddSingleton<SoundFlowAudioRecorder>(provider =>
 {
-    var logger = provider.GetService<ILogger<AudioStreamManager>>();
-    return AudioStreamManager.GetInstance(logger);
+    var logger = provider.GetService<ILogger<SoundFlowAudioRecorder>>();
+    return SoundFlowAudioRecorder.GetInstance(logger);
 });
-builder.Services.AddSingleton<ISharedAudioRecorder>(provider => provider.GetRequiredService<AudioStreamManager>());
+builder.Services.AddSingleton<ISharedAudioRecorder>(provider => provider.GetRequiredService<SoundFlowAudioRecorder>());
 
 // Music player service (using mpg123)
 builder.Services.AddSingleton<IMusicPlayerService, ApiMusicService>();
