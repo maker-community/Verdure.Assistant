@@ -107,13 +107,13 @@ class Program
                 services.AddSingleton<MusicVoiceCoordinationService>();
 
                 // Register AudioStreamManager as singleton using factory pattern
-                services.AddSingleton<AudioStreamManager>(provider =>
+                services.AddSingleton<SoundFlowAudioRecorder>(provider =>
                 {
-                    var logger = provider.GetService<ILogger<AudioStreamManager>>();
-                    return AudioStreamManager.GetInstance(logger);
+                    var logger = provider.GetService<ILogger<SoundFlowAudioRecorder>>();
+                    return SoundFlowAudioRecorder.GetInstance(logger);
                 });
-                services.AddSingleton<IAudioRecorder>(provider => provider.GetRequiredService<AudioStreamManager>());
-                services.AddSingleton<ISharedAudioRecorder>(provider => provider.GetRequiredService<AudioStreamManager>());
+                services.AddSingleton<IAudioPlayer>(provider => provider.GetRequiredService<SoundFlowAudioPlayer>());
+                services.AddSingleton<ISharedAudioRecorder>(provider => provider.GetRequiredService<SoundFlowAudioRecorder>());
 
                 // Music player service (required for MCP music device)
                 services.AddSingleton<IMusicPlayerService, KugouMusicService>();
