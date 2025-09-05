@@ -81,7 +81,7 @@ public partial class App : Application
         });
         services.AddSingleton<ISharedAudioRecorder>(provider => provider.GetRequiredService<SoundFlowAudioRecorder>());
 
-        services.AddSingleton<IAudioPlayer, PortAudioPlayer>();
+        services.AddSingleton<IAudioPlayer, SoundFlowAudioPlayer>();
         services.AddSingleton<IAudioCodec, OpusSharpAudioCodec>();
 
         // Communication services

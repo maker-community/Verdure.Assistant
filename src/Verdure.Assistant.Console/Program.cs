@@ -135,7 +135,7 @@ class Program
                 });
 
 
-                services.AddSingleton<IAudioPlayer, PortAudioPlayer>();
+                services.AddSingleton<IAudioPlayer, SoundFlowAudioPlayer>();
                 services.AddSingleton<ISharedAudioRecorder>(provider => provider.GetRequiredService<SoundFlowAudioRecorder>());
 
                 // Music player service (required for MCP music device)

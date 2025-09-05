@@ -124,7 +124,7 @@ builder.Services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>()
 // Add Music-Voice Coordination Service for automatic pause/resume synchronization
 builder.Services.AddSingleton<MusicVoiceCoordinationService>();
 
-builder.Services.AddSingleton<IAudioPlayer, PortAudioPlayer>();
+builder.Services.AddSingleton<IAudioPlayer, SoundFlowAudioPlayer>();
 
 // Register AudioStreamManager as singleton using factory pattern
 builder.Services.AddSingleton<SoundFlowAudioRecorder>(provider =>
