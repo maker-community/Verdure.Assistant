@@ -115,8 +115,8 @@ builder.Services.AddSingleton<IVerificationService, VerificationService>();
 builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
 builder.Services.AddSingleton<IVoiceChatService, VoiceChatService>();
 
-// Add InterruptManager for wake word detector coordination
-builder.Services.AddSingleton<InterruptManager>();
+// Add EnhancedInterruptManager for wake word detector coordination
+builder.Services.AddSingleton<Verdure.Assistant.Core.Services.Interrupt.EnhancedInterruptManager>();
 
 // Add Microsoft Cognitive Services keyword spotting service
 builder.Services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
@@ -253,17 +253,17 @@ try
                         Console.WriteLine("[语音聊天] 自动启动语音聊天功能...");
 
                         var voiceChatService = app.Services.GetService<IVoiceChatService>();
-                        var interruptManager = app.Services.GetService<InterruptManager>();
+                        var enhancedInterruptManager = app.Services.GetService<Verdure.Assistant.Core.Services.Interrupt.EnhancedInterruptManager>();
                         var keywordSpottingService = app.Services.GetService<IKeywordSpottingService>();
                         var musicVoiceCoordinationService = app.Services.GetService<MusicVoiceCoordinationService>();
                         var emotionIntegrationService = app.Services.GetService<Verdure.Assistant.Api.Services.EmotionIntegrationService>();
 
-                        if (voiceChatService != null && interruptManager != null && keywordSpottingService != null)
+                        if (voiceChatService != null && enhancedInterruptManager != null && keywordSpottingService != null)
                         {
                             // 设置语音聊天服务的各种组件（类似Console项目）
-                            voiceChatService.SetInterruptManager(interruptManager);
+                            voiceChatService.SetEnhancedInterruptManager(enhancedInterruptManager);
 
-                            await interruptManager.InitializeAsync();
+                            await enhancedInterruptManager.InitializeAsync();
 
                             // 连接机器人情感集成服务
                             if (emotionIntegrationService != null)

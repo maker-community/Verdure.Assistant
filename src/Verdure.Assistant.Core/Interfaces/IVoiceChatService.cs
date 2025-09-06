@@ -62,6 +62,13 @@ public interface IVoiceChatService : IDisposable
     Task InterruptAsync(AbortReason reason = AbortReason.UserInterruption);
 
     /// <summary>
+    /// 触发API打断 - 通过增强的打断管理器
+    /// </summary>
+    /// <param name="endpoint">API端点</param>
+    /// <param name="requestData">请求数据</param>
+    void TriggerApiInterrupt(string endpoint, object? requestData = null);
+
+    /// <summary>
     /// 发送文本消息
     /// </summary>
     /// <param name="text">文本内容</param>
@@ -103,10 +110,15 @@ public interface IVoiceChatService : IDisposable
     ConversationStateMachine? StateMachine { get; }
     
     /// <summary>
-    /// Set interrupt manager for wake word detector coordination
+    /// Set enhanced interrupt manager for wake word detector coordination
     /// This enables py-xiaozhi-like wake word detector pause/resume behavior
     /// </summary>
-    void SetInterruptManager(InterruptManager interruptManager);
+    void SetEnhancedInterruptManager(Services.Interrupt.EnhancedInterruptManager enhancedInterruptManager);
+    
+    /// <summary>
+    /// Set the new interrupt service for improved interrupt architecture
+    /// </summary>
+    void SetInterruptService(Services.Interrupt.IInterruptService interruptService);
 
     /// <summary>
     /// 启动关键词唤醒检测

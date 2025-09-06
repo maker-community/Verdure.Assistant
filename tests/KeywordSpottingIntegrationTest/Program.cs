@@ -306,7 +306,7 @@ public class MockVoiceChatService : IVoiceChatService
         return Task.CompletedTask;
     }
 
-    public void SetInterruptManager(InterruptManager interruptManager)
+    public void SetEnhancedInterruptManager(Verdure.Assistant.Core.Services.Interrupt.EnhancedInterruptManager enhancedInterruptManager)
     {
         // 模拟实现
     }    public void SetKeywordSpottingService(IKeywordSpottingService keywordSpottingService)
@@ -331,5 +331,16 @@ public class MockVoiceChatService : IVoiceChatService
     public Task<bool> SwitchKeywordModelAsync(string modelFileName)
     {
         throw new NotImplementedException();
+    }
+
+    // 添加缺少的接口方法
+    public void TriggerApiInterrupt(string reason, object? data = null)
+    {
+        // 模拟实现
+    }
+
+    public void SetInterruptService(Verdure.Assistant.Core.Services.Interrupt.IInterruptService interruptService)
+    {
+        // 模拟实现
     }
 }

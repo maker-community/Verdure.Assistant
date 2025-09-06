@@ -190,6 +190,35 @@ namespace Verdure.Assistant.Api.Controllers
         }
 
         /// <summary>
+        /// 中断当前对话
+        /// </summary>
+        /// <param name="request">中断请求</param>
+        /// <returns>操作结果</returns>
+        [HttpPost("interrupt")]
+        public async Task<IActionResult> InterruptConversation([FromBody] InterruptRequest? request = null)
+        {
+            try
+            {
+                var reason = request?.Reason ?? "API interrupt request";
+                
+                _logger.LogInformation("API中断当前对话: {Reason}", reason);
+                
+                // Use the enhanced interrupt system through API interrupt source
+                _voiceChatService.TriggerApiInterrupt($"/api/voicechat/interrupt", new { Reason = reason });
+                
+                // Also call the standard interrupt method for backward compatibility
+                await _voiceChatService.InterruptAsync(Core.Constants.AbortReason.UserInterruption);
+                
+                return Ok(new { Success = true, Message = "对话已中断", Reason = reason });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "中断对话失败");
+                return StatusCode(500, $"中断对话失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// 设置自动对话模式
         /// </summary>
         /// <param name="request">自动模式设置请求</param>
@@ -276,5 +305,10 @@ namespace Verdure.Assistant.Api.Controllers
     public class SetAutoModeRequest
     {
         public bool Enabled { get; set; }
+    }
+
+    public class InterruptRequest
+    {
+        public string Reason { get; set; } = "API interrupt request";
     }
 }
