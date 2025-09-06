@@ -24,6 +24,7 @@ public class EnhancedInterruptManager : IDisposable
     
     private bool _isInitialized = false;
     private bool _disposed = false;
+    private bool _isMusicPlaying = false; // Track music playback state for VAD control
 
     public EnhancedInterruptManager(
         ISharedAudioRecorder? audioRecorder = null, 
@@ -73,14 +74,16 @@ public class EnhancedInterruptManager : IDisposable
             {
                 case "playing":
                     // 音乐开始播放时，启用打断功能（特别是VAD和热键）
-                    _logger?.LogInformation("Music started playing, interrupt sources enabled for music interruption");
+                    _isMusicPlaying = true;
+                    _logger?.LogInformation("Music started playing, VAD interrupt enabled");
                     break;
                     
                 case "paused":
                 case "stopped":
                 case "ended":
-                    // 音乐停止时，可以选择性暂停某些打断源
-                    _logger?.LogInformation("Music stopped, interrupt behavior updated");
+                    // 音乐停止时，VAD打断应该被禁用以避免误触发
+                    _isMusicPlaying = false;
+                    _logger?.LogInformation("Music stopped, VAD interrupt sensitivity reduced");
                     break;
             }
         }
@@ -305,6 +308,33 @@ public class EnhancedInterruptManager : IDisposable
     }
 
     /// <summary>
+    /// 触发分类的手动打断 (API, Hotkey, Manual类型)
+    /// Trigger categorized manual interrupt (API, Hotkey, Manual types)
+    /// </summary>
+    public async Task TriggerCategorizedManualInterruptAsync(string sourceName, string description, object? data = null)
+    {
+        await HandleInterruptAsync(InterruptTypes.Manual, sourceName, description, data);
+    }
+
+    /// <summary>
+    /// 触发分类的VAD打断 (仅在音乐播放时有效)
+    /// Trigger categorized VAD interrupt (only effective during music playback)
+    /// </summary>
+    public async Task TriggerCategorizedVadInterruptAsync(string sourceName, string description, object? data = null)
+    {
+        // VAD打断只有在音乐播放时才应该被处理
+        // VAD interrupts should only be processed during music playback
+        if (ShouldVadBeActive())
+        {
+            await HandleInterruptAsync(InterruptTypes.VoiceActivity, sourceName, description, data);
+        }
+        else
+        {
+            _logger?.LogDebug("VAD interrupt ignored - not during music playback: {Source}", sourceName);
+        }
+    }
+
+    /// <summary>
     /// 处理打断事件并触发适当的状态机转换
     /// Handle interrupt events and trigger appropriate state machine transitions
     /// </summary>
@@ -347,10 +377,9 @@ public class EnhancedInterruptManager : IDisposable
     /// </summary>
     public bool ShouldVadBeActive()
     {
-        // TODO: 这里需要检查音乐播放状态
-        // This would need to check the actual music playback state
-        // For now, return true as a placeholder
-        return true;
+        // VAD打断仅在音乐播放时激活，避免在其他时候的误触发
+        // VAD interrupts are only active during music playback to avoid false positives
+        return _isMusicPlaying;
     }
 
     public void Dispose()
