@@ -24,12 +24,13 @@ public class EnhancedInterruptManager : IDisposable
     private bool _isInitialized = false;
     private bool _disposed = false;
 
-    public EnhancedInterruptManager(ISharedAudioRecorder? audioRecorder = null, 
+    public EnhancedInterruptManager(
+        ISharedAudioRecorder? audioRecorder = null, 
         ILogger<EnhancedInterruptManager>? logger = null)
     {
         _logger = logger;
         _audioRecorder = audioRecorder;
-        _interruptService = new InterruptService(null); // Pass null logger for now
+        _interruptService = new InterruptService(null); // 创建时先不传logger，稍后可以通过其他方式设置
     }
 
     /// <summary>
@@ -146,21 +147,40 @@ public class EnhancedInterruptManager : IDisposable
     private async Task CreateInterruptSources()
     {
         // Manual interrupt source
-        _manualSource = new ManualInterruptSource(null);
+        _manualSource = new ManualInterruptSource(_logger != null ? 
+            Microsoft.Extensions.Logging.LoggerFactory.Create(builder => {}).CreateLogger<ManualInterruptSource>() : null);
         _interruptService.RegisterInterruptSource(_manualSource);
 
-        // Voice activity interrupt source
-        _vadSource = new VoiceActivityInterruptSource(_audioRecorder, _voiceChatService, null);
+        // Voice activity interrupt source with proper configuration
+        var vadConfig = new VoiceActivityInterruptSource.VadConfiguration
+        {
+            EnergyThreshold = 0.001f,
+            MinVoiceFrames = 3,
+            MinSilenceFrames = 10,
+            MinVoiceDurationMs = 100f,
+            MaxSilenceDurationMs = 500f,
+            DebugOutput = _logger?.IsEnabled(LogLevel.Debug) ?? false
+        };
+        
+        _vadSource = new VoiceActivityInterruptSource(
+            _audioRecorder, 
+            _voiceChatService, 
+            vadConfig,
+            _logger != null ? 
+                Microsoft.Extensions.Logging.LoggerFactory.Create(builder => {}).CreateLogger<VoiceActivityInterruptSource>() : null);
         _interruptService.RegisterInterruptSource(_vadSource);
 
         // Hotkey interrupt source
-        _hotkeySource = new HotkeyInterruptSource(null);
+        _hotkeySource = new HotkeyInterruptSource(_logger != null ? 
+            Microsoft.Extensions.Logging.LoggerFactory.Create(builder => {}).CreateLogger<HotkeyInterruptSource>() : null);
         _interruptService.RegisterInterruptSource(_hotkeySource);
 
         // API interrupt source
-        _apiSource = new ApiInterruptSource(null);
+        _apiSource = new ApiInterruptSource(_logger != null ? 
+            Microsoft.Extensions.Logging.LoggerFactory.Create(builder => {}).CreateLogger<ApiInterruptSource>() : null);
         _interruptService.RegisterInterruptSource(_apiSource);
 
+        _logger?.LogInformation("All interrupt sources created and registered successfully");
         await Task.CompletedTask;
     }
 
