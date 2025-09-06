@@ -13,7 +13,6 @@ public class InterruptManager : IDisposable
     private readonly ILogger<InterruptManager>? _logger;
     private IVoiceChatService? _voiceChatService;
     private VADDetectorService? _vadDetector;
-    private GlobalHotkeyService? _hotkeyService;
     
     // Interrupt state tracking
     private bool _isInitialized = false;
@@ -42,11 +41,9 @@ public class InterruptManager : IDisposable
         // Initialize interrupt services
         // Pass null for audioRecorder since voice interruption is disabled
         _vadDetector = new VADDetectorService(_voiceChatService, null);
-        _hotkeyService = new GlobalHotkeyService(_voiceChatService);
         
         // Subscribe to interrupt events
         _vadDetector.VoiceInterruptDetected += OnVADInterrupt;
-        _hotkeyService.HotkeyPressed += OnHotkeyInterrupt;
         
         _logger?.LogInformation("语音聊天服务已设置到中断管理器");
     }
@@ -59,7 +56,7 @@ public class InterruptManager : IDisposable
             return Task.CompletedTask;
         }
 
-        if (_voiceChatService == null || _vadDetector == null || _hotkeyService == null)
+        if (_voiceChatService == null || _vadDetector == null)
         {
             _logger?.LogError("VoiceChatService must be set before initialization");
             return Task.CompletedTask;
@@ -67,20 +64,9 @@ public class InterruptManager : IDisposable
 
         try
         {
-            // Register global hotkey
-            if (IsHotkeyEnabled)
-            {
-                var hotkeyRegistered = _hotkeyService.RegisterHotkey();
-                if (hotkeyRegistered)
-                {
-                    _logger?.LogInformation("F3 hotkey interrupt enabled");
-                }
-                else
-                {
-                    _logger?.LogWarning("Failed to register F3 hotkey - hotkey interrupts disabled");
-                    IsHotkeyEnabled = false;
-                }
-            }
+            // Note: Hotkey functionality is now handled by the new HotkeyInterruptSource
+            // This will be integrated through the new interrupt source architecture
+            _logger?.LogInformation("Hotkey interrupt will be handled by HotkeyInterruptSource");
 
             // Start VAD if enabled
             if (IsVADEnabled)
@@ -108,8 +94,7 @@ public class InterruptManager : IDisposable
             // Stop VAD
             _vadDetector?.Stop();
             
-            // Unregister hotkey
-            _hotkeyService?.UnregisterHotkey();
+            // Note: Hotkey unregistration is now handled by HotkeyInterruptSource
             
             _isInitialized = false;
             _logger?.LogInformation("Interrupt manager shut down");
@@ -186,14 +171,6 @@ public class InterruptManager : IDisposable
         }
     }
 
-    private void OnHotkeyInterrupt(object? sender, bool pressed)
-    {
-        if (pressed)
-        {
-            _ = ProcessInterrupt(AbortReason.KeyboardInterruption, "F3 hotkey pressed");
-        }
-    }
-
     private async Task ProcessInterrupt(AbortReason reason, string description)
     {
         // Implement cooldown to prevent rapid-fire interrupts
@@ -237,7 +214,6 @@ public class InterruptManager : IDisposable
         _ = ShutdownAsync();
         
         _vadDetector?.Dispose();
-        _hotkeyService?.Dispose();
     }
 }
 

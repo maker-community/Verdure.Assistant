@@ -155,8 +155,7 @@ public class EnhancedInterruptManager : IDisposable
         _interruptService.RegisterInterruptSource(_vadSource);
 
         // Hotkey interrupt source
-        _hotkeySource = new HotkeyInterruptSource(_voiceChatService, null);
-        _hotkeySource.SetVoiceChatService(_voiceChatService!);
+        _hotkeySource = new HotkeyInterruptSource(null);
         _interruptService.RegisterInterruptSource(_hotkeySource);
 
         // API interrupt source

@@ -1,77 +1,78 @@
 using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Verdure.Assistant.Core.Interfaces;
 
 namespace Verdure.Assistant.Core.Services.Interrupt.Sources;
 
 /// <summary>
-/// 热键打断源 - 基于全局热键的打断
-/// Hotkey interrupt source based on global hotkey detection
+/// 热键打断源 - 使用轮询方式检测按键状态 (基于 ElectronBot 的实现方式)
 /// </summary>
 public class HotkeyInterruptSource : InterruptSourceBase
 {
-    private readonly IVoiceChatService? _voiceChatService;
-    private GlobalHotkeyService? _hotkeyService;
-    private bool _hotkeyRegistered = false;
+    private readonly Dictionary<string, KeyInfo> _monitoredKeys = new();
+    private readonly Dictionary<string, bool> _keyStates = new();
+    private readonly Dictionary<string, DateTime> _lastTriggerTimes = new();
+    private readonly TimeSpan _debounceTime = TimeSpan.FromMilliseconds(300);
+    private readonly int _pollingInterval = 50; // 50ms 轮询间隔
 
-    public HotkeyInterruptSource(IVoiceChatService? voiceChatService = null, 
-        ILogger<HotkeyInterruptSource>? logger = null)
-        : base("Hotkey", InterruptTypes.Hotkey, logger)
+    // Windows API
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
+
+    public HotkeyInterruptSource(ILogger<HotkeyInterruptSource>? logger = null)
+        : base("HotkeyDetector", InterruptTypes.Hotkey, logger)
     {
-        _voiceChatService = voiceChatService;
+        // 初始化默认监控的按键
+        AddMonitoredKey("F3", 0x72);  // F3 键
+        AddMonitoredKey("E", 'E');    // E 键 (参考 ElectronBot 实现)
+        AddMonitoredKey("ESC", 0x1B); // ESC 键
     }
 
-    /// <summary>
-    /// 设置语音聊天服务
-    /// </summary>
-    public void SetVoiceChatService(IVoiceChatService voiceChatService)
+    public void AddMonitoredKey(string name, int virtualKeyCode)
     {
-        if (_hotkeyService == null)
-        {
-            _hotkeyService = new GlobalHotkeyService(voiceChatService);
-            _hotkeyService.HotkeyPressed += OnHotkeyPressed;
-        }
+        _monitoredKeys[name] = new KeyInfo(name, virtualKeyCode);
+        _keyStates[name] = false;
+        _lastTriggerTimes[name] = DateTime.MinValue;
+        _logger?.LogInformation("Added monitored key: {Name} (VK: 0x{Key:X2})", name, virtualKeyCode);
     }
 
-    protected override async Task OnStartAsync()
+    public void RemoveMonitoredKey(string name)
     {
-        if (_hotkeyService != null && !_hotkeyRegistered)
-        {
-            _hotkeyRegistered = _hotkeyService.RegisterHotkey();
-            if (_hotkeyRegistered)
-            {
-                _logger?.LogInformation("Global hotkey (F3) registered for interrupt");
-            }
-            else
-            {
-                _logger?.LogWarning("Failed to register global hotkey (F3)");
-            }
-        }
-        await base.OnStartAsync();
+        _monitoredKeys.Remove(name);
+        _keyStates.Remove(name);
+        _lastTriggerTimes.Remove(name);
+        _logger?.LogInformation("Removed monitored key: {Name}", name);
     }
 
-    protected override async Task OnStopAsync()
+    protected override Task OnStartAsync()
     {
-        if (_hotkeyService != null && _hotkeyRegistered)
-        {
-            _hotkeyService.UnregisterHotkey();
-            _hotkeyRegistered = false;
-            _logger?.LogInformation("Global hotkey (F3) unregistered");
-        }
-        await base.OnStopAsync();
+        _logger?.LogInformation("Started hotkey monitoring using polling method");
+        _logger?.LogInformation("Monitoring keys: {Keys}", string.Join(", ", _monitoredKeys.Keys));
+        return Task.CompletedTask;
+    }
+
+    protected override Task OnStopAsync()
+    {
+        _logger?.LogInformation("Stopped hotkey monitoring");
+        return Task.CompletedTask;
     }
 
     protected override async Task MonitoringLoopAsync()
     {
-        _logger?.LogInformation("Hotkey interrupt monitoring started");
+        _logger?.LogInformation("Hotkey polling loop started (interval: {Interval}ms)", _pollingInterval);
 
         while (!_cancellationTokenSource.Token.IsCancellationRequested)
         {
             try
             {
-                // 热键检测在OnHotkeyPressed中处理，这里只需要保持监听循环
-                await Task.Delay(1000, _cancellationTokenSource.Token);
+                if (!_isPaused && IsEnabled)
+                {
+                    CheckAllKeys();
+                }
+
+                await Task.Delay(_pollingInterval, _cancellationTokenSource.Token);
             }
             catch (OperationCanceledException)
             {
@@ -79,34 +80,108 @@ public class HotkeyInterruptSource : InterruptSourceBase
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error in hotkey interrupt monitoring loop");
+                _logger?.LogError(ex, "Error in hotkey polling loop");
                 await Task.Delay(1000, _cancellationTokenSource.Token);
             }
         }
+
+        _logger?.LogDebug("Hotkey polling loop stopped");
     }
 
-    private void OnHotkeyPressed(object? sender, bool pressed)
+    private void CheckAllKeys()
     {
-        if (pressed && !_isPaused && IsEnabled)
-        {
-            TriggerInterrupt("F3 hotkey pressed", null, priority: 7);
-        }
-    }
+        var now = DateTime.UtcNow;
 
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
+        foreach (var kvp in _monitoredKeys)
         {
-            if (_hotkeyService != null)
+            var keyName = kvp.Key;
+            var keyInfo = kvp.Value;
+            var currentState = IsKeyPressed(keyInfo.VirtualKeyCode);
+            var previousState = _keyStates[keyName];
+
+            // 检测按键按下事件 (从未按下到按下的状态变化)
+            if (currentState && !previousState)
             {
-                _hotkeyService.HotkeyPressed -= OnHotkeyPressed;
-                if (_hotkeyRegistered)
+                // 检查防抖
+                if (now - _lastTriggerTimes[keyName] >= _debounceTime)
                 {
-                    _hotkeyService.UnregisterHotkey();
+                    _lastTriggerTimes[keyName] = now;
+                    OnKeyPressed(keyName, keyInfo);
                 }
-                _hotkeyService.Dispose();
+                else
+                {
+                    _logger?.LogDebug("Key press ignored due to debounce: {Key}", keyName);
+                }
             }
+
+            _keyStates[keyName] = currentState;
         }
-        base.Dispose(disposing);
+    }
+
+    private bool IsKeyPressed(int virtualKeyCode)
+    {
+        try
+        {
+            // GetAsyncKeyState 返回按键状态，最高位表示按键是否被按下
+            return (GetAsyncKeyState(virtualKeyCode) & 0x8000) != 0;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error checking key state for VK: 0x{Key:X2}", virtualKeyCode);
+            return false;
+        }
+    }
+
+    private void OnKeyPressed(string keyName, KeyInfo keyInfo)
+    {
+        _logger?.LogInformation("Key pressed: {KeyName} (VK: 0x{VK:X2})", keyName, keyInfo.VirtualKeyCode);
+        
+        TriggerInterrupt(
+            $"Key '{keyName}' pressed", 
+            new { 
+                KeyName = keyName, 
+                VirtualKeyCode = keyInfo.VirtualKeyCode,
+                Timestamp = DateTime.UtcNow
+            }, 
+            priority: 8
+        );
+    }
+
+    /// <summary>
+    /// 获取按钮状态 - 兼容 ElectronBot 的接口
+    /// </summary>
+    /// <returns>E 键是否被按下</returns>
+    public bool GetButtonState()
+    {
+        return IsKeyPressed('E');
+    }
+
+    /// <summary>
+    /// 检查特定按键是否被按下
+    /// </summary>
+    /// <param name="keyName">按键名称</param>
+    /// <returns>是否被按下</returns>
+    public bool IsKeyCurrentlyPressed(string keyName)
+    {
+        if (_monitoredKeys.TryGetValue(keyName, out var keyInfo))
+        {
+            return IsKeyPressed(keyInfo.VirtualKeyCode);
+        }
+        return false;
+    }
+}
+
+/// <summary>
+/// 按键信息
+/// </summary>
+public class KeyInfo
+{
+    public string Name { get; }
+    public int VirtualKeyCode { get; }
+
+    public KeyInfo(string name, int virtualKeyCode)
+    {
+        Name = name;
+        VirtualKeyCode = virtualKeyCode;
     }
 }
