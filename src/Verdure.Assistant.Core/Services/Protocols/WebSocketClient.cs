@@ -39,6 +39,9 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     private bool _mcpInitialized = false;
     // 统一事件管理器
     private readonly WebSocketEventManager _eventManager;
+    
+    // Channel 优化的音频处理器
+    private WebSocketAudioHandler? _audioHandler;
 
     /// <summary>
     /// 新的统一WebSocket事件 - 推荐使用
@@ -59,6 +62,10 @@ public class WebSocketClient : ICommunicationClient, IDisposable
         _configurationService = configurationService;
         _logger = logger;
         _eventManager = new WebSocketEventManager();
+        
+        // 初始化 Channel 优化的音频处理器
+        _audioHandler = new WebSocketAudioHandler(SendAudioDirectAsync, logger);
+        _audioHandler.AudioDataReceived += OnAudioDataReceived;
     }
 
     public async Task ConnectAsync()
@@ -197,24 +204,42 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     }
 
     /// <summary>
-    /// 发送音频数据
+    /// 发送音频数据 - 使用 Channel 优化缓冲
     /// </summary>
     /// <param name="audioData">音频数据</param>
     public async Task SendAudioAsync(byte[] audioData)
     {
+        if (_audioHandler == null) 
+        {
+            _logger?.LogWarning("音频处理器未初始化");
+            return;
+        }
+
+        // 使用 Channel 缓冲发送
+        if (!await _audioHandler.QueueAudioForSendingAsync(audioData))
+        {
+            _logger?.LogWarning("音频发送队列已满，丢弃数据");
+        }
+    }
+
+    /// <summary>
+    /// 直接发送音频数据到 WebSocket（由 Channel 处理器调用）
+    /// </summary>
+    private async Task SendAudioDirectAsync(byte[] audioData, CancellationToken cancellationToken)
+    {
         if (!_isConnected || _webSocket?.State != WebSocketState.Open)
             throw new InvalidOperationException("WebSocket未连接");
 
-        try
-        {
-            await _webSocket.SendAsync(new ArraySegment<byte>(audioData), WebSocketMessageType.Binary, true, CancellationToken.None);
-            _logger?.LogDebug("已发送WebSocket音频数据，长度: {Length}", audioData.Length);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "发送WebSocket音频数据失败");
-            throw;
-        }
+        await _webSocket.SendAsync(new ArraySegment<byte>(audioData), WebSocketMessageType.Binary, true, cancellationToken);
+    }
+
+    /// <summary>
+    /// 处理接收到的音频数据事件
+    /// </summary>
+    private void OnAudioDataReceived(object? sender, byte[] audioData)
+    {
+        _eventManager.TriggerMessageEvent(WebSocketEventTrigger.AudioDataReceived,
+            audioData: audioData, context: $"Audio data: {audioData.Length} bytes");
     }
 
     #region Protocol Message Methods
@@ -374,9 +399,8 @@ public class WebSocketClient : ICommunicationClient, IDisposable
                     Array.Copy(buffer, audioData, result.Count);
                     _logger?.LogDebug("收到WebSocket音频数据，长度: {Length}", audioData.Length);
 
-                    // 触发音频数据事件
-                    _eventManager.TriggerMessageEvent(WebSocketEventTrigger.AudioDataReceived,
-                        audioData: audioData, context: $"Audio data: {audioData.Length} bytes");
+                    // 使用 Channel 优化的音频处理器处理接收到的音频数据
+                    _audioHandler?.TryProcessReceivedAudio(audioData);
                 }
                 else if (result.MessageType == WebSocketMessageType.Close)
                 {
@@ -697,5 +721,6 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     public void Dispose()
     {
         DisconnectAsync().Wait();
+        _audioHandler?.Dispose();
     }
 }

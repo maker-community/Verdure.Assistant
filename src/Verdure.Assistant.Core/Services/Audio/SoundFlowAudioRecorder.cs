@@ -25,7 +25,7 @@ public class SoundFlowAudioRecorder : ISharedAudioRecorder, IDisposable
     private AudioCaptureDevice? _captureDevice;
     private Recorder? _recorder;
     private readonly object _streamLock = new();
-    private readonly List<EventHandler<byte[]>> _dataSubscribers = new();
+    private readonly AudioDataDistributor _audioDistributor; // 使用 Channel 优化的音频分发器
     private bool _isRecording = false;
     private bool _isDisposed = false;
     private int _sampleRate = 16000;
@@ -65,6 +65,7 @@ public class SoundFlowAudioRecorder : ISharedAudioRecorder, IDisposable
     private SoundFlowAudioRecorder(ILogger<SoundFlowAudioRecorder>? logger = null)
     {
         _logger = logger;
+        _audioDistributor = new AudioDataDistributor(logger);
         InitializeAudioEngine();
     }
 
@@ -118,17 +119,12 @@ public class SoundFlowAudioRecorder : ISharedAudioRecorder, IDisposable
 
     /// <summary>
     /// 订阅音频数据（参考 AudioStreamManager 的多组件共享模式）
+    /// 使用 Channel 优化的高性能分发
     /// </summary>
     public void SubscribeToAudioData(EventHandler<byte[]> handler)
     {
-        lock (_streamLock)
-        {
-            if (!_dataSubscribers.Contains(handler))
-            {
-                _dataSubscribers.Add(handler);
-                _logger?.LogInformation("新的音频数据订阅者已添加，当前订阅者数量: {Count}", _dataSubscribers.Count);
-            }
-        }
+        _audioDistributor.Subscribe(handler);
+        _logger?.LogInformation("新的音频数据订阅者已添加");
     }
 
     /// <summary>
@@ -136,11 +132,8 @@ public class SoundFlowAudioRecorder : ISharedAudioRecorder, IDisposable
     /// </summary>
     public void UnsubscribeFromAudioData(EventHandler<byte[]> handler)
     {
-        lock (_streamLock)
-        {
-            _dataSubscribers.Remove(handler);
-            _logger?.LogInformation("音频数据订阅者已移除，当前订阅者数量: {Count}", _dataSubscribers.Count);
-        }
+        _audioDistributor.Unsubscribe(handler);
+        _logger?.LogInformation("音频数据订阅者已移除");
     }
 
     public async Task StartRecordingAsync(int sampleRate = 16000, int channels = 1)
@@ -246,25 +239,8 @@ public class SoundFlowAudioRecorder : ISharedAudioRecorder, IDisposable
             // 验证音频数据有效性
             if (IsValidAudioData(audioDataBytes))
             {
-                // 分发给所有订阅者（参考 AudioStreamManager 的共享模式）
-                lock (_streamLock)
-                {
-                    // 触发主要的 DataAvailable 事件
-                    DataAvailable?.Invoke(this, audioDataBytes);
-
-                    // 通知所有额外的订阅者
-                    foreach (var subscriber in _dataSubscribers.ToList())
-                    {
-                        try
-                        {
-                            subscriber?.Invoke(this, audioDataBytes);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger?.LogWarning(ex, "SoundFlow音频数据订阅者处理时出错");
-                        }
-                    }
-                }
+                // 使用 Channel 优化的音频数据分发，避免在回调中阻塞
+                _audioDistributor.TryDistributeAudioData(audioDataBytes, DataAvailable);
             }
         }
         catch (Exception ex)
@@ -428,9 +404,8 @@ public class SoundFlowAudioRecorder : ISharedAudioRecorder, IDisposable
                 // 强制重置所有状态
                 _isRecording = false;
                 
-                // 清理订阅者
-                var subscriberCount = _dataSubscribers.Count;
-                _dataSubscribers.Clear();
+                // 清理 Channel 优化的音频分发器
+                _audioDistributor?.Dispose();
                 
                 // 强制清理流
                 if (_recorder != null || _captureDevice != null || _engine != null)
@@ -464,7 +439,7 @@ public class SoundFlowAudioRecorder : ISharedAudioRecorder, IDisposable
                     }
                 }
                 
-                _logger?.LogWarning("SoundFlow强制清理完成，已清理 {Count} 个订阅者", subscriberCount);
+                _logger?.LogWarning("SoundFlow强制清理完成");
             }
         }
         catch (Exception ex)
@@ -492,7 +467,8 @@ public class SoundFlowAudioRecorder : ISharedAudioRecorder, IDisposable
                 _logger?.LogWarning(ex, "SoundFlow Dispose 时停止录制出错");
             }
 
-            _dataSubscribers.Clear();
+            // 释放 Channel 优化的音频分发器
+            _audioDistributor?.Dispose();
             
             // 在最后一个组件释放时清理引擎
             if (_instance == this)
