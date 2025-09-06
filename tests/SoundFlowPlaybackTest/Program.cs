@@ -22,7 +22,7 @@ namespace SoundFlowPlaybackTest;
 /// 测试目标：
 /// 1. 验证SoundFlow播放字节数据的能力
 /// 2. 测试从服务端接收的音频数据解码后播放
-/// 3. 对比PortAudioPlayer的播放效果
+/// 3. 验证SoundFlow播放效果
 /// 4. 验证OpusSharp解码 + SoundFlow播放的完整流程
 /// 
 /// 基于分析的播放流程：
@@ -218,7 +218,7 @@ internal class Program
         Console.WriteLine("   1. 生成测试音频数据 (模拟服务端数据)");
         Console.WriteLine("   2. OpusSharp编码 (模拟网络传输格式)");
         Console.WriteLine("   3. OpusSharp解码 (模拟接收端处理)");
-        Console.WriteLine("   4. SoundFlow播放 (替代PortAudioPlayer)");
+        Console.WriteLine("   4. SoundFlow播放");
         Console.WriteLine();
         
         // 开始生成和播放测试音频

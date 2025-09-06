@@ -19,7 +19,7 @@ namespace SoundFlowRecordingCodecTest;
 /// 
 /// 测试目标：
 /// 1. 验证SoundFlow使用最优参数(S16/1ch/16kHz)录音的转码性能
-/// 2. 对比与PortAudioSharp2的兼容性
+/// 2. 验证录音功能的兼容性
 /// 3. 测试OpusSharp编码集成
 /// 4. 验证VAD检测功能
 /// 
@@ -255,7 +255,7 @@ internal class Program
     /// 音频数据处理回调 - 核心转码测试逻辑
     /// 
     /// 兼容性验证：
-    /// 1. SoundFlow输出F32 → 转换为byte[] (与AudioStreamManager兼容)
+    /// 1. SoundFlow输出F32 → 转换为byte[] (与音频服务兼容)
     /// 2. 验证帧大小匹配 (960 samples = 1920 bytes @ 16kHz/1ch/Int16)
     /// 3. 确保与OpusSharpAudioCodec的数据格式兼容
     /// </summary>
@@ -280,7 +280,7 @@ internal class Program
                 int16Samples[i] = (short)(clampedSample * short.MaxValue);
             }
 
-            // 2. 转换为byte[]格式 (匹配AudioStreamManager.OnAudioDataReceived的输出)
+            // 2. 转换为byte[]格式 (匹配音频服务输出)
             var audioDataBytes = new byte[sampleCount * 2]; // 2 bytes per Int16
             for (int i = 0; i < sampleCount; i++)
             {
@@ -334,11 +334,11 @@ internal class Program
     /// </summary>
     private static void VerifyDataCompatibility(byte[] audioDataBytes, int sampleCount)
     {
-        // 验证与AudioStreamManager的兼容性
+        // 验证与音频服务的兼容性
         var expectedDataSize = sampleCount * 1 * 2; // samples * channels * sizeof(short)
         if (audioDataBytes.Length == expectedDataSize)
         {
-            // 数据大小匹配AudioStreamManager的计算逻辑
+            // 数据大小匹配音频服务的计算逻辑
             // int dataSize = (int)(frameCount * _channels * sizeof(short));
         }
 
@@ -390,7 +390,7 @@ internal class Program
         
         // 兼容性验证结果
         Console.WriteLine($"\n=== 兼容性验证结果 ===");
-        Console.WriteLine($"📋 AudioStreamManager兼容性:");
+        Console.WriteLine($"📋 音频服务兼容性:");
         Console.WriteLine($"   • 帧大小: 960 samples (60ms @ 16kHz) ✅");
         Console.WriteLine($"   • 数据格式: byte[] from Int16 ✅");
         Console.WriteLine($"   • 计算公式: frameCount * channels * sizeof(short) ✅");
@@ -423,7 +423,7 @@ internal class Program
         Console.WriteLine($"\n=== 兼容性测试结果 ===");
         Console.WriteLine($"✅ SoundFlow录音: 正常");
         Console.WriteLine($"✅ F32→Int16→byte[]转换: 正常");
-        Console.WriteLine($"✅ AudioStreamManager格式兼容: 正常");
+        Console.WriteLine($"✅ 音频服务格式兼容: 正常");
         Console.WriteLine($"✅ OpusSharpAudioCodec格式兼容: 正常");
         Console.WriteLine($"✅ 音频处理: {(_audioProcessedFrames > 0 ? "正常处理" : "未处理数据")}");
         Console.WriteLine($"✅ 音频文件保存: {_audioFileName} ({_totalSamplesWritten} samples)");

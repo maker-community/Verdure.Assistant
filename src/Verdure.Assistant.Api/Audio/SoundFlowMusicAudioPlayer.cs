@@ -23,9 +23,9 @@ namespace Verdure.Assistant.Api.Audio
     /// 参考SoundFlow.Samples.VoiceInterruptionMusic的MP3播放逻辑
     /// 使用SoundFlow的StreamDataProvider直接播放MP3文件
     /// </summary>
-    public class Mpg123AudioPlayer : IMusicAudioPlayer
+    public class SoundFlowMusicAudioPlayer : IMusicAudioPlayer
     {
-        private readonly ILogger<Mpg123AudioPlayer> _logger;
+        private readonly ILogger<SoundFlowMusicAudioPlayer> _logger;
         private AudioEngine? _engine;
         private AudioPlaybackDevice? _playbackDevice;
         private SoundPlayer? _musicPlayer;
@@ -93,7 +93,7 @@ namespace Verdure.Assistant.Api.Audio
             }
         }
 
-        public Mpg123AudioPlayer(ILogger<Mpg123AudioPlayer> logger)
+        public SoundFlowMusicAudioPlayer(ILogger<SoundFlowMusicAudioPlayer> logger)
         {
             _logger = logger;
             InitializeSoundFlowEngine();

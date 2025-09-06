@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Verdure.Assistant.Core.Services;
+using Verdure.Assistant.Core.Services.Audio;
 using Verdure.Assistant.Core.Services.MCP;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
@@ -40,8 +41,8 @@ class Program
             var mcpDeviceManager = provider.GetRequiredService<McpDeviceManager>();
             var mcpIntegration = provider.GetRequiredService<McpIntegrationService>();
             
-            // Use AudioStreamManager singleton
-            var audioStreamManager = AudioStreamManager.GetInstance();
+            // Use SoundFlowAudioRecorder singleton (replaces AudioStreamManager)
+            var audioRecorder = SoundFlowAudioRecorder.GetInstance();
 
             await mcpServer.InitializeAsync();
             await mcpDeviceManager.InitializeAsync();
