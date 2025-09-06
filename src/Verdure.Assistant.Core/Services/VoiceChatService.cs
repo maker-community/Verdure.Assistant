@@ -777,6 +777,10 @@ public class VoiceChatService : IVoiceChatService
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// 打断当前对话 - 发送打断消息到服务器
+    /// </summary>
+    /// <param name="reason">打断原因</param>
     public async Task InterruptAsync(AbortReason reason = AbortReason.UserInterruption)
     {
         try
@@ -800,6 +804,24 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogError(ex, "Failed to interrupt conversation");
             ErrorOccurred?.Invoke(this, $"打断对话失败: {ex.Message}");
             throw;
+        }
+    }
+
+    /// <summary>
+    /// 触发API打断 - 通过增强的打断管理器
+    /// </summary>
+    /// <param name="endpoint">API端点</param>
+    /// <param name="requestData">请求数据</param>
+    public void TriggerApiInterrupt(string endpoint, object? requestData = null)
+    {
+        try
+        {
+            _logger?.LogInformation("Triggering API interrupt from endpoint: {Endpoint}", endpoint);
+            _enhancedInterruptManager?.TriggerApiInterrupt(endpoint, requestData);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to trigger API interrupt");
         }
     }
 

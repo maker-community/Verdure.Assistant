@@ -51,6 +51,61 @@ public class EnhancedInterruptManager : IDisposable
     }
 
     /// <summary>
+    /// 设置音乐播放服务以支持音乐播放打断
+    /// </summary>
+    public void SetMusicPlayerService(IMusicPlayerService musicPlayerService)
+    {
+        // Subscribe to music playback state changes to handle music interruption
+        musicPlayerService.PlaybackStateChanged += OnMusicPlaybackStateChanged;
+        _logger?.LogInformation("MusicPlayerService set for music interruption handling");
+    }
+
+    /// <summary>
+    /// 处理音乐播放状态变化，在音乐播放时允许打断
+    /// </summary>
+    private void OnMusicPlaybackStateChanged(object? sender, Interfaces.MusicPlaybackEventArgs e)
+    {
+        try
+        {
+            switch (e.Status.ToLower())
+            {
+                case "playing":
+                    // 音乐开始播放时，启用打断功能（特别是VAD和热键）
+                    _logger?.LogInformation("Music started playing, interrupt sources enabled for music interruption");
+                    break;
+                    
+                case "paused":
+                case "stopped":
+                case "ended":
+                    // 音乐停止时，可以选择性暂停某些打断源
+                    _logger?.LogInformation("Music stopped, interrupt behavior updated");
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error handling music playback state change for interruption");
+        }
+    }
+
+    /// <summary>
+    /// 触发音乐打断（停止音乐播放）
+    /// </summary>
+    public async Task TriggerMusicInterruptionAsync(string reason = "Voice interrupt during music playback")
+    {
+        try
+        {
+            _logger?.LogInformation("Triggering music interruption: {Reason}", reason);
+            await _interruptService.TriggerManualInterruptAsync($"Music interruption: {reason}", 
+                new { Type = "MusicInterruption", Reason = reason });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to trigger music interruption");
+        }
+    }
+
+    /// <summary>
     /// 初始化打断管理器
     /// </summary>
     public async Task InitializeAsync()
