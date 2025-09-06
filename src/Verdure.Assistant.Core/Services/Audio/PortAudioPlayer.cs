@@ -5,33 +5,35 @@ using Microsoft.Extensions.Logging;
 namespace Verdure.Assistant.Core.Services;
 
 /// <summary>
-/// PortAudioSharp2实现的音频播放器
+/// PortAudioSharp2实现的音频播放器 - 直接实现接口
 /// </summary>
-public class PortAudioPlayer : IAudioPlayer
+public class PortAudioPlayer : IAudioPlayer, IDisposable
 {    
+    private readonly ILogger<PortAudioPlayer>? _logger;
     private PortAudioSharp.Stream? _outputStream;
-    private bool _isPlaying;
     private readonly Queue<byte[]> _audioQueue = new();
     private readonly object _lock = new();
-    private int _sampleRate;
-    private int _channels;
+    private bool _isPlaying = false;
+    private bool _isDisposed = false;
+    private bool _portAudioInitialized = false;
+    private int _sampleRate = 16000;
+    private int _channels = 1;
     private int _emptyFrameCount = 0; // 空帧计数器
     private const int MaxEmptyFrames = 50; // 最大空帧数（约1秒的静音后停止）
     private DateTime _lastDataTime = DateTime.Now;
     private readonly Timer _playbackTimer;
-    private readonly ILogger<PortAudioPlayer>? _logger;
-    private bool _isDisposed = false;
     private const int MaxQueueSize = 20; // 最大队列大小，防止内存积累
 
     public event EventHandler? PlaybackStopped;
-
     public bool IsPlaying => _isPlaying;
+
     public PortAudioPlayer(ILogger<PortAudioPlayer>? logger = null)
     {
         _logger = logger;
         // 创建定时器来检测播放完成（类似Python中的延迟状态变更）
         _playbackTimer = new Timer(CheckPlaybackCompletion, null, Timeout.Infinite, Timeout.Infinite);
     }
+
     private void CheckPlaybackCompletion(object? state)
     {
         lock (_lock)
@@ -59,29 +61,110 @@ public class PortAudioPlayer : IAudioPlayer
                         }
                         catch (Exception ex)
                         {
-                            System.Console.WriteLine($"Error in playback completion handler: {ex.Message}");
+                            _logger?.LogError(ex, "Error in playback completion handler");
                         }
                     });
                 }
             }
         }
-    }    public async Task InitializeAsync(int sampleRate, int channels)
+    }
+
+    /// <summary>
+    /// 确保 PortAudio 已初始化
+    /// </summary>
+    private bool EnsurePortAudioInitialized()
     {
+        if (!_portAudioInitialized)
+        {
+            try
+            {
+                PortAudio.Initialize();
+                _portAudioInitialized = true;
+                _logger?.LogDebug("PortAudio 播放器初始化成功");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "PortAudio 播放器初始化失败");
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// 清理 PortAudio
+    /// </summary>
+    private void CleanupPortAudio()
+    {
+        if (_portAudioInitialized)
+        {
+            try
+            {
+                // 平台自适应超时：ARM设备用更短的超时时间
+                var timeout = Environment.ProcessorCount <= 4 ? 1000 : 2000;
+                
+                var terminateTask = Task.Run(() =>
+                {
+                    try
+                    {
+                        PortAudio.Terminate();
+                        return true;
+                    }
+                    catch (PortAudioException paEx)
+                    {
+                        _logger?.LogDebug(paEx, "PortAudio 播放器终止时的预期异常");
+                        return true; // 对于 PortAudio 异常，认为是成功的
+                    }
+                });
+
+                var completed = terminateTask.Wait(timeout);
+                
+                if (completed && terminateTask.Result)
+                {
+                    _logger?.LogDebug("PortAudio 播放器已终止");
+                }
+                else
+                {
+                    _logger?.LogWarning("PortAudio 播放器终止超时");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "PortAudio 播放器终止时出错");
+            }
+            finally
+            {
+                _portAudioInitialized = false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 初始化音频播放器
+    /// </summary>
+    public async Task InitializeAsync(int sampleRate, int channels)
+    {
+        if (!ValidateAudioParameters(sampleRate, channels))
+        {
+            throw new ArgumentException("Invalid audio parameters");
+        }
+
         _sampleRate = sampleRate;
         _channels = channels;
 
         try
         {
-            // 使用 PortAudioManager 确保正确初始化
-            if (!PortAudioManager.Instance.AcquireReference())
+            // 确保 PortAudio 已初始化
+            if (!EnsurePortAudioInitialized())
             {
-                throw new InvalidOperationException("无法初始化 PortAudio");
+                throw new InvalidOperationException("无法获取音频资源");
             }
             
             // 获取默认输出设备
-            var defaultOutputDevice = PortAudio.DefaultOutputDevice;            if (defaultOutputDevice == -1)
+            var defaultOutputDevice = PortAudio.DefaultOutputDevice;
+            if (defaultOutputDevice == -1)
             {
-                PortAudioManager.Instance.ReleaseReference();
                 throw new InvalidOperationException("未找到音频输出设备");
             }
 
@@ -94,27 +177,30 @@ public class PortAudioPlayer : IAudioPlayer
                 suggestedLatency = PortAudio.GetDeviceInfo(defaultOutputDevice).defaultLowOutputLatency
             };
 
-            // 计算正确的帧大小 - 匹配Python的OUTPUT_FRAME_SIZE
-            int frameSize = sampleRate * 60 / 1000; // 60ms帧，匹配Python的FRAME_DURATION
+            // 计算帧大小 (60ms帧，匹配Python配置)
+            var frameSize = (uint)(sampleRate * 60 / 1000);
 
             // 创建输出流
             _outputStream = new PortAudioSharp.Stream(
                 null,
                 outputParameters,
                 sampleRate,
-                (uint)frameSize, // 使用计算出的帧大小
+                frameSize,
                 StreamFlags.ClipOff, // 使用ClipOff匹配其他实现
                 OnAudioDataRequested,
                 IntPtr.Zero);
 
-            System.Console.WriteLine($"音频播放器初始化成功: {sampleRate}Hz, {channels}声道, 帧大小: {frameSize}");
+            _logger?.LogInformation("音频播放器初始化成功: {SampleRate}Hz, {Channels}声道, 帧大小: {FrameSize}", 
+                sampleRate, channels, frameSize);
             await Task.CompletedTask;
-        }        catch (Exception ex)
+        }        
+        catch (Exception ex)
         {
-            PortAudioManager.Instance.ReleaseReference();
             throw new Exception($"初始化音频播放器失败: {ex.Message}", ex);
         }
-    }    public async Task PlayAsync(byte[] audioData, int sampleRate, int channels)
+    }
+
+    public async Task PlayAsync(byte[] audioData, int sampleRate = 16000, int channels = 1)
     {
         if (_isDisposed) return;
         
@@ -159,9 +245,10 @@ public class PortAudioPlayer : IAudioPlayer
         catch (Exception ex)
         {
             _logger?.LogError(ex, "播放音频时出错");
-            Console.WriteLine($"播放音频时出错: {ex.Message}");
         }
-    }    public async Task StopAsync()
+    }
+
+    public async Task StopAsync()
     {
         if (!_isPlaying) return;
 
@@ -170,7 +257,9 @@ public class PortAudioPlayer : IAudioPlayer
             // 停止定时器
             _playbackTimer.Change(Timeout.Infinite, Timeout.Infinite);
 
-            _isPlaying = false;            // 安全停止音频流
+            _isPlaying = false;
+
+            // 安全停止音频流
             if (_outputStream != null)
             {
                 try
@@ -195,18 +284,15 @@ public class PortAudioPlayer : IAudioPlayer
                 _audioQueue.Clear();
             }
 
-            // 释放 PortAudio 引用
-            PortAudioManager.Instance.ReleaseReference();
-
             _logger?.LogInformation("音频播放已停止");
             await Task.CompletedTask;
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "停止音频播放时出错");
-            Console.WriteLine($"停止音频播放时出错: {ex.Message}");
         }
     }    
+    
     private StreamCallbackResult OnAudioDataRequested(
         IntPtr input,
         IntPtr output,
@@ -267,7 +353,6 @@ public class PortAudioPlayer : IAudioPlayer
         catch (Exception ex)
         {
             _logger?.LogError(ex, "音频播放回调错误");
-            Console.WriteLine($"音频播放回调错误: {ex.Message}");
             
             // 发生错误时填充静音以避免杂音
             if (output != IntPtr.Zero && frameCount > 0)
@@ -278,7 +363,28 @@ public class PortAudioPlayer : IAudioPlayer
             
             return StreamCallbackResult.Continue; // 继续而不是中止，避免音频流断开
         }
-    }    
+    }
+
+    /// <summary>
+    /// 验证音频参数
+    /// </summary>
+    private bool ValidateAudioParameters(int sampleRate, int channels)
+    {
+        if (sampleRate <= 0 || sampleRate > 192000)
+        {
+            _logger?.LogError("无效的采样率: {SampleRate}", sampleRate);
+            return false;
+        }
+
+        if (channels <= 0 || channels > 8)
+        {
+            _logger?.LogError("无效的声道数: {Channels}", channels);
+            return false;
+        }
+
+        return true;
+    }
+
     public void Dispose()
     {
         if (_isDisposed) return;
@@ -288,7 +394,12 @@ public class PortAudioPlayer : IAudioPlayer
         try
         {
             _playbackTimer?.Dispose();
-            StopAsync().Wait(5000); // 5秒超时
+            
+            // 停止播放
+            StopAsync().Wait(3000); // 3秒超时
+            
+            // 清理 PortAudio
+            CleanupPortAudio();
         }
         catch (Exception ex)
         {
@@ -314,21 +425,10 @@ public class PortAudioPlayer : IAudioPlayer
                         _isPlaying = false;
                     }
                 }
-                
-                // 确保释放 PortAudio 引用
-                try
-                {
-                    PortAudioManager.Instance.ReleaseReference();
-                }
-                catch (Exception releaseEx)
-                {
-                    _logger?.LogWarning(releaseEx, "Dispose 时释放 PortAudio 引用出现警告");
-                }
             }
         }
         finally
         {
-            // 抑制终结器调用，避免双重释放
             GC.SuppressFinalize(this);
         }
     }

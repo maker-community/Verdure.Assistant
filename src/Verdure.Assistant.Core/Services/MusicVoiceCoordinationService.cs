@@ -26,13 +26,11 @@ public class MusicVoiceCoordinationService : IDisposable
     /// </summary>
     public MusicVoiceCoordinationService(
         IMusicPlayerService? musicPlayerService = null,
-        IVoiceChatService? voiceChatService = null,
         IKeywordSpottingService? keywordSpottingService = null,
         InterruptManager? interruptManager = null,
         ILogger<MusicVoiceCoordinationService>? logger = null)
     {
         _musicPlayerService = musicPlayerService;
-        _voiceChatService = voiceChatService;
         _keywordSpottingService = keywordSpottingService;
         _interruptManager = interruptManager;
         _logger = logger;
@@ -205,6 +203,24 @@ public class MusicVoiceCoordinationService : IDisposable
             _musicPlayerService.PlaybackStateChanged += OnMusicPlaybackStateChanged;
             _logger?.LogInformation("音乐播放器服务已更新并重新订阅事件");
         }
+    }
+
+    /// <summary>
+    /// 手动设置语音聊天服务（用于打破循环依赖）
+    /// </summary>
+    public void SetVoiceChatService(IVoiceChatService voiceChatService)
+    {
+        _voiceChatService = voiceChatService;
+        _logger?.LogInformation("语音聊天服务已设置");
+    }
+
+    /// <summary>
+    /// 手动设置中断管理器（用于打破循环依赖）
+    /// </summary>
+    public void SetInterruptManager(InterruptManager interruptManager)
+    {
+        _interruptManager = interruptManager;
+        _logger?.LogInformation("中断管理器已设置");
     }
 
     /// <summary>

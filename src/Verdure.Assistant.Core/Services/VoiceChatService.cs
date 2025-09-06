@@ -15,7 +15,7 @@ public class VoiceChatService : IVoiceChatService
 {
     private readonly ILogger<VoiceChatService>? _logger;
     private readonly IConfigurationService _configurationService;
-    private readonly AudioStreamManager _audioStreamManager;
+    private readonly ISharedAudioRecorder _audioStreamManager;
     private readonly ICommunicationClient? _communicationClient;
     private readonly IAudioPlayer? _audioPlayer;
     private readonly IAudioCodec? _audioCodec;
@@ -39,7 +39,7 @@ public class VoiceChatService : IVoiceChatService
     // Wake word detector coordination (matches py-xiaozhi behavior)
     private InterruptManager? _interruptManager;
     // Keyword spotting service (Microsoft Cognitive Services based)
-    private IKeywordSpottingService? _keywordSpottingService;
+    private IKeywordSpottingService _keywordSpottingService;
     private bool _keywordDetectionEnabled = false;
 
     private readonly McpServer _mcpServer;
@@ -96,7 +96,12 @@ public class VoiceChatService : IVoiceChatService
 
     #region 构造函数和初始化
     public VoiceChatService(IConfigurationService configurationService,
-        AudioStreamManager audioStreamManager, ILogger<VoiceChatService>? logger = null, McpServer mcpServer = null)
+        IKeywordSpottingService keywordSpottingService,
+        ISharedAudioRecorder audioStreamManager,
+        IAudioPlayer audioPlayer,
+        McpServer mcpServer,
+        MusicVoiceCoordinationService musicVoiceCoordinationService,
+        ILogger<VoiceChatService>? logger = null)
     {
         _configurationService = configurationService;
         _audioStreamManager = audioStreamManager;
@@ -105,7 +110,7 @@ public class VoiceChatService : IVoiceChatService
         // 初始化音频编解码器 - 使用OpusSharp
         _audioCodec = new OpusSharpAudioCodec();
         // 初始化音频录制和播放
-        _audioPlayer = new PortAudioPlayer();
+        _audioPlayer = audioPlayer;
 
         _audioStreamManager.DataAvailable += OnAudioDataReceived;
         _audioPlayer.PlaybackStopped += OnAudioPlaybackStopped;
@@ -118,9 +123,23 @@ public class VoiceChatService : IVoiceChatService
             // 使用新的统一事件系统
             wsClient.WebSocketEventOccurred += OnWebSocketEventOccurred;
         }
-        // Initialize state machine
-        InitializeStateMachine();
+
+        _keywordSpottingService = keywordSpottingService;
+
+        // 订阅关键词检测事件
+        _keywordSpottingService.KeywordDetected += OnKeywordDetected;
+        _keywordSpottingService.ErrorOccurred += OnKeywordDetectionError;
+
+        _logger?.LogInformation("关键词唤醒服务已设置");
+
+        _musicVoiceCoordinationService = musicVoiceCoordinationService;
         _mcpServer = mcpServer;
+        
+        // 设置循环引用（打破循环依赖）
+        _musicVoiceCoordinationService?.SetVoiceChatService(this);
+        
+        // Initialize state machine
+        InitializeStateMachine();     
     }
 
     private void InitializeStateMachine()
@@ -179,6 +198,14 @@ public class VoiceChatService : IVoiceChatService
                 _keywordSpottingService.SetConfig(config);
             }
 
+            // 启动连续音频录制（程序启动后立即开始，直到程序关闭才停止）
+            if (_config?.EnableVoice == true && _audioStreamManager != null)
+            {
+                _logger?.LogInformation("启动连续音频录制模式...");
+                await _audioStreamManager.StartRecordingAsync(_config.AudioSampleRate, _config.AudioChannels);
+                _logger?.LogInformation("连续音频录制已启动，音频数据将根据状态机决定是否传输");
+            }
+
             // 启动关键词唤醒检测（对应py-xiaozhi的_start_wake_word_detector调用）
             if (_keywordSpottingService != null)
             {
@@ -233,32 +260,13 @@ public class VoiceChatService : IVoiceChatService
     public void SetInterruptManager(InterruptManager interruptManager)
     {
         _interruptManager = interruptManager;
+        
+        // Set circular reference to break dependency injection cycle
+        _interruptManager.SetVoiceChatService(this);
+        
         _logger?.LogInformation("InterruptManager set for wake word detector coordination");
     }
 
-    /// <summary>
-    /// 设置关键词唤醒服务（对应py-xiaozhi的wake_word_detector集成）
-    /// </summary>
-    public void SetKeywordSpottingService(IKeywordSpottingService keywordSpottingService)
-    {
-        _keywordSpottingService = keywordSpottingService;
-
-        // 订阅关键词检测事件
-        _keywordSpottingService.KeywordDetected += OnKeywordDetected;
-        _keywordSpottingService.ErrorOccurred += OnKeywordDetectionError;
-
-        _logger?.LogInformation("关键词唤醒服务已设置");
-    }
-
-
-    /// <summary>
-    /// 设置音乐语音协调服务（用于音乐播放时暂停语音识别）
-    /// </summary>
-    public void SetMusicVoiceCoordinationService(MusicVoiceCoordinationService musicVoiceCoordinationService)
-    {
-        _musicVoiceCoordinationService = musicVoiceCoordinationService;
-        _logger?.LogInformation("音乐语音协调服务已设置");
-    }
 
     /// <summary>
     /// 切换关键词模型
@@ -494,79 +502,13 @@ public class VoiceChatService : IVoiceChatService
     /// <summary>
     /// Internal method to start listening (called by state machine)
     /// </summary>
-    /// <summary>
-    /// 音频流异常恢复机制
-    /// </summary>
-    public async Task<bool> RecoverFromAudioStreamErrorAsync(Exception audioException)
-    {
-        try
-        {
-            _logger?.LogWarning(audioException, "检测到音频流异常，开始恢复程序...");
-
-            // 1. 停止当前的录音状态
-            _isVoiceChatActive = false;
-            VoiceChatStateChanged?.Invoke(this, false);
-
-            // 2. 强制清理音频流管理器
-            try
-            {
-                _audioStreamManager?.ForceCleanup();
-                _logger?.LogInformation("音频流已强制清理");
-            }
-            catch (Exception cleanupEx)
-            {
-                _logger?.LogWarning(cleanupEx, "强制清理音频流时出错");
-            }
-
-            // 3. 重置状态机到空闲状态
-            try
-            {
-                _stateMachine?.RequestTransition(ConversationTrigger.ForceIdle, "音频流异常恢复");
-                _logger?.LogInformation("状态机已重置到空闲状态");
-            }
-            catch (Exception stateEx)
-            {
-                _logger?.LogWarning(stateEx, "重置状态机时出错");
-            }
-
-            // 4. 等待一段时间让系统稳定
-            await Task.Delay(2000);
-
-            // 5. 尝试重新初始化音频系统
-            if (_config?.EnableVoice == true && _audioStreamManager != null)
-            {
-                try
-                {
-                    await _audioStreamManager.StartRecordingAsync(_config.AudioSampleRate, _config.AudioChannels);
-                    await Task.Delay(500); // 短暂延迟确保启动稳定
-                    await _audioStreamManager.StopRecordingAsync();
-
-                    _logger?.LogInformation("音频系统重新初始化成功");
-                    return true;
-                }
-                catch (Exception reinitEx)
-                {
-                    _logger?.LogError(reinitEx, "重新初始化音频系统失败");
-                    return false;
-                }
-            }
-
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "音频流异常恢复过程失败");
-            return false;
-        }
-    }
-
     private async Task StartListeningInternalAsync()
     {
         if (!IsConnected) return;
 
         try
         {
-            // Send start listen message first before starting audio recording
+            // Send start listen message first
             if (_communicationClient is WebSocketClient wsClient)
             {
                 // Determine listening mode based on KeepListening setting
@@ -578,26 +520,19 @@ public class VoiceChatService : IVoiceChatService
 
             if (_config?.EnableVoice == true && _audioStreamManager != null)
             {
-                // 检查当前录音状态
-                var wasRecording = _audioStreamManager.IsRecording;
-                _logger?.LogDebug("当前录音状态: {IsRecording}", wasRecording);
-
-                if (!wasRecording)
+                // 新逻辑：不启动/停止录制，而是订阅音频数据流来控制数据传输
+                _logger?.LogDebug("订阅音频数据流用于WebSocket传输...");
+                
+                // 确保音频流正在运行（应该在初始化时已经启动）
+                if (!_audioStreamManager.IsRecording)
                 {
-                    _logger?.LogDebug("启动音频录制...");
-                    await _audioStreamManager.StartRecordingAsync(_config.AudioSampleRate, _config.AudioChannels);
-                    _logger?.LogDebug("音频录制已启动");
-                }
-                else
-                {
-                    _logger?.LogDebug("音频录制已在运行，无需重新启动");
-                    // 即使已经在录音，也要确保参数正确
+                    _logger?.LogWarning("发现音频流未运行，尝试重新启动连续录制模式");
                     await _audioStreamManager.StartRecordingAsync(_config.AudioSampleRate, _config.AudioChannels);
                 }
-
+                
                 _isVoiceChatActive = true;
                 VoiceChatStateChanged?.Invoke(this, true);
-                _logger?.LogInformation("Started listening");
+                _logger?.LogInformation("Started listening - audio data will be transmitted to WebSocket");
             }
         }
         catch (Exception ex)
@@ -643,61 +578,18 @@ public class VoiceChatService : IVoiceChatService
                 _logger?.LogDebug("Sent stop listen message");
             }
 
-            if (_audioStreamManager != null)
-            {
-                // 只有在确实正在录音时才尝试停止
-                if (_audioStreamManager.IsRecording)
-                {
-                    _logger?.LogDebug("Stop Recording");
-
-                    // 添加超时保护，避免在树莓派等平台上卡死
-                    var stopTask = _audioStreamManager.StopRecordingAsync();
-                    var timeoutTask = Task.Delay(10000); // 10秒超时
-
-                    var completedTask = await Task.WhenAny(stopTask, timeoutTask);
-
-                    if (completedTask == timeoutTask)
-                    {
-                        _logger?.LogWarning("停止音频录制超时，可能存在平台兼容性问题");
-                    }
-                    else
-                    {
-                        await stopTask; // 等待正常完成
-                        _logger?.LogDebug("Stop Record ok");
-                    }
-                }
-                else
-                {
-                    _logger?.LogDebug("音频录制未运行，跳过停止操作");
-                }
-            }
+            // 新逻辑：不停止录制，只是停止将音频数据发送到WebSocket
+            // 音频流继续运行，供关键词检测等其他功能使用
+            _logger?.LogDebug("停止音频数据传输到WebSocket，但保持录制运行");
 
             _isVoiceChatActive = false;
             VoiceChatStateChanged?.Invoke(this, false);
 
-            _logger?.LogInformation("Stopped listening");
+            _logger?.LogInformation("Stopped listening - audio recording continues for other services");
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to stop listening");
-
-            // 特殊处理音频流异常
-            if (ex.Message.Contains("PortAudio") || ex.Message.Contains("audio") || ex.Message.Contains("stream"))
-            {
-                _logger?.LogWarning("停止监听时检测到音频流异常，启动恢复程序...");
-                _ = Task.Run(async () =>
-                {
-                    var recovered = await RecoverFromAudioStreamErrorAsync(ex);
-                    if (recovered)
-                    {
-                        _logger?.LogInformation("停止监听时的音频流异常恢复成功");
-                    }
-                    else
-                    {
-                        _logger?.LogError("停止监听时的音频流异常恢复失败");
-                    }
-                });
-            }
 
             // 确保即使出错也要重置状态
             _isVoiceChatActive = false;
@@ -843,8 +735,13 @@ public class VoiceChatService : IVoiceChatService
     }
     private async void OnAudioDataReceived(object? sender, byte[] audioData)
     {
+        // 新逻辑：只有在语音聊天激活状态下才发送音频数据到WebSocket
+        // 音频录制始终在运行，但数据传输由状态机控制
         if (!_isVoiceChatActive || _communicationClient == null || _audioCodec == null || _config == null)
+        {
+            // 音频数据被丢弃，但录制继续运行，供关键词检测等功能使用
             return;
+        }
 
         try
         {
@@ -1301,18 +1198,16 @@ public class VoiceChatService : IVoiceChatService
         {
             _logger?.LogInformation("开始释放VoiceChatService资源");
 
-            // 1. 停止语音聊天并等待完成
+            // 1. 停止语音聊天状态，但不停止录制
             try
             {
-                var stopTask = StopVoiceChatAsync();
-                if (!stopTask.Wait(3000)) // 最多等待3秒
-                {
-                    _logger?.LogWarning("停止语音聊天超时");
-                }
+                _isVoiceChatActive = false;
+                VoiceChatStateChanged?.Invoke(this, false);
+                _logger?.LogDebug("语音聊天状态已停止");
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "停止语音聊天时出错");
+                _logger?.LogWarning(ex, "停止语音聊天状态时出错");
             }
 
             // 2. 释放通信客户端
@@ -1334,21 +1229,26 @@ public class VoiceChatService : IVoiceChatService
                 }
             }
 
-            // 3. 释放音频录制器
+            // 3. 释放音频录制器 - 新逻辑：只在程序最终关闭时停止录制
             if (_audioStreamManager != null)
             {
                 try
                 {
                     _audioStreamManager.DataAvailable -= OnAudioDataReceived;
 
-                    if (_audioStreamManager is IDisposable disposableRecorder)
-                    {
-                        disposableRecorder.Dispose();
-                    }
+                    // 只有在程序完全关闭时才停止录制，这里不停止录制
+                    // 录制会在程序退出时由单例的Dispose方法处理
+                    _logger?.LogDebug("取消订阅音频数据事件，但保持录制运行");
+
+                    // 不调用 StopRecordingAsync() 和 Dispose()
+                    // if (_audioStreamManager is IDisposable disposableRecorder)
+                    // {
+                    //     disposableRecorder.Dispose();
+                    // }
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogWarning(ex, "释放音频录制器时出错");
+                    _logger?.LogWarning(ex, "取消订阅音频录制器时出错");
                 }
             }
 
@@ -1393,7 +1293,7 @@ public class VoiceChatService : IVoiceChatService
                     _keywordSpottingService.KeywordDetected -= OnKeywordDetected;
                     _keywordSpottingService.ErrorOccurred -= OnKeywordDetectionError;
                     _keywordSpottingService.Dispose();
-                    _keywordSpottingService = null;
+                    // _keywordSpottingService = null;  // 修复编译错误：不能赋值null给非可空引用类型
                     _keywordDetectionEnabled = false;
                 }
                 catch (Exception ex)
@@ -1443,14 +1343,92 @@ public class VoiceChatService : IVoiceChatService
                 }
             }
 
-            // 10. 重置状态 - 不再需要重置_currentState，因为已经移除
+            // 10. 重置状态
             _isVoiceChatActive = false;
 
-            _logger?.LogInformation("VoiceChatService资源释放完成");
+            _logger?.LogInformation("VoiceChatService资源释放完成 - 音频录制保持运行直到程序退出");
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "释放VoiceChatService资源时发生严重错误");
+        }
+    }
+
+    /// <summary>
+    /// 音频流异常恢复机制
+    /// 树莓派优化版本：更激进的清理和平台自适应恢复
+    /// </summary>
+    public async Task<bool> RecoverFromAudioStreamErrorAsync(Exception audioException)
+    {
+        try
+        {
+            _logger?.LogWarning(audioException, "检测到音频流异常，开始恢复程序...");
+
+            // 1. 立即停止所有音频操作
+            _isVoiceChatActive = false;
+            VoiceChatStateChanged?.Invoke(this, false);
+
+            // 2. 强制清理音频流（更激进的清理策略）
+            try
+            {
+                _audioStreamManager?.ForceCleanup();
+                
+                // 强制垃圾回收清理悬挂对象
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+                
+                _logger?.LogInformation("音频系统已强制清理");
+            }
+            catch (Exception cleanupEx)
+            {
+                _logger?.LogWarning(cleanupEx, "强制清理音频流时出错");
+            }
+
+            // 3. 重置状态机到空闲状态
+            try
+            {
+                _stateMachine?.RequestTransition(ConversationTrigger.ForceIdle, "音频流异常恢复");
+                _logger?.LogInformation("状态机已重置到空闲状态");
+            }
+            catch (Exception stateEx)
+            {
+                _logger?.LogWarning(stateEx, "重置状态机时出错");
+            }
+
+            // 4. 平台自适应等待时间：ARM设备需要更多时间
+            var waitTime = Environment.ProcessorCount <= 4 ? 3000 : 2000;
+            _logger?.LogDebug("等待系统稳定，等待时间: {WaitTime}ms", waitTime);
+            await Task.Delay(waitTime);
+
+            // 5. 尝试重新初始化音频系统
+            if (_config?.EnableVoice == true && _audioStreamManager != null)
+            {
+                try
+                {
+                    _logger?.LogInformation("尝试重新初始化音频系统...");
+                    
+                    // 测试性启动和停止，验证音频系统可用性
+                    await _audioStreamManager.StartRecordingAsync(_config.AudioSampleRate, _config.AudioChannels);
+                    await Task.Delay(500); // 短暂延迟确保启动稳定
+                    await _audioStreamManager.StopRecordingAsync();
+
+                    _logger?.LogInformation("音频系统重新初始化成功");
+                    return true;
+                }
+                catch (Exception reinitEx)
+                {
+                    _logger?.LogError(reinitEx, "重新初始化音频系统失败");
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "音频流异常恢复过程失败");
+            return false;
         }
     }
 }

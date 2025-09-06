@@ -51,15 +51,12 @@ class Program
             // Set up wake word detector coordination (matches py-xiaozhi behavior)
             _voiceChatService.SetInterruptManager(interruptManager);
             await interruptManager.InitializeAsync();
-
-            // Set up Microsoft Cognitive Services keyword spotting (matches py-xiaozhi wake word detector)
-            _voiceChatService.SetKeywordSpottingService(keywordSpottingService);
-            System.Console.WriteLine("关键词唤醒功能已启用（基于Microsoft认知服务）");
-
-            // Set up Music-Voice Coordination Service for automatic synchronization
-            var musicVoiceCoordinationService = host.Services.GetRequiredService<MusicVoiceCoordinationService>();
-            _voiceChatService.SetMusicVoiceCoordinationService(musicVoiceCoordinationService);
             System.Console.WriteLine("音乐语音协调服务已启用（自动暂停/恢复语音识别）");
+
+            // Set up music voice coordination service (resolve circular dependency)
+            var musicVoiceCoordinationService = host.Services.GetRequiredService<MusicVoiceCoordinationService>();
+            musicVoiceCoordinationService.SetVoiceChatService(_voiceChatService);
+            musicVoiceCoordinationService.SetInterruptManager(interruptManager);
 
             // Initialize MCP IoT devices (new architecture based on xiaozhi-esp32)
             await InitializeMcpDevicesAsync(host.Services);
@@ -81,7 +78,28 @@ class Program
         }
         finally
         {
-            _voiceChatService?.Dispose();
+            try
+            {
+                // 先释放VoiceChatService，但不停止音频录制
+                _voiceChatService?.Dispose();
+                
+                // 最后释放音频录制器，停止连续录制
+                var audioRecorder = host.Services.GetService<SoundFlowAudioRecorder>();
+                if (audioRecorder != null)
+                {
+                    _logger?.LogInformation("程序退出，停止连续音频录制...");
+                    audioRecorder.Dispose();
+                    _logger?.LogInformation("连续音频录制已停止");
+                }
+                
+                // 释放主机服务
+                host?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "释放资源时出错");
+                System.Console.WriteLine($"释放资源时出错: {ex.Message}");
+            }
         }
     }
 
@@ -109,18 +127,23 @@ class Program
                 // Add Music-Voice Coordination Service for automatic pause/resume synchronization
                 services.AddSingleton<MusicVoiceCoordinationService>();
 
-                // 注册 AudioStreamManager 单例（使用正确的方式）
-                services.AddSingleton<AudioStreamManager>(provider =>
+                // Register AudioStreamManager as singleton using factory pattern
+                services.AddSingleton<SoundFlowAudioRecorder>(provider =>
                 {
-                    var logger = provider.GetService<ILogger<AudioStreamManager>>();
-                    return AudioStreamManager.GetInstance(logger);
+                    var logger = provider.GetService<ILogger<SoundFlowAudioRecorder>>();
+                    return SoundFlowAudioRecorder.GetInstance(logger);
                 });
+
+
+                services.AddSingleton<IAudioPlayer, SoundFlowAudioPlayer>();
+                services.AddSingleton<ISharedAudioRecorder>(provider => provider.GetRequiredService<SoundFlowAudioRecorder>());
+
                 // Music player service (required for MCP music device)
                 services.AddSingleton<IMusicPlayerService, KugouMusicService>();
                 services.AddSingleton<IMusicAudioPlayer, ConsoleMusicAudioPlayer>();
                 // Register MCP services (new architecture based on xiaozhi-esp32)
                 services.AddSingleton<McpServer>();
-                services.AddSingleton<McpDeviceManager>(provider =>
+                services.AddSingleton(provider =>
                 {
                     var logger = provider.GetRequiredService<ILogger<McpDeviceManager>>();
                     var mcpServer = provider.GetRequiredService<McpServer>();

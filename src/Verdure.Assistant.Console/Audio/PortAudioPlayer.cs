@@ -3,7 +3,6 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Verdure.Assistant.Console.Services.Audio;
-using Verdure.Assistant.Core.Services;
 
 namespace Verdure.Assistant.Console.Audio
 {
@@ -12,6 +11,7 @@ namespace Verdure.Assistant.Console.Audio
         private readonly ILogger<PortAudioPlayer> _logger;
         private PortAudioSharp.Stream? _stream;
         private bool _isPlaying;
+        private bool _portAudioInitialized = false;
         private AudioBuffer? _audioBuffer;
         private readonly object _lock = new object();
         private int _sampleRate;
@@ -21,6 +21,77 @@ namespace Verdure.Assistant.Console.Audio
         {
             _logger = logger;
             _logger.LogDebug("PortAudioPlayer 初始化");
+        }
+
+        /// <summary>
+        /// 确保 PortAudio 已初始化
+        /// </summary>
+        private bool EnsurePortAudioInitialized()
+        {
+            if (!_portAudioInitialized)
+            {
+                try
+                {
+                    PortAudio.Initialize();
+                    _portAudioInitialized = true;
+                    _logger.LogDebug("Console PortAudio 初始化成功");
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Console PortAudio 初始化失败");
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// 清理 PortAudio
+        /// </summary>
+        private void CleanupPortAudio()
+        {
+            if (_portAudioInitialized)
+            {
+                try
+                {
+                    // 平台自适应超时：ARM设备用更短的超时时间
+                    var timeout = Environment.ProcessorCount <= 4 ? 1000 : 2000;
+                    
+                    var terminateTask = Task.Run(() =>
+                    {
+                        try
+                        {
+                            PortAudio.Terminate();
+                            return true;
+                        }
+                        catch (PortAudioException paEx)
+                        {
+                            _logger.LogDebug(paEx, "Console PortAudio 终止时的预期异常");
+                            return true; // 对于 PortAudio 异常，认为是成功的
+                        }
+                    });
+
+                    var completed = terminateTask.Wait(timeout);
+                    
+                    if (completed && terminateTask.Result)
+                    {
+                        _logger.LogDebug("Console PortAudio 已终止");
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Console PortAudio 终止超时");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Console PortAudio 终止时出错");
+                }
+                finally
+                {
+                    _portAudioInitialized = false;
+                }
+            }
         }
 
         public async Task StartAsync(AudioBuffer audioBuffer, int sampleRate)
@@ -38,8 +109,8 @@ namespace Verdure.Assistant.Console.Audio
 
                     try
                     {
-                        // 使用 PortAudioManager 确保正确初始化
-                        if (!PortAudioManager.Instance.AcquireReference())
+                        // 确保 PortAudio 已初始化
+                        if (!EnsurePortAudioInitialized())
                         {
                             throw new InvalidOperationException("无法初始化 PortAudio");
                         }
@@ -48,7 +119,6 @@ namespace Verdure.Assistant.Console.Audio
                         var defaultOutputDevice = PortAudio.DefaultOutputDevice;
                         if (defaultOutputDevice == -1)
                         {
-                            PortAudioManager.Instance.ReleaseReference();
                             throw new InvalidOperationException("未找到音频输出设备");
                         }
 
@@ -82,7 +152,6 @@ namespace Verdure.Assistant.Console.Audio
                     }
                     catch (Exception ex)
                     {
-                        PortAudioManager.Instance.ReleaseReference();
                         throw new InvalidOperationException($"启动 PortAudio 流失败: {ex.Message}", ex);
                     }
                 }
@@ -130,24 +199,11 @@ namespace Verdure.Assistant.Console.Audio
                             }
                         }
 
-                        // 释放 PortAudio 引用
-                        PortAudioManager.Instance.ReleaseReference();
-
                         _logger.LogDebug("PortAudio 流已停止");
                     }
                     catch (Exception ex)
                     {
                         _logger.LogWarning(ex, "停止 PortAudio 流时出现警告");
-                        
-                        // 确保即使出错也要释放 PortAudio 引用
-                        try
-                        {
-                            PortAudioManager.Instance.ReleaseReference();
-                        }
-                        catch (Exception releaseEx)
-                        {
-                            _logger.LogWarning(releaseEx, "释放 PortAudio 引用时出错");
-                        }
                     }
                 }
             });
@@ -249,6 +305,9 @@ namespace Verdure.Assistant.Console.Audio
             try
             {
                 StopAsync().Wait(10000); // 10秒超时
+                
+                // 清理 PortAudio
+                CleanupPortAudio();
             }
             catch (Exception ex)
             {
@@ -272,16 +331,6 @@ namespace Verdure.Assistant.Console.Audio
                             _stream = null;
                             _isPlaying = false;
                         }
-                    }
-                    
-                    // 确保释放 PortAudio 引用
-                    try
-                    {
-                        PortAudioManager.Instance.ReleaseReference();
-                    }
-                    catch (Exception releaseEx)
-                    {
-                        _logger?.LogWarning(releaseEx, "Dispose 时释放 PortAudio 引用出现警告");
                     }
                 }
             }

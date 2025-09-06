@@ -17,7 +17,8 @@ namespace Verdure.Assistant.Core.Services;
 public class VADDetectorService : IDisposable
 {
     private readonly ILogger<VADDetectorService>? _logger;
-    private readonly IVoiceChatService _voiceChatService;    private readonly IAudioRecorder? _audioRecorder;
+    private readonly IVoiceChatService _voiceChatService;    
+    private readonly IAudioRecorder? _audioRecorder;
 
     private bool _isRunning = false;
     private bool _isPaused = false;
