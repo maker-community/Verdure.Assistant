@@ -12,64 +12,40 @@ namespace Verdure.Assistant.Core.Services.Interrupt.Sources;
 public class VoiceActivityInterruptSource : InterruptSourceBase
 {
     private readonly ISharedAudioRecorder? _audioRecorder;
-    private VADDetectorService? _vadDetector;
-    private bool _vadDetectionActive = false;
+    private readonly IVoiceChatService? _voiceChatService;
+    private readonly Random _random = new();
+    private readonly TimeSpan _averageInterval = TimeSpan.FromSeconds(30); // 平均30秒触发一次
 
     public VoiceActivityInterruptSource(ISharedAudioRecorder? audioRecorder = null, 
+        IVoiceChatService? voiceChatService = null,
         ILogger<VoiceActivityInterruptSource>? logger = null)
         : base("VoiceActivity", InterruptTypes.VoiceActivity, logger)
     {
         _audioRecorder = audioRecorder;
-    }
-
-    /// <summary>
-    /// 设置语音聊天服务用于VAD检测
-    /// </summary>
-    public void SetVoiceChatService(IVoiceChatService voiceChatService)
-    {
-        _vadDetector = new VADDetectorService(voiceChatService, _audioRecorder);
-        _vadDetector.VoiceInterruptDetected += OnVoiceActivityDetected;
+        _voiceChatService = voiceChatService;
     }
 
     protected override async Task OnStartAsync()
     {
-        if (_vadDetector != null && !_vadDetectionActive)
-        {
-            _vadDetector.Start();
-            _vadDetectionActive = true;
-            _logger?.LogInformation("VAD detection started for voice activity interrupt");
-        }
+        _logger?.LogInformation("Voice activity interrupt source started");
         await base.OnStartAsync();
     }
 
     protected override async Task OnStopAsync()
     {
-        if (_vadDetector != null && _vadDetectionActive)
-        {
-            _vadDetector.Stop();
-            _vadDetectionActive = false;
-            _logger?.LogInformation("VAD detection stopped for voice activity interrupt");
-        }
+        _logger?.LogInformation("Voice activity interrupt source stopped");
         await base.OnStopAsync();
     }
 
     protected override async Task OnPauseAsync()
     {
-        if (_vadDetector != null && _vadDetectionActive)
-        {
-            _vadDetector.Pause();
-            _logger?.LogDebug("VAD detection paused");
-        }
+        _logger?.LogDebug("Voice activity detection paused");
         await base.OnPauseAsync();
     }
 
     protected override async Task OnResumeAsync()
     {
-        if (_vadDetector != null && _vadDetectionActive && _vadDetector.IsPaused)
-        {
-            _vadDetector.Resume();
-            _logger?.LogDebug("VAD detection resumed");
-        }
+        _logger?.LogDebug("Voice activity detection resumed");
         await base.OnResumeAsync();
     }
 
@@ -81,8 +57,27 @@ public class VoiceActivityInterruptSource : InterruptSourceBase
         {
             try
             {
-                // VAD检测在OnVoiceActivityDetected中处理，这里只需要保持监听循环
-                await Task.Delay(1000, _cancellationTokenSource.Token);
+                if (!_isPaused && IsEnabled)
+                {
+                    // 模拟语音活动检测 - 随机触发
+                    var waitTime = TimeSpan.FromSeconds(_averageInterval.TotalSeconds * (0.5 + _random.NextDouble()));
+                    await Task.Delay(waitTime, _cancellationTokenSource.Token);
+
+                    if (!_isPaused && IsEnabled && !_cancellationTokenSource.Token.IsCancellationRequested)
+                    {
+                        var probability = 0.6f + (float)(_random.NextDouble() * 0.4); // 0.6-1.0
+                        
+                        TriggerInterrupt(
+                            "Simulated voice activity detected",
+                            new { Probability = probability },
+                            priority: 6
+                        );
+                    }
+                }
+                else
+                {
+                    await Task.Delay(1000, _cancellationTokenSource.Token);
+                }
             }
             catch (OperationCanceledException)
             {
@@ -96,23 +91,11 @@ public class VoiceActivityInterruptSource : InterruptSourceBase
         }
     }
 
-    private void OnVoiceActivityDetected(object? sender, bool detected)
-    {
-        if (detected && !_isPaused && IsEnabled)
-        {
-            TriggerInterrupt("Voice activity detected during assistant response", null, priority: 8);
-        }
-    }
-
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
-            if (_vadDetector != null)
-            {
-                _vadDetector.VoiceInterruptDetected -= OnVoiceActivityDetected;
-                _vadDetector.Dispose();
-            }
+            // 清理资源
         }
         base.Dispose(disposing);
     }

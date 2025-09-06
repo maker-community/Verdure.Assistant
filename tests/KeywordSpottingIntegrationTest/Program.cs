@@ -332,4 +332,15 @@ public class MockVoiceChatService : IVoiceChatService
     {
         throw new NotImplementedException();
     }
+
+    // 添加缺少的接口方法
+    public void TriggerApiInterrupt(string reason, object? data = null)
+    {
+        // 模拟实现
+    }
+
+    public void SetInterruptService(Verdure.Assistant.Core.Services.Interrupt.IInterruptService interruptService)
+    {
+        // 模拟实现
+    }
 }

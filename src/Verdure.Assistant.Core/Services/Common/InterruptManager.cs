@@ -12,7 +12,6 @@ public class InterruptManager : IDisposable
 {
     private readonly ILogger<InterruptManager>? _logger;
     private IVoiceChatService? _voiceChatService;
-    private VADDetectorService? _vadDetector;
     
     // Interrupt state tracking
     private bool _isInitialized = false;
@@ -38,13 +37,6 @@ public class InterruptManager : IDisposable
     {
         _voiceChatService = voiceChatService;
         
-        // Initialize interrupt services
-        // Pass null for audioRecorder since voice interruption is disabled
-        _vadDetector = new VADDetectorService(_voiceChatService, null);
-        
-        // Subscribe to interrupt events
-        _vadDetector.VoiceInterruptDetected += OnVADInterrupt;
-        
         _logger?.LogInformation("语音聊天服务已设置到中断管理器");
     }
 
@@ -56,7 +48,7 @@ public class InterruptManager : IDisposable
             return Task.CompletedTask;
         }
 
-        if (_voiceChatService == null || _vadDetector == null)
+        if (_voiceChatService == null)
         {
             _logger?.LogError("VoiceChatService must be set before initialization");
             return Task.CompletedTask;
@@ -68,12 +60,8 @@ public class InterruptManager : IDisposable
             // This will be integrated through the new interrupt source architecture
             _logger?.LogInformation("Hotkey interrupt will be handled by HotkeyInterruptSource");
 
-            // Start VAD if enabled
-            if (IsVADEnabled)
-            {
-                _vadDetector.Start();
-                _logger?.LogInformation("VAD interrupt detection enabled");
-            }            
+            // VAD functionality is now handled by VoiceActivityInterruptSource
+            _logger?.LogInformation("VAD interrupt will be handled by VoiceActivityInterruptSource");
 
             _isInitialized = true;
             _logger?.LogInformation("Interrupt manager initialized successfully");
@@ -91,9 +79,7 @@ public class InterruptManager : IDisposable
 
         try
         {
-            // Stop VAD
-            _vadDetector?.Stop();
-            
+            // Note: VAD shutdown is now handled by VoiceActivityInterruptSource
             // Note: Hotkey unregistration is now handled by HotkeyInterruptSource
             
             _isInitialized = false;
@@ -116,6 +102,7 @@ public class InterruptManager : IDisposable
 
     /// <summary>
     /// Enable or disable VAD-based interrupts
+    /// Note: VAD functionality is now handled by VoiceActivityInterruptSource
     /// </summary>
     public void SetVADEnabled(bool enabled)
     {
@@ -124,51 +111,26 @@ public class InterruptManager : IDisposable
 
         IsVADEnabled = enabled;
         
-        if (_isInitialized)
-        {
-            if (enabled)
-            {
-                _vadDetector?.Start();
-                _logger?.LogInformation("VAD interrupt detection enabled");
-            }
-            else
-            {
-                _vadDetector?.Stop();
-                _logger?.LogInformation("VAD interrupt detection disabled");
-            }
-        }
+        _logger?.LogInformation("VAD interrupt detection {Status} (handled by VoiceActivityInterruptSource)", 
+            enabled ? "enabled" : "disabled");
     }
 
     /// <summary>
     /// Pause VAD detection temporarily (e.g., during user speech input)
+    /// Note: VAD functionality is now handled by VoiceActivityInterruptSource
     /// </summary>
     public void PauseVAD()
     {
-        if (IsVADEnabled && _vadDetector?.IsRunning == true)
-        {
-            _vadDetector.Pause();
-            _logger?.LogDebug("VAD detection paused");
-        }
+        _logger?.LogDebug("VAD detection pause requested (handled by VoiceActivityInterruptSource)");
     }
 
     /// <summary>
     /// Resume VAD detection
+    /// Note: VAD functionality is now handled by VoiceActivityInterruptSource
     /// </summary>
     public void ResumeVAD()
     {
-        if (IsVADEnabled && _vadDetector?.IsPaused == true)
-        {
-            _vadDetector.Resume();
-            _logger?.LogDebug("VAD detection resumed");
-        }
-    }
-
-    private void OnVADInterrupt(object? sender, bool detected)
-    {
-        if (detected)
-        {
-            _ = ProcessInterrupt(AbortReason.VoiceInterruption, "Voice activity detected during response");
-        }
+        _logger?.LogDebug("VAD detection resume requested (handled by VoiceActivityInterruptSource)");
     }
 
     private async Task ProcessInterrupt(AbortReason reason, string description)
@@ -212,8 +174,6 @@ public class InterruptManager : IDisposable
     public void Dispose()
     {
         _ = ShutdownAsync();
-        
-        _vadDetector?.Dispose();
     }
 }
 

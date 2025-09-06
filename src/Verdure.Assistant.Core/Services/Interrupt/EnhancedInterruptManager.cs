@@ -150,8 +150,7 @@ public class EnhancedInterruptManager : IDisposable
         _interruptService.RegisterInterruptSource(_manualSource);
 
         // Voice activity interrupt source
-        _vadSource = new VoiceActivityInterruptSource(_audioRecorder, null);
-        _vadSource.SetVoiceChatService(_voiceChatService!);
+        _vadSource = new VoiceActivityInterruptSource(_audioRecorder, _voiceChatService, null);
         _interruptService.RegisterInterruptSource(_vadSource);
 
         // Hotkey interrupt source
