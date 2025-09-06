@@ -162,13 +162,13 @@ public class EnhancedInterruptManager : IDisposable
             DebugOutput = _logger?.IsEnabled(LogLevel.Debug) ?? false
         };
         
-        _vadSource = new VoiceActivityInterruptSource(
-            _audioRecorder, 
-            _voiceChatService, 
-            vadConfig,
-            _logger != null ? 
-                Microsoft.Extensions.Logging.LoggerFactory.Create(builder => {}).CreateLogger<VoiceActivityInterruptSource>() : null);
-        _interruptService.RegisterInterruptSource(_vadSource);
+        //_vadSource = new VoiceActivityInterruptSource(
+        //    _audioRecorder, 
+        //    _voiceChatService, 
+        //    vadConfig,
+        //    _logger != null ? 
+        //        Microsoft.Extensions.Logging.LoggerFactory.Create(builder => {}).CreateLogger<VoiceActivityInterruptSource>() : null);
+        //_interruptService.RegisterInterruptSource(_vadSource);
 
         // Hotkey interrupt source
         _hotkeySource = new HotkeyInterruptSource(_logger != null ? 
