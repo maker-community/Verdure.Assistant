@@ -34,7 +34,7 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
     private bool _isDisposed = false;
     private int _sampleRate = 16000;
     private int _channels = 1;
-    private const int MaxQueueSize = 20;
+    private const int MaxQueueSize = 50;  // 增加队列大小，支持更多缓冲
     private readonly Timer _playbackTimer;
     private DateTime _lastDataTime = DateTime.Now;
     private EventHandler<EventArgs>? _onPlaybackEnded;
@@ -72,16 +72,15 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
     {
         _logger = logger;
         
-        // 创建有界通道用于音频数据缓冲，优化播放性能
-        var options = new BoundedChannelOptions(MaxQueueSize)
+        // 创建无界通道用于音频数据缓冲，避免阻塞问题
+        var options = new UnboundedChannelOptions
         {
-            FullMode = BoundedChannelFullMode.DropOldest, // 满时丢弃最旧数据，避免延迟
             SingleReader = true,   // 只有播放任务读取
             SingleWriter = false,  // 多个来源可能写入音频数据
             AllowSynchronousContinuations = false // 避免死锁
         };
         
-        _audioChannel = Channel.CreateBounded<byte[]>(options);
+        _audioChannel = Channel.CreateUnbounded<byte[]>(options);
         _audioWriter = _audioChannel.Writer;
         _audioReader = _audioChannel.Reader;
         
@@ -102,38 +101,36 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
     }
 
     /// <summary>
-    /// 检查播放完成条件（类似PortAudioPlayer的定时器逻辑）
+    /// 检查播放完成条件（基于实际音频数据状态）
     /// </summary>
     private void CheckPlaybackCompletion(object? state)
     {
         try
         {
-            lock (_lock)
+            if (_isPlaying)
             {
-                // 检查播放完成条件
-                if (_isPlaying && !_audioReader.TryPeek(out _))
+                var timeSinceLastData = (DateTime.Now - _lastDataTime).TotalMilliseconds;
+                
+                // 检查是否有足够长时间没有新音频数据
+                if (timeSinceLastData > 2000) // 2秒没有新数据认为播放完成
                 {
-                    var timeSinceLastData = (DateTime.Now - _lastDataTime).TotalMilliseconds;
-                    if (timeSinceLastData > 1500) // 类似PortAudioPlayer的1500ms超时
+                    _logger?.LogDebug("SoundFlow播放完成检测 - 无新数据 {TimeSinceLastData}ms", timeSinceLastData);
+                    
+                    // 停止定时器防止多次触发
+                    _playbackTimer.Change(Timeout.Infinite, Timeout.Infinite);
+                    
+                    Task.Run(async () =>
                     {
-                        _logger?.LogDebug("SoundFlow播放完成检测 - 无数据 {TimeSinceLastData}ms", timeSinceLastData);
-                        
-                        // 停止定时器防止多次触发
-                        _playbackTimer.Change(Timeout.Infinite, Timeout.Infinite);
-                        
-                        Task.Run(async () =>
+                        try
                         {
-                            try
-                            {
-                                await StopAsync();
-                                PlaybackStopped?.Invoke(this, EventArgs.Empty);
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger?.LogError(ex, "播放完成处理时出错");
-                            }
-                        });
-                    }
+                            await StopAsync();
+                            PlaybackStopped?.Invoke(this, EventArgs.Empty);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogError(ex, "播放完成处理时出错");
+                        }
+                    });
                 }
             }
         }
@@ -219,11 +216,12 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
                 throw new InvalidOperationException("SoundFlow引擎未正确初始化");
             }
 
+            // 修复：统一使用F32格式，与QueueDataProvider保持一致
             var format = new AudioFormat
             {
                 SampleRate = sampleRate,
                 Channels = channels,
-                Format = SampleFormat.S16
+                Format = SampleFormat.F32  // 改为F32，与播放器格式一致
             };
 
             _playbackDevice = _engine.InitializePlaybackDevice(null, format, DeviceConfig);
@@ -307,6 +305,20 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
         
         try
         {
+            // 验证输入数据
+            if (audioData == null || audioData.Length == 0)
+            {
+                _logger?.LogWarning("接收到空的音频数据");
+                return;
+            }
+
+            // 验证数据格式
+            if (audioData.Length % 2 != 0)
+            {
+                _logger?.LogWarning("音频数据长度不是2的倍数: {Length}字节", audioData.Length);
+                return;
+            }
+
             // 如果参数不匹配或设备未就绪，重新初始化设备与播放器
             if (_sampleRate != sampleRate || _channels != channels || _playbackDevice == null || _soundPlayer == null)
             {
@@ -315,22 +327,17 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
                 await InitializePlayer(sampleRate, channels);
             }
 
-            lock (_lock)
-            {
-                // 使用 Channel 的非阻塞写入，如果满了会自动丢弃最旧数据
-                if (!_audioWriter.TryWrite(audioData))
-                {
-                    _logger?.LogWarning("SoundFlow音频通道已满，丢弃音频数据");
-                }
-                _lastDataTime = DateTime.Now; // 更新最后接收数据的时间
-            }
-
-            // 如果还没开始播放，启动播放
+            // 直接转换并播放音频数据，不使用Channel
+            await PlayAudioDataDirectly(audioData);
+            
+            // 如果还没开始播放设备，启动播放
             if (!_isPlaying && _playbackDevice != null && _soundPlayer != null)
             {
                 await StartPlayback();
-                _logger?.LogDebug("开始SoundFlow播放音频，使用Channel优化缓冲");
+                _logger?.LogDebug("开始SoundFlow播放音频");
             }
+
+            _lastDataTime = DateTime.Now; // 更新最后接收数据的时间
 
             await Task.CompletedTask;
         }
@@ -346,60 +353,18 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
 
         try
         {
-            _cancellationTokenSource = new CancellationTokenSource();
             _isPlaying = true;
             
             // 启动播放设备
             _playbackDevice.Start();
-            _logger?.LogDebug("🔊 SoundFlow播放器启动");
+            _logger?.LogDebug("🔊 SoundFlow播放设备启动");
             
             // 启动播放器
             _soundPlayer.Play();
+            _logger?.LogDebug("🔊 SoundFlow播放器启动");
             
             // 启动定时器检查播放完成，类似PortAudioPlayer
             _playbackTimer.Change(200, 200); // 每200ms检查一次
-            
-            // 启动音频数据馈送任务，使用Channel优化流式播放
-            _feedTask = Task.Run(async () =>
-            {
-                try
-                {
-                    // 使用Channel的异步枚举，更高效的音频数据处理
-                    await foreach (var audioData in _audioReader.ReadAllAsync(_cancellationTokenSource.Token))
-                    {
-                        if (!_isPlaying) break;
-                        
-                        try
-                        {
-                            // 将数据添加到QueueDataProvider，它会自动处理流式播放
-                            await UpdateAudioData(audioData);
-                            
-                            // 简化的延迟，不需要精确计算播放时长
-                            await Task.Delay(10, _cancellationTokenSource.Token);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger?.LogWarning(ex, "处理音频数据时出错");
-                        }
-                    }
-                    
-                    // Channel完成后结束添加
-                    _dataProvider?.CompleteAdding();
-                }
-                catch (OperationCanceledException)
-                {
-                    // 正常取消，忽略
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "音频播放任务异常");
-                }
-                finally
-                {
-                    _isPlaying = false;
-                    _logger?.LogDebug("🔇 SoundFlow播放器任务结束");
-                }
-            });
 
             await Task.CompletedTask;
         }
@@ -457,7 +422,55 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
     }
 
     /// <summary>
+    /// 直接播放音频数据，不使用Channel缓冲
+    /// </summary>
+    private async Task PlayAudioDataDirectly(byte[] audioData)
+    {
+        if (_engine == null || _playbackDevice == null || _dataProvider == null)
+        {
+            _logger?.LogWarning("SoundFlow设备未就绪，忽略音频数据");
+            return;
+        }
+
+        try
+        {
+            // 验证输入数据
+            if (audioData.Length == 0 || audioData.Length % 2 != 0)
+            {
+                _logger?.LogWarning("音频数据长度无效: {Length}字节", audioData.Length);
+                return;
+            }
+
+            // 将16位PCM字节数据正确转换为32位float数组
+            var sampleCount = audioData.Length / 2; // 16-bit = 2 bytes per sample
+            var floatSamples = new float[sampleCount];
+            
+            for (int i = 0; i < sampleCount; i++)
+            {
+                // 正确处理字节序列（小端序）
+                var sample = BitConverter.ToInt16(audioData, i * 2);
+                // 正确的归一化：-32768到32767映射到-1.0到1.0
+                floatSamples[i] = sample / 32768.0f;
+            }
+            
+            // 添加调试信息
+            var rms = Math.Sqrt(floatSamples.Select(s => s * s).Average());
+            _logger?.LogDebug("直接播放音频: {SampleCount}样本, RMS={Rms:F4}", sampleCount, rms);
+            
+            // 直接添加到QueueDataProvider
+            _dataProvider.AddSamples(floatSamples);
+            
+            await Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "直接播放音频数据时出错");
+        }
+    }
+
+    /// <summary>
     /// 更新音频数据到播放器，基于QueueDataProvider的流式播放实现
+    /// 修复：确保正确的16位PCM到32位Float转换
     /// </summary>
     private async Task UpdateAudioData(byte[] audioData)
     {
@@ -469,13 +482,28 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
 
         try
         {
-            // 将字节数据转换为float数组
-            var floatSamples = new float[audioData.Length / 2]; // 16-bit = 2 bytes per sample
-            for (int i = 0; i < floatSamples.Length; i++)
+            // 验证输入数据
+            if (audioData.Length == 0 || audioData.Length % 2 != 0)
             {
-                var sample = BitConverter.ToInt16(audioData, i * 2);
-                floatSamples[i] = sample / 32768.0f; // 归一化到 [-1, 1]
+                _logger?.LogWarning("音频数据长度无效: {Length}字节", audioData.Length);
+                return;
             }
+
+            // 将16位PCM字节数据正确转换为32位float数组
+            var sampleCount = audioData.Length / 2; // 16-bit = 2 bytes per sample
+            var floatSamples = new float[sampleCount];
+            
+            for (int i = 0; i < sampleCount; i++)
+            {
+                // 正确处理字节序列（小端序）
+                var sample = BitConverter.ToInt16(audioData, i * 2);
+                // 正确的归一化：-32768到32767映射到-1.0到1.0
+                floatSamples[i] = sample / 32768.0f;
+            }
+            
+            // 添加调试信息
+            var rms = Math.Sqrt(floatSamples.Select(s => s * s).Average());
+            _logger?.LogDebug("音频数据转换: {SampleCount}样本, RMS={Rms:F4}", sampleCount, rms);
             
             // 添加到队列中，QueueDataProvider会自动处理流式播放
             _dataProvider.AddSamples(floatSamples);
@@ -484,7 +512,7 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
         }
         catch (Exception ex)
         {
-            _logger?.LogWarning(ex, "更新SoundFlow音频数据时出错");
+            _logger?.LogError(ex, "更新SoundFlow音频数据时出错");
         }
     }
 
@@ -495,30 +523,31 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
             // 停止定时器
             _playbackTimer.Change(Timeout.Infinite, Timeout.Infinite);
 
-            // 取消音频馈送任务
-            if (_isPlaying && _cancellationTokenSource != null)
-            {
-                _cancellationTokenSource.Cancel();
-                if (_feedTask != null)
-                {
-                    try { await _feedTask; } catch { /* ignore */ }
-                }
-            }
-
             _isPlaying = false;
 
-            // 停止底层设备与播放器，但不在此处销毁引擎（留待Dispose），以便后续可快速重启
-            try { _soundPlayer?.Stop(); } catch { /* ignore */ }
+            // 停止底层设备与播放器
+            try 
+            { 
+                _soundPlayer?.Stop(); 
+                _logger?.LogDebug("🔇 SoundFlow播放器已停止");
+            } 
+            catch (Exception ex) 
+            { 
+                _logger?.LogDebug(ex, "停止播放器时出现警告"); 
+            }
+            
             if (_playbackDevice != null)
             {
-                try { _playbackDevice.Stop(); } catch (Exception ex) { _logger?.LogWarning(ex, "停止SoundFlow播放设备时出现警告"); }
+                try 
+                { 
+                    _playbackDevice.Stop(); 
+                    _logger?.LogDebug("🔇 SoundFlow播放设备已停止");
+                } 
+                catch (Exception ex) 
+                { 
+                    _logger?.LogWarning(ex, "停止SoundFlow播放设备时出现警告"); 
+                }
             }
-
-            // 完成Channel写入，清理剩余数据
-            _audioWriter.TryComplete();
-            
-            // 消费剩余数据以清空Channel
-            while (_audioReader.TryRead(out _)) { }
 
             _logger?.LogInformation("SoundFlow音频播放已停止");
             await Task.CompletedTask;
