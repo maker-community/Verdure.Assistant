@@ -5,6 +5,7 @@ using Verdure.Assistant.Core.Events;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Services.MCP;
+using Verdure.Assistant.Core.Services.Interrupt;
 
 namespace Verdure.Assistant.Core.Services;
 
@@ -38,6 +39,10 @@ public class VoiceChatService : IVoiceChatService
 
     // Wake word detector coordination (matches py-xiaozhi behavior)
     private InterruptManager? _interruptManager;
+    // New interrupt service for improved architecture
+    private Interrupt.IInterruptService? _interruptService;
+    // Enhanced interrupt manager that integrates both systems
+    private Interrupt.EnhancedInterruptManager? _enhancedInterruptManager;
     // Keyword spotting service (Microsoft Cognitive Services based)
     private IKeywordSpottingService _keywordSpottingService;
     private bool _keywordDetectionEnabled = false;
@@ -139,7 +144,10 @@ public class VoiceChatService : IVoiceChatService
         _musicVoiceCoordinationService?.SetVoiceChatService(this);
         
         // Initialize state machine
-        InitializeStateMachine();     
+        InitializeStateMachine();
+        
+        // Initialize enhanced interrupt manager
+        InitializeEnhancedInterruptManager();     
     }
 
     private void InitializeStateMachine()
@@ -186,6 +194,14 @@ public class VoiceChatService : IVoiceChatService
         _stateMachine.StateChanged += OnStateMachineStateChanged;
     }
 
+    private void InitializeEnhancedInterruptManager()
+    {
+        _enhancedInterruptManager = new Interrupt.EnhancedInterruptManager(_audioStreamManager, null);
+        _enhancedInterruptManager.SetVoiceChatService(this);
+        
+        _logger?.LogInformation("Enhanced interrupt manager initialized");
+    }
+
 
     public async Task InitializeAsync(VerdureConfig config)
     {
@@ -211,6 +227,14 @@ public class VoiceChatService : IVoiceChatService
             {
                 _logger?.LogInformation("正在启动关键词唤醒检测...");
                 await StartKeywordDetectionAsync();
+            }
+
+            // 初始化增强的打断管理器
+            if (_enhancedInterruptManager != null)
+            {
+                _logger?.LogInformation("正在初始化增强的打断管理器...");
+                await _enhancedInterruptManager.InitializeAsync();
+                _logger?.LogInformation("增强的打断管理器初始化完成");
             }
 
             _logger?.LogInformation("语音聊天服务初始化完成");
@@ -265,6 +289,75 @@ public class VoiceChatService : IVoiceChatService
         _interruptManager.SetVoiceChatService(this);
         
         _logger?.LogInformation("InterruptManager set for wake word detector coordination");
+    }
+
+    /// <summary>
+    /// Set the new interrupt service for improved interrupt architecture
+    /// </summary>
+    public void SetInterruptService(Interrupt.IInterruptService interruptService)
+    {
+        _interruptService = interruptService;
+        
+        // Subscribe to interrupt events
+        _interruptService.InterruptOccurred += OnInterruptOccurred;
+        
+        _logger?.LogInformation("New InterruptService set for enhanced interrupt handling");
+    }
+
+    /// <summary>
+    /// Handle interrupt events from the new interrupt service
+    /// </summary>
+    private async void OnInterruptOccurred(object? sender, Interrupt.InterruptEventArgs e)
+    {
+        try
+        {
+            _logger?.LogInformation("Processing interrupt: {Type} from {Source} - {Description}", 
+                e.InterruptType, e.SourceName, e.Description);
+
+            // Send abort message to WebSocket server
+            if (_communicationClient is WebSocketClient wsClient)
+            {
+                await wsClient.SendAbortAsync(e.AbortReason);
+                _logger?.LogDebug("Sent abort message to server with reason: {Reason}", e.AbortReason);
+            }
+
+            // Use state machine to handle interrupt based on current state
+            switch (CurrentState)
+            {
+                case DeviceState.Listening:
+                    _stateMachine?.RequestTransition(ConversationTrigger.UserInterrupt, 
+                        $"Interrupt from {e.SourceName}: {e.Description}");
+                    break;
+
+                case DeviceState.Speaking:
+                    // Stop current audio playback and reset to idle
+                    if (_audioPlayer != null)
+                    {
+                        await _audioPlayer.StopAsync();
+                    }
+                    _stateMachine?.RequestTransition(ConversationTrigger.UserInterrupt, 
+                        $"Speaking interrupted by {e.SourceName}: {e.Description}");
+                    break;
+
+                case DeviceState.Idle:
+                    // Already idle, just log the interrupt
+                    _logger?.LogDebug("Interrupt received in idle state, no action needed");
+                    break;
+
+                case DeviceState.Connecting:
+                    // Cancel connection attempt
+                    _stateMachine?.RequestTransition(ConversationTrigger.UserInterrupt, 
+                        $"Connection interrupted by {e.SourceName}: {e.Description}");
+                    break;
+            }
+
+            _logger?.LogInformation("Interrupt processed successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to process interrupt from {Source}", e.SourceName);
+            ErrorOccurred?.Invoke(this, $"打断处理失败: {ex.Message}");
+        }
     }
 
 
@@ -1316,7 +1409,21 @@ public class VoiceChatService : IVoiceChatService
                 }
             }
 
-            // 9. 释放状态机
+            // 9. 释放增强的打断管理器
+            if (_enhancedInterruptManager != null)
+            {
+                try
+                {
+                    _enhancedInterruptManager.Dispose();
+                    _enhancedInterruptManager = null;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "释放增强的打断管理器时出错");
+                }
+            }
+
+            // 10. 释放状态机
             if (_stateMachineContext != null)
             {
                 try

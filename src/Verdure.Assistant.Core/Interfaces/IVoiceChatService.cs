@@ -107,6 +107,11 @@ public interface IVoiceChatService : IDisposable
     /// This enables py-xiaozhi-like wake word detector pause/resume behavior
     /// </summary>
     void SetInterruptManager(InterruptManager interruptManager);
+    
+    /// <summary>
+    /// Set the new interrupt service for improved interrupt architecture
+    /// </summary>
+    void SetInterruptService(Services.Interrupt.IInterruptService interruptService);
 
     /// <summary>
     /// 启动关键词唤醒检测

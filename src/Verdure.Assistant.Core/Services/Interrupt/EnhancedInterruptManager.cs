@@ -1,0 +1,212 @@
+using Microsoft.Extensions.Logging;
+using Verdure.Assistant.Core.Interfaces;
+using Verdure.Assistant.Core.Services.Interrupt.Sources;
+
+namespace Verdure.Assistant.Core.Services.Interrupt;
+
+/// <summary>
+/// 打断管理器 - 整合新旧打断架构的管理器
+/// Enhanced interrupt manager that integrates old and new interrupt architectures
+/// </summary>
+public class EnhancedInterruptManager : IDisposable
+{
+    private readonly ILogger<EnhancedInterruptManager>? _logger;
+    private readonly InterruptService _interruptService;
+    private readonly ISharedAudioRecorder? _audioRecorder;
+    private IVoiceChatService? _voiceChatService;
+    
+    // Interrupt sources
+    private ManualInterruptSource? _manualSource;
+    private VoiceActivityInterruptSource? _vadSource;
+    private HotkeyInterruptSource? _hotkeySource;
+    private ApiInterruptSource? _apiSource;
+    
+    private bool _isInitialized = false;
+    private bool _disposed = false;
+
+    public EnhancedInterruptManager(ISharedAudioRecorder? audioRecorder = null, 
+        ILogger<EnhancedInterruptManager>? logger = null)
+    {
+        _logger = logger;
+        _audioRecorder = audioRecorder;
+        _interruptService = new InterruptService(null); // Pass null logger for now
+    }
+
+    /// <summary>
+    /// 获取打断服务实例
+    /// </summary>
+    public IInterruptService InterruptService => _interruptService;
+
+    /// <summary>
+    /// 设置语音聊天服务
+    /// </summary>
+    public void SetVoiceChatService(IVoiceChatService voiceChatService)
+    {
+        _voiceChatService = voiceChatService;
+        
+        // Set the interrupt service in the voice chat service
+        _voiceChatService.SetInterruptService(_interruptService);
+        
+        _logger?.LogInformation("VoiceChatService set in EnhancedInterruptManager");
+    }
+
+    /// <summary>
+    /// 初始化打断管理器
+    /// </summary>
+    public async Task InitializeAsync()
+    {
+        if (_isInitialized)
+        {
+            _logger?.LogWarning("EnhancedInterruptManager is already initialized");
+            return;
+        }
+
+        if (_voiceChatService == null)
+        {
+            _logger?.LogError("VoiceChatService must be set before initialization");
+            return;
+        }
+
+        try
+        {
+            // Create and register interrupt sources
+            await CreateInterruptSources();
+            
+            // Start all interrupt sources
+            await _interruptService.StartAllAsync();
+            
+            _isInitialized = true;
+            _logger?.LogInformation("EnhancedInterruptManager initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to initialize EnhancedInterruptManager");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 创建并注册打断源
+    /// </summary>
+    private async Task CreateInterruptSources()
+    {
+        // Manual interrupt source
+        _manualSource = new ManualInterruptSource(null);
+        _interruptService.RegisterInterruptSource(_manualSource);
+
+        // Voice activity interrupt source
+        _vadSource = new VoiceActivityInterruptSource(_audioRecorder, null);
+        _vadSource.SetVoiceChatService(_voiceChatService!);
+        _interruptService.RegisterInterruptSource(_vadSource);
+
+        // Hotkey interrupt source
+        _hotkeySource = new HotkeyInterruptSource(_voiceChatService, null);
+        _hotkeySource.SetVoiceChatService(_voiceChatService!);
+        _interruptService.RegisterInterruptSource(_hotkeySource);
+
+        // API interrupt source
+        _apiSource = new ApiInterruptSource(null);
+        _interruptService.RegisterInterruptSource(_apiSource);
+
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 启用或禁用VAD检测
+    /// </summary>
+    public async Task SetVADEnabledAsync(bool enabled)
+    {
+        if (_vadSource != null)
+        {
+            _vadSource.IsEnabled = enabled;
+            if (enabled)
+            {
+                await _interruptService.ResumeSourceAsync(_vadSource.Name);
+                _logger?.LogInformation("VAD interrupt detection enabled");
+            }
+            else
+            {
+                await _interruptService.PauseSourceAsync(_vadSource.Name);
+                _logger?.LogInformation("VAD interrupt detection disabled");
+            }
+        }
+    }
+
+    /// <summary>
+    /// 启用或禁用热键检测
+    /// </summary>
+    public async Task SetHotkeyEnabledAsync(bool enabled)
+    {
+        if (_hotkeySource != null)
+        {
+            _hotkeySource.IsEnabled = enabled;
+            if (enabled)
+            {
+                await _interruptService.ResumeSourceAsync(_hotkeySource.Name);
+                _logger?.LogInformation("Hotkey interrupt detection enabled");
+            }
+            else
+            {
+                await _interruptService.PauseSourceAsync(_hotkeySource.Name);
+                _logger?.LogInformation("Hotkey interrupt detection disabled");
+            }
+        }
+    }
+
+    /// <summary>
+    /// 暂停VAD检测（例如在用户语音输入期间）
+    /// </summary>
+    public async Task PauseVADAsync()
+    {
+        if (_vadSource != null && _vadSource.IsEnabled)
+        {
+            await _interruptService.PauseSourceAsync(_vadSource.Name);
+            _logger?.LogDebug("VAD detection paused");
+        }
+    }
+
+    /// <summary>
+    /// 恢复VAD检测
+    /// </summary>
+    public async Task ResumeVADAsync()
+    {
+        if (_vadSource != null && _vadSource.IsEnabled)
+        {
+            await _interruptService.ResumeSourceAsync(_vadSource.Name);
+            _logger?.LogDebug("VAD detection resumed");
+        }
+    }
+
+    /// <summary>
+    /// 触发手动打断
+    /// </summary>
+    public async Task TriggerManualInterruptAsync(string description, object? data = null)
+    {
+        await _interruptService.TriggerManualInterruptAsync(description, data);
+    }
+
+    /// <summary>
+    /// 触发API打断
+    /// </summary>
+    public void TriggerApiInterrupt(string endpoint, object? requestData = null)
+    {
+        _apiSource?.TriggerApiInterrupt(endpoint, requestData);
+    }
+
+    /// <summary>
+    /// 触发外部系统打断
+    /// </summary>
+    public void TriggerExternalInterrupt(string source, string description, object? data = null)
+    {
+        _apiSource?.TriggerExternalInterrupt(source, description, data);
+    }
+
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _interruptService?.Dispose();
+            _disposed = true;
+        }
+    }
+}
