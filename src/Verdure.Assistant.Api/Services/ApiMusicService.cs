@@ -17,7 +17,7 @@ namespace Verdure.Assistant.Api.Services
     {
         private readonly ILogger<ApiMusicService> _logger;
         private readonly KugouMusicService _kugouMusicService;
-        private readonly Mpg123AudioPlayer _mpg123AudioPlayer;
+        private readonly Audio.SoundFlowMusicAudioPlayer _mpg123AudioPlayer;
         private bool _disposed;
 
         public event EventHandler<MusicPlaybackEventArgs>? PlaybackStateChanged
@@ -46,9 +46,9 @@ namespace Verdure.Assistant.Api.Services
         public ApiMusicService(ILogger<ApiMusicService> logger, ILoggerFactory loggerFactory)
         {
             _logger = logger;
-            
+
             // 创建mpg123音频播放器
-            _mpg123AudioPlayer = new Mpg123AudioPlayer(loggerFactory.CreateLogger<Mpg123AudioPlayer>());
+            _mpg123AudioPlayer = new Audio.SoundFlowMusicAudioPlayer(loggerFactory.CreateLogger<Audio.SoundFlowMusicAudioPlayer>());
             
             // 创建酷狗音乐服务，使用mpg123作为音频播放器
             var cacheDirectory = GetMusicCacheDirectory();

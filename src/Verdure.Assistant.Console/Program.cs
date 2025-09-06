@@ -1,7 +1,9 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
+using Verdure.Assistant.Console.Audio;
+using Verdure.Assistant.Console.Services;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Services;
@@ -17,13 +19,6 @@ class Program
 
     static async Task Main(string[] args)
     {
-        // 检查是否有测试音乐播放器的参数
-        if (args.Length > 0 && args[0] == "--test-music")
-        {
-            await TestMusic.MusicPlayerTest.TestMusicPlayback();
-            return;
-        }
-
         // 创建主机
         var host = CreateHostBuilder(args).Build();
 
@@ -67,7 +62,7 @@ class Program
             System.Console.WriteLine($"已连接到服务器: {(_config.UseWebSocket ? _config.ServerUrl : $"{_config.MqttBroker}:{_config.MqttPort}")}");
             System.Console.WriteLine();
 
-           System.Console.ReadLine();
+            System.Console.ReadLine();
 
             //await ShowMenu();
         }
@@ -82,7 +77,7 @@ class Program
             {
                 // 先释放VoiceChatService，但不停止音频录制
                 _voiceChatService?.Dispose();
-                
+
                 // 最后释放音频录制器，停止连续录制
                 var audioRecorder = host.Services.GetService<SoundFlowAudioRecorder>();
                 if (audioRecorder != null)
@@ -91,7 +86,7 @@ class Program
                     audioRecorder.Dispose();
                     _logger?.LogInformation("连续音频录制已停止");
                 }
-                
+
                 // 释放主机服务
                 host?.Dispose();
             }
@@ -139,8 +134,8 @@ class Program
                 services.AddSingleton<ISharedAudioRecorder>(provider => provider.GetRequiredService<SoundFlowAudioRecorder>());
 
                 // Music player service (required for MCP music device)
-                services.AddSingleton<IMusicPlayerService, KugouMusicService>();
-                services.AddSingleton<IMusicAudioPlayer, ConsoleMusicAudioPlayer>();
+                services.AddSingleton<IMusicPlayerService, ApiMusicService>();
+                services.AddSingleton<IMusicAudioPlayer, SoundFlowMusicAudioPlayer>();
                 // Register MCP services (new architecture based on xiaozhi-esp32)
                 services.AddSingleton<McpServer>();
                 services.AddSingleton(provider =>
@@ -220,7 +215,7 @@ class Program
             System.Console.WriteLine($"MCP IoT设备初始化失败: {ex.Message}");
         }
     }
- 
+
     static void OnMessageReceived(object? sender, ChatMessage message)
     {
         System.Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] 收到消息 ({message.Role}): {message.Content}");
