@@ -260,7 +260,7 @@ namespace KeywordSpottingHandleErrorFixTest
             return Task.CompletedTask;
         }
 
-        public void SetInterruptManager(InterruptManager interruptManager)
+        public void SetEnhancedInterruptManager(Verdure.Assistant.Core.Services.Interrupt.EnhancedInterruptManager enhancedInterruptManager)
         {
             // Mock implementation
         }

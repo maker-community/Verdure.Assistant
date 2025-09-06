@@ -110,10 +110,10 @@ public interface IVoiceChatService : IDisposable
     ConversationStateMachine? StateMachine { get; }
     
     /// <summary>
-    /// Set interrupt manager for wake word detector coordination
+    /// Set enhanced interrupt manager for wake word detector coordination
     /// This enables py-xiaozhi-like wake word detector pause/resume behavior
     /// </summary>
-    void SetInterruptManager(InterruptManager interruptManager);
+    void SetEnhancedInterruptManager(Services.Interrupt.EnhancedInterruptManager enhancedInterruptManager);
     
     /// <summary>
     /// Set the new interrupt service for improved interrupt architecture

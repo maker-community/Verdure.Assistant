@@ -213,7 +213,7 @@ public class ErrorTestMockVoiceChatService : IVoiceChatService
     public Task SendTextMessageAsync(string text) => Task.CompletedTask;
     public Task ToggleChatStateAsync() => Task.CompletedTask;
     
-    public void SetInterruptManager(InterruptManager interruptManager) { }
+    public void SetEnhancedInterruptManager(Verdure.Assistant.Core.Services.Interrupt.EnhancedInterruptManager enhancedInterruptManager) { }
     public void SetKeywordSpottingService(IKeywordSpottingService keywordSpottingService) { }
     
     public Task<bool> StartKeywordDetectionAsync() 

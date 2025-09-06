@@ -29,7 +29,7 @@ class Program
 
         _logger = host.Services.GetRequiredService<ILogger<Program>>();
         _voiceChatService = host.Services.GetRequiredService<IVoiceChatService>();
-        var interruptManager = host.Services.GetRequiredService<InterruptManager>();
+        var enhancedInterruptManager = host.Services.GetRequiredService<Verdure.Assistant.Core.Services.Interrupt.EnhancedInterruptManager>();
         var keywordSpottingService = host.Services.GetRequiredService<IKeywordSpottingService>();
 
         // 加载配置
@@ -49,14 +49,14 @@ class Program
             _voiceChatService.ListeningModeChanged += OnListeningModeChanged;
 
             // Set up wake word detector coordination (matches py-xiaozhi behavior)
-            _voiceChatService.SetInterruptManager(interruptManager);
-            await interruptManager.InitializeAsync();
-            System.Console.WriteLine("音乐语音协调服务已启用（自动暂停/恢复语音识别）");
+            _voiceChatService.SetEnhancedInterruptManager(enhancedInterruptManager);
+            await enhancedInterruptManager.InitializeAsync();
+            System.Console.WriteLine("增强音乐语音协调服务已启用（自动暂停/恢复语音识别）");
 
             // Set up music voice coordination service (resolve circular dependency)
             var musicVoiceCoordinationService = host.Services.GetRequiredService<MusicVoiceCoordinationService>();
             musicVoiceCoordinationService.SetVoiceChatService(_voiceChatService);
-            musicVoiceCoordinationService.SetInterruptManager(interruptManager);
+            musicVoiceCoordinationService.SetEnhancedInterruptManager(enhancedInterruptManager);
 
             // Initialize MCP IoT devices (new architecture based on xiaozhi-esp32)
             await InitializeMcpDevicesAsync(host.Services);
@@ -119,8 +119,8 @@ class Program
                 services.AddSingleton<IConfigurationService, ConfigurationService>();
                 services.AddSingleton<IVoiceChatService, VoiceChatService>();
 
-                // Add InterruptManager for wake word detector coordination
-                services.AddSingleton<InterruptManager>();
+                // Add EnhancedInterruptManager for wake word detector coordination
+                services.AddSingleton<Verdure.Assistant.Core.Services.Interrupt.EnhancedInterruptManager>();
                 // Add Microsoft Cognitive Services keyword spotting service
                 services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
 

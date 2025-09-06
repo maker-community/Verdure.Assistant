@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Constants;
+using Verdure.Assistant.Core.Services.Interrupt;
 
 namespace Verdure.Assistant.Core.Services;
 
@@ -15,7 +16,7 @@ public class MusicVoiceCoordinationService : IDisposable
     private IMusicPlayerService? _musicPlayerService;
     private IVoiceChatService? _voiceChatService;
     private IKeywordSpottingService? _keywordSpottingService;
-    private InterruptManager? _interruptManager;
+    private EnhancedInterruptManager? _enhancedInterruptManager;
     
     private bool _isMusicPlaying = false;
     private bool _wasVoiceRecognitionEnabled = false;
@@ -27,12 +28,12 @@ public class MusicVoiceCoordinationService : IDisposable
     public MusicVoiceCoordinationService(
         IMusicPlayerService? musicPlayerService = null,
         IKeywordSpottingService? keywordSpottingService = null,
-        InterruptManager? interruptManager = null,
+        EnhancedInterruptManager? enhancedInterruptManager = null,
         ILogger<MusicVoiceCoordinationService>? logger = null)
     {
         _musicPlayerService = musicPlayerService;
         _keywordSpottingService = keywordSpottingService;
-        _interruptManager = interruptManager;
+        _enhancedInterruptManager = enhancedInterruptManager;
         _logger = logger;
 
         Initialize();
@@ -66,14 +67,14 @@ public class MusicVoiceCoordinationService : IDisposable
             switch (e.Status.ToLower())
             {
                 case "playing":
-                    HandleMusicStarted();
+                    _ = Task.Run(async () => await HandleMusicStarted());
                     break;
                     
                 case "paused":
                 case "stopped":
                 case "ended":
                 case "failed":
-                    HandleMusicStopped();
+                    _ = Task.Run(async () => await HandleMusicStopped());
                     break;
                     
                 default:
@@ -90,7 +91,7 @@ public class MusicVoiceCoordinationService : IDisposable
     /// <summary>
     /// 处理音乐开始播放
     /// </summary>
-    private void HandleMusicStarted()
+    private async Task HandleMusicStarted()
     {
         if (_isMusicPlaying) return; // 避免重复处理
         
@@ -110,9 +111,9 @@ public class MusicVoiceCoordinationService : IDisposable
             }
             
             // 暂停VAD检测
-            if (_interruptManager != null)
+            if (_enhancedInterruptManager != null)
             {
-                _interruptManager.PauseVAD();
+                await _enhancedInterruptManager.PauseVADAsync();
                 _logger?.LogDebug("VAD检测已暂停");
             }
             
@@ -142,7 +143,7 @@ public class MusicVoiceCoordinationService : IDisposable
     /// <summary>
     /// 处理音乐停止播放
     /// </summary>
-    private void HandleMusicStopped()
+    private async Task HandleMusicStopped()
     {
         if (!_isMusicPlaying) return; // 避免重复处理
         
@@ -152,37 +153,27 @@ public class MusicVoiceCoordinationService : IDisposable
         try
         {
             // 延迟一小段时间确保音频系统稳定
-            _ = Task.Run(async () =>
+            await Task.Delay(200); // 等待音频系统稳定
+            
+            // 恢复VAD检测
+            if (_enhancedInterruptManager != null)
             {
-                try
-                {
-                    await Task.Delay(200); // 等待音频系统稳定
-                    
-                    // 恢复VAD检测
-                    if (_interruptManager != null)
-                    {
-                        _interruptManager.ResumeVAD();
-                        _logger?.LogDebug("VAD检测已恢复");
-                    }
-                    
-                    // 恢复关键词唤醒检测
-                    if (_wasVoiceRecognitionEnabled && _keywordSpottingService != null)
-                    {
-                        _keywordSpottingService.Resume();
-                        _logger?.LogDebug("关键词唤醒检测已恢复");
-                    }
-                    
-                    _logger?.LogInformation("语音识别系统已完全恢复");
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "恢复语音识别系统时出错");
-                }
-            });
+                await _enhancedInterruptManager.ResumeVADAsync();
+                _logger?.LogDebug("VAD检测已恢复");
+            }
+            
+            // 恢复关键词唤醒检测
+            if (_wasVoiceRecognitionEnabled && _keywordSpottingService != null)
+            {
+                _keywordSpottingService.Resume();
+                _logger?.LogDebug("关键词唤醒检测已恢复");
+            }
+            
+            _logger?.LogInformation("语音识别系统已完全恢复");
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "启动语音识别系统恢复任务时出错");
+            _logger?.LogError(ex, "恢复语音识别系统时出错");
         }
     }
 
@@ -215,12 +206,12 @@ public class MusicVoiceCoordinationService : IDisposable
     }
 
     /// <summary>
-    /// 手动设置中断管理器（用于打破循环依赖）
+    /// 手动设置增强中断管理器（用于打破循环依赖）
     /// </summary>
-    public void SetInterruptManager(InterruptManager interruptManager)
+    public void SetEnhancedInterruptManager(EnhancedInterruptManager enhancedInterruptManager)
     {
-        _interruptManager = interruptManager;
-        _logger?.LogInformation("中断管理器已设置");
+        _enhancedInterruptManager = enhancedInterruptManager;
+        _logger?.LogInformation("增强中断管理器已设置");
     }
 
     /// <summary>
@@ -239,7 +230,7 @@ public class MusicVoiceCoordinationService : IDisposable
     public void ForceResumeVoiceRecognition()
     {
         _logger?.LogWarning("手动强制恢复语音识别");
-        HandleMusicStopped();
+        _ = Task.Run(async () => await HandleMusicStopped());
     }
 
     /// <summary>
@@ -248,7 +239,7 @@ public class MusicVoiceCoordinationService : IDisposable
     public void ForcePauseVoiceRecognition()
     {
         _logger?.LogWarning("手动强制暂停语音识别");
-        HandleMusicStarted();
+        _ = Task.Run(async () => await HandleMusicStarted());
     }
 
     public void Dispose()
@@ -265,7 +256,7 @@ public class MusicVoiceCoordinationService : IDisposable
             // 如果当前因为音乐播放而暂停了语音识别，尝试恢复
             if (_isMusicPlaying)
             {
-                HandleMusicStopped();
+                _ = Task.Run(async () => await HandleMusicStopped());
             }
             
             _logger?.LogInformation("音乐语音协调服务已释放");

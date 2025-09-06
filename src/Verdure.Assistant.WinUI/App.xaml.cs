@@ -5,6 +5,7 @@ using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Services;
 using Verdure.Assistant.Core.Services.MCP;
+using Verdure.Assistant.Core.Services.Interrupt;
 using Verdure.Assistant.ViewModels;
 using Verdure.Assistant.WinUI.Services;
 using Windows.Storage;
@@ -111,8 +112,8 @@ public partial class App : Application
         // Register MCP services (new architecture based on xiaozhi-esp32)
         services.AddSingleton<McpServer>();
         services.AddSingleton<McpDeviceManager>();
-        // Interrupt manager and related services
-        services.AddSingleton<InterruptManager>();
+        // Interrupt manager and related services (using enhanced architecture)
+        services.AddSingleton<EnhancedInterruptManager>();
 
         // Microsoft Cognitive Services keyword spotting service (matches py-xiaozhi wake word detector)
         services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
@@ -147,7 +148,7 @@ public partial class App : Application
             var mcpServer = GetService<McpServer>();
             var mcpDeviceManager = GetService<McpDeviceManager>();
             var voiceChatService = GetService<IVoiceChatService>();
-            var interruptManager = GetService<InterruptManager>();
+            var enhancedInterruptManager = GetService<EnhancedInterruptManager>();
             var keywordSpottingService = GetService<IKeywordSpottingService>();
             var musicVoiceCoordinationService = GetService<MusicVoiceCoordinationService>();
 
@@ -163,21 +164,21 @@ public partial class App : Application
                 return;
             }
 
-            // Set up interrupt manager and keyword spotting service
-            if (interruptManager != null)
+            // Set up enhanced interrupt manager and keyword spotting service
+            if (enhancedInterruptManager != null)
             {
-                voiceChatService.SetInterruptManager(interruptManager);
-                await interruptManager.InitializeAsync();
-                logger?.LogInformation("中断管理器已设置并初始化");
+                voiceChatService.SetEnhancedInterruptManager(enhancedInterruptManager);
+                await enhancedInterruptManager.InitializeAsync();
+                logger?.LogInformation("增强中断管理器已设置并初始化");
             }
 
             // Set up music voice coordination service (resolve circular dependency)
             if (musicVoiceCoordinationService != null)
             {
                 musicVoiceCoordinationService.SetVoiceChatService(voiceChatService);
-                if (interruptManager != null)
+                if (enhancedInterruptManager != null)
                 {
-                    musicVoiceCoordinationService.SetInterruptManager(interruptManager);
+                    musicVoiceCoordinationService.SetEnhancedInterruptManager(enhancedInterruptManager);
                 }
                 logger?.LogInformation("音乐语音协调服务已设置语音聊天服务引用");
             }

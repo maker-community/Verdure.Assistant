@@ -6,6 +6,7 @@ using Verdure.Assistant.Core.Constants;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Services;
+using Verdure.Assistant.Core.Services.Interrupt;
 using Verdure.Assistant.Core.Events;
 
 namespace Verdure.Assistant.ViewModels;
@@ -28,7 +29,7 @@ public partial class HomePageViewModel : ViewModelBase
     private IUIDispatcher _uiDispatcher;
 
 
-    private InterruptManager? _interruptManager;
+    private EnhancedInterruptManager? _enhancedInterruptManager;
 
     #region 可观察属性
 
@@ -141,7 +142,7 @@ public partial class HomePageViewModel : ViewModelBase
     public HomePageViewModel(ILogger<HomePageViewModel> logger,
       IVoiceChatService? voiceChatService = null,
       IEmotionManager? emotionManager = null,
-      InterruptManager? interruptManager = null,
+      EnhancedInterruptManager? enhancedInterruptManager = null,
       IKeywordSpottingService? keywordSpottingService = null,
       IVerificationService? verificationService = null,
       IMusicPlayerService? musicPlayerService = null,
@@ -150,7 +151,7 @@ public partial class HomePageViewModel : ViewModelBase
     {
         _voiceChatService = voiceChatService;
         _emotionManager = emotionManager;
-        _interruptManager = interruptManager;
+        _enhancedInterruptManager = enhancedInterruptManager;
         _keywordSpottingService = keywordSpottingService;
         _verificationService = verificationService;
         _musicPlayerService = musicPlayerService;
@@ -322,18 +323,18 @@ public partial class HomePageViewModel : ViewModelBase
             _logger?.LogInformation("配置服务验证码事件已绑定");
         }
 
-        // 初始化和绑定InterruptManager事件
-        if (_interruptManager != null)
+        // 初始化和绑定EnhancedInterruptManager事件
+        if (_enhancedInterruptManager != null)
         {
             try
             {
-                await _interruptManager.InitializeAsync();
-                _interruptManager.InterruptTriggered += OnInterruptTriggered;
-                _logger?.LogInformation("InterruptManager initialized successfully");
+                await _enhancedInterruptManager.InitializeAsync();
+                _enhancedInterruptManager.InterruptService.InterruptOccurred += OnInterruptOccurred;
+                _logger?.LogInformation("EnhancedInterruptManager initialized successfully");
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Failed to initialize InterruptManager");
+                _logger?.LogError(ex, "Failed to initialize EnhancedInterruptManager");
             }
         }
     }
@@ -569,14 +570,17 @@ public partial class HomePageViewModel : ViewModelBase
         });
     }
 
-    private void OnInterruptTriggered(object? sender, InterruptEventArgs e)
+    private void OnInterruptOccurred(object? sender, Core.Services.Interrupt.InterruptEventArgs e)
     {
         try
         {
-            _logger?.LogInformation("Interrupt triggered: {Reason} - {Description}", e.Reason, e.Description);
+            _logger?.LogInformation("Interrupt occurred: {SourceName} - {Description}", e.SourceName, e.Description);
 
-            // 在UI线程中处理中断需要通过事件通知View
-            InterruptTriggered?.Invoke(this, e);
+            // 在UI线程中处理中断需要通过事件通知View - 转换为旧的事件格式以保持兼容性
+            var oldEventArgs = new Core.Services.InterruptEventArgs(
+                Enum.TryParse<AbortReason>(e.InterruptType, out var reason) ? reason : AbortReason.UserInterruption,
+                e.Description);
+            InterruptTriggered?.Invoke(this, oldEventArgs);
         }
         catch (Exception ex)
         {
@@ -793,10 +797,10 @@ public partial class HomePageViewModel : ViewModelBase
             await BindEventsAsync();
 
             // Set up wake word detector coordination
-            if (_interruptManager != null)
+            if (_enhancedInterruptManager != null)
             {
-                _voiceChatService.SetInterruptManager(_interruptManager);
-                _logger?.LogInformation("Wake word detector coordination enabled");
+                _voiceChatService.SetEnhancedInterruptManager(_enhancedInterruptManager);
+                _logger?.LogInformation("Enhanced wake word detector coordination enabled");
             }
 
             // Use the service's IsConnected property to determine actual connection state
@@ -1773,10 +1777,10 @@ public partial class HomePageViewModel : ViewModelBase
             _logger?.LogInformation("Voice chat service event subscriptions cleaned up");
         }
 
-        if (_interruptManager != null)
+        if (_enhancedInterruptManager != null)
         {
-            _interruptManager.InterruptTriggered -= OnInterruptTriggered;
-            _logger?.LogInformation("Interrupt manager event subscriptions cleaned up");
+            _enhancedInterruptManager.InterruptService.InterruptOccurred -= OnInterruptOccurred;
+            _logger?.LogInformation("Enhanced interrupt manager event subscriptions cleaned up");
         }
 
         if (_musicPlayerService != null)
@@ -1946,7 +1950,7 @@ public partial class HomePageViewModel : ViewModelBase
 
     #region 事件
 
-    public event EventHandler<InterruptEventArgs>? InterruptTriggered;
+    public event EventHandler<Core.Services.InterruptEventArgs>? InterruptTriggered;
     public event EventHandler? ScrollToBottomRequested;
     public event EventHandler<ManualButtonStateEventArgs>? ManualButtonStateChanged;
     public event EventHandler<EmotionGifPathEventArgs>? EmotionGifPathChanged;

@@ -37,8 +37,6 @@ public class VoiceChatService : IVoiceChatService
     /// </summary>
     public ConversationStateMachine? StateMachine => _stateMachine;
 
-    // Wake word detector coordination (matches py-xiaozhi behavior)
-    private InterruptManager? _interruptManager;
     // New interrupt service for improved architecture
     private Interrupt.IInterruptService? _interruptService;
     // Enhanced interrupt manager that integrates both systems
@@ -279,17 +277,23 @@ public class VoiceChatService : IVoiceChatService
     }
 
     /// <summary>
-    /// Set the interrupt manager for wake word detector coordination
-    /// This enables py-xiaozhi-like wake word detector pause/resume behavior
+    /// Set the enhanced interrupt manager for wake word detector coordination
+    /// This enables py-xiaozhi-like wake word detector pause/resume behavior with improved architecture
     /// </summary>
-    public void SetInterruptManager(InterruptManager interruptManager)
+    public void SetEnhancedInterruptManager(Interrupt.EnhancedInterruptManager enhancedInterruptManager)
     {
-        _interruptManager = interruptManager;
+        _enhancedInterruptManager = enhancedInterruptManager;
         
         // Set circular reference to break dependency injection cycle
-        _interruptManager.SetVoiceChatService(this);
+        _enhancedInterruptManager.SetVoiceChatService(this);
         
-        _logger?.LogInformation("InterruptManager set for wake word detector coordination");
+        // Get the interrupt service from enhanced manager
+        _interruptService = _enhancedInterruptManager.InterruptService;
+        
+        // Subscribe to interrupt events
+        _interruptService.InterruptOccurred += OnInterruptOccurred;
+        
+        _logger?.LogInformation("EnhancedInterruptManager set for wake word detector coordination");
     }
 
     /// <summary>
