@@ -222,13 +222,6 @@ public class VoiceChatService : IVoiceChatService
                 _logger?.LogInformation("连续音频录制已启动，音频数据将根据状态机决定是否传输");
             }
 
-            // 启动关键词唤醒检测（对应py-xiaozhi的_start_wake_word_detector调用）
-            if (_keywordSpottingService != null)
-            {
-                _logger?.LogInformation("正在启动关键词唤醒检测...");
-                await StartKeywordDetectionAsync();
-            }
-
             // 初始化增强的打断管理器
             if (_enhancedInterruptManager != null)
             {
@@ -238,6 +231,14 @@ public class VoiceChatService : IVoiceChatService
             }
 
             _logger?.LogInformation("语音聊天服务初始化完成");
+
+            // 启动关键词唤醒检测（对应py-xiaozhi的_start_wake_word_detector调用）
+            if (_keywordSpottingService != null)
+            {
+                _logger?.LogInformation("正在启动关键词唤醒检测...");
+                await StartKeywordDetectionAsync();
+            }
+ 
         }
         catch (Exception ex)
         {
