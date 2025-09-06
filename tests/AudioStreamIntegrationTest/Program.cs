@@ -147,6 +147,10 @@ class Program
 
             Console.WriteLine("🎉 所有测试完成！简化音频架构工作正常。");
             Console.WriteLine("✅ 已成功移除 PortAudioManager，简化了架构");
+            Console.WriteLine();
+
+            // 运行 Channel 优化验证测试
+            await ChannelOptimizationTests.RunChannelOptimizationTests(host);
         }
         catch (Exception ex)
         {

@@ -12,7 +12,7 @@ namespace Verdure.Assistant.Core.Services
     /// 提供高性能的音频数据广播功能，支持多个订阅者
     /// 避免在音频回调中执行阻塞操作，提高音频处理性能
     /// </summary>
-    internal class AudioDataDistributor : IDisposable
+    public class AudioDataDistributor : IDisposable
     {
         private readonly Channel<(byte[] Data, EventHandler<byte[]>? MainHandler)> _dataChannel;
         private readonly ChannelWriter<(byte[] Data, EventHandler<byte[]>? MainHandler)> _writer;
