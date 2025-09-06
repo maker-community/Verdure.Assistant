@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Services.Interrupt.Sources;
+using Verdure.Assistant.Core.Services;
 
 namespace Verdure.Assistant.Core.Services.Interrupt;
 
@@ -90,6 +91,32 @@ public class EnhancedInterruptManager : IDisposable
     }
 
     /// <summary>
+    /// 处理分类打断事件
+    /// Handle categorized interrupt events
+    /// </summary>
+    private async void OnInterruptOccurred(object? sender, InterruptEventArgs e)
+    {
+        try
+        {
+            // 检查VAD打断是否应该被忽略（仅在音乐播放时激活）
+            // Check if VAD interrupt should be ignored (only active during music playback)
+            if (InterruptTypeHelper.IsVadInterrupt(e.InterruptType) && !ShouldVadBeActive())
+            {
+                _logger?.LogDebug("VAD interrupt ignored - not during music playback: {Source}", e.SourceName);
+                return;
+            }
+
+            // 处理打断并触发状态机转换
+            // Handle interrupt and trigger state machine transition
+            await HandleInterruptAsync(e.InterruptType, e.SourceName, e.Description, e.Data);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error handling categorized interrupt from {Source}", e.SourceName);
+        }
+    }
+
+    /// <summary>
     /// 触发音乐打断（停止音乐播放）
     /// </summary>
     public async Task TriggerMusicInterruptionAsync(string reason = "Voice interrupt during music playback")
@@ -127,6 +154,9 @@ public class EnhancedInterruptManager : IDisposable
         {
             // Create and register interrupt sources
             await CreateInterruptSources();
+            
+            // Subscribe to interrupt events for categorized handling
+            _interruptService.InterruptOccurred += OnInterruptOccurred;
             
             // Start all interrupt sources
             await _interruptService.StartAllAsync();
@@ -274,10 +304,65 @@ public class EnhancedInterruptManager : IDisposable
         _apiSource?.TriggerExternalInterrupt(source, description, data);
     }
 
+    /// <summary>
+    /// 处理打断事件并触发适当的状态机转换
+    /// Handle interrupt events and trigger appropriate state machine transitions
+    /// </summary>
+    public async Task HandleInterruptAsync(string interruptType, string sourceName, string description, object? data = null)
+    {
+        try
+        {
+            // 停止音乐播放 - Stop music playback for all interrupts
+            await TriggerMusicInterruptionAsync($"{sourceName} interrupt: {description}");
+            
+            // 根据打断类型确定状态机触发器
+            // Determine state machine trigger based on interrupt type
+            var trigger = InterruptTypeHelper.IsVadInterrupt(interruptType) 
+                ? ConversationTrigger.VadInterrupt 
+                : ConversationTrigger.ManualInterrupt;
+            
+            // 触发状态机转换 - 需要通过VoiceChatService进行
+            // Trigger state machine transition - needs to be done through VoiceChatService
+            if (_voiceChatService != null)
+            {
+                // 使用反射或创建新的接口方法来触发状态转换
+                // For now, log the event - in a real implementation, we'd need to coordinate with the VoiceChatService
+                _logger?.LogInformation("Handling {InterruptType} interrupt from {Source}: {Description}. " +
+                    "Suggested state transition: {Trigger}", 
+                    interruptType, sourceName, description, trigger);
+                
+                // Note: The actual state machine transition would need to be coordinated through
+                // the VoiceChatService or a state management service that has access to the state machine
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error handling interrupt from {Source}: {Description}", sourceName, description);
+        }
+    }
+
+    /// <summary>
+    /// 检查VAD是否应该激活（仅在音乐播放时）
+    /// Check if VAD should be active (only during music playback)
+    /// </summary>
+    public bool ShouldVadBeActive()
+    {
+        // TODO: 这里需要检查音乐播放状态
+        // This would need to check the actual music playback state
+        // For now, return true as a placeholder
+        return true;
+    }
+
     public void Dispose()
     {
         if (!_disposed)
         {
+            // Unsubscribe from events
+            if (_interruptService != null)
+            {
+                _interruptService.InterruptOccurred -= OnInterruptOccurred;
+            }
+            
             _interruptService?.Dispose();
             _disposed = true;
         }
