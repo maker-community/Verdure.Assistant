@@ -10,7 +10,7 @@ namespace Verdure.Assistant.Console
 {
     /// <summary>
     /// Console平台的音乐播放器实现
-    /// 使用 NLayer 解码 MP3，PortAudioSharp2 进行音频播放，提供跨平台音频播放能力
+    /// 使用 NLayer 解码 MP3，SoundFlow 进行音频播放，提供跨平台音频播放能力
     /// 参考 WinUIMusicAudioPlayer 的架构设计
     /// </summary>
     public class ConsoleMusicAudioPlayer : IMusicAudioPlayer
@@ -20,7 +20,7 @@ namespace Verdure.Assistant.Console
         private Mp3Decoder? _decoder;
         private AudioBuffer? _audioBuffer;
         private AudioDecodeThread? _decodeThread;
-        private PortAudioPlayer? _portAudioPlayer;
+        private SoundFlowMusicPlayer? _soundFlowPlayer;
         private readonly System.Timers.Timer _progressTimer;
         
         private bool _disposed;
@@ -53,14 +53,14 @@ namespace Verdure.Assistant.Console
             _logger = logger;
             _loggerFactory = LoggerFactory.Create(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Information));
             
-            // 初始化 PortAudioPlayer
-            _portAudioPlayer = new PortAudioPlayer(_loggerFactory.CreateLogger<PortAudioPlayer>());
+            // 初始化 SoundFlowMusicPlayer
+            _soundFlowPlayer = new SoundFlowMusicPlayer(_loggerFactory.CreateLogger<SoundFlowMusicPlayer>());
             
             // 设置进度更新定时器
             _progressTimer = new System.Timers.Timer(1000); // 每秒更新一次
             _progressTimer.Elapsed += OnProgressTimerElapsed;
             
-            _logger.LogInformation("Console音乐播放器初始化完成 (NLayer + PortAudioSharp2)");
+            _logger.LogInformation("Console音乐播放器初始化完成 (NLayer + SoundFlow)");
         }
 
         public async Task LoadAsync(string filePath)
@@ -139,7 +139,7 @@ namespace Verdure.Assistant.Console
         {
             try
             {
-                if (_decoder == null || _decodeThread == null || _audioBuffer == null || _portAudioPlayer == null)
+                if (_decoder == null || _decodeThread == null || _audioBuffer == null || _soundFlowPlayer == null)
                 {
                     _logger.LogWarning("没有加载音频文件，无法播放");
                     return;
@@ -151,13 +151,13 @@ namespace Verdure.Assistant.Console
                     return;
                 }
 
-                _logger.LogInformation("开始播放音频 (NLayer 解码 + PortAudio 播放)");
+                _logger.LogInformation("开始播放音频 (NLayer 解码 + SoundFlow 播放)");
                 
                 // 启动解码线程
                 _decodeThread.Start();
                 
-                // 启动 PortAudio 播放
-                await _portAudioPlayer.StartAsync(_audioBuffer, _decoder.SampleRate);
+                // 启动 SoundFlow 播放
+                await _soundFlowPlayer.StartAsync(_audioBuffer, _decoder.SampleRate);
                 
                 // 启动进度定时器
                 _progressTimer.Start();
@@ -184,10 +184,10 @@ namespace Verdure.Assistant.Console
 
                 _logger.LogInformation("暂停播放");
                 
-                // 停止 PortAudio 播放
-                if (_portAudioPlayer != null)
+                // 停止 SoundFlow 播放
+                if (_soundFlowPlayer != null)
                 {
-                    await _portAudioPlayer.StopAsync();
+                    await _soundFlowPlayer.StopAsync();
                 }
                 
                 // 停止进度定时器
@@ -209,10 +209,10 @@ namespace Verdure.Assistant.Console
             {
                 _logger.LogInformation("停止播放");
                 
-                // 停止 PortAudio 播放
-                if (_portAudioPlayer != null)
+                // 停止 SoundFlow 播放
+                if (_soundFlowPlayer != null)
                 {
-                    await _portAudioPlayer.StopAsync();
+                    await _soundFlowPlayer.StopAsync();
                 }
                 
                 // 停止解码线程
@@ -319,9 +319,9 @@ namespace Verdure.Assistant.Console
         private async Task ResetAsync()
         {
             // 停止所有活动
-            if (_portAudioPlayer != null)
+            if (_soundFlowPlayer != null)
             {
-                await _portAudioPlayer.StopAsync();
+                await _soundFlowPlayer.StopAsync();
             }
             _decodeThread?.Stop();
             _progressTimer.Stop();
@@ -352,7 +352,7 @@ namespace Verdure.Assistant.Console
             try
             {
                 ResetAsync().Wait(1000);
-                _portAudioPlayer?.Dispose();
+                _soundFlowPlayer?.Dispose();
             }
             catch (Exception ex)
             {

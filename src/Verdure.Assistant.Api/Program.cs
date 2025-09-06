@@ -39,9 +39,7 @@ AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
             GC.WaitForPendingFinalizers();
             GC.Collect();
             
-            // 尝试重新初始化音频系统
-            //var audioManager = AudioStreamManager.GetInstance();
-            //audioManager?.ForceCleanup();
+            // 尝试重新初始化音频系统（已移除PortAudio组件）
             Console.WriteLine("[音频异常] 音频系统已强制清理");
         }
         catch (Exception cleanupEx)
@@ -63,8 +61,7 @@ AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
         // 紧急清理资源
         try
         {
-            //var audioManager = AudioStreamManager.GetInstance();
-            //audioManager?.ForceCleanup();
+            // 音频系统清理（已移除PortAudio组件）
             Console.WriteLine("[清理] 紧急清理完成");
         }
         catch (Exception emergencyEx)
@@ -126,7 +123,7 @@ builder.Services.AddSingleton<MusicVoiceCoordinationService>();
 
 builder.Services.AddSingleton<IAudioPlayer, SoundFlowAudioPlayer>();
 
-// Register AudioStreamManager as singleton using factory pattern
+// Register SoundFlow audio components as singleton using factory pattern
 builder.Services.AddSingleton<SoundFlowAudioRecorder>(provider =>
 {
     var logger = provider.GetService<ILogger<SoundFlowAudioRecorder>>();
@@ -329,8 +326,7 @@ AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
     try
     {
         Console.WriteLine("[关闭] 应用程序正在关闭，清理资源...");
-        //var audioManager = AudioStreamManager.GetInstance();
-        //audioManager?.ForceCleanup();
+        // 音频系统清理（已移除PortAudio组件）
         Console.WriteLine("[关闭] 资源清理完成");
     }
     catch (Exception ex)

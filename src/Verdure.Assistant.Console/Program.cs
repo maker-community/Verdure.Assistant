@@ -127,7 +127,7 @@ class Program
                 // Add Music-Voice Coordination Service for automatic pause/resume synchronization
                 services.AddSingleton<MusicVoiceCoordinationService>();
 
-                // Register AudioStreamManager as singleton using factory pattern
+                // Register SoundFlow audio components as singleton using factory pattern
                 services.AddSingleton<SoundFlowAudioRecorder>(provider =>
                 {
                     var logger = provider.GetService<ILogger<SoundFlowAudioRecorder>>();

@@ -1,5 +1,3 @@
-﻿using PortAudioSharp;
-
 namespace Verdure.Assistant.Core.Interfaces;
 
 /// <summary>
