@@ -19,7 +19,7 @@ public class AudioStreamManager : ISharedAudioRecorder, IDisposable
     
     private PortAudioSharp.Stream? _sharedInputStream;
     private readonly object _streamLock = new();
-    private readonly List<EventHandler<byte[]>> _dataSubscribers = new();
+    private readonly AudioDataDistributor _audioDistributor; // 使用 Channel 优化的音频分发器
     private bool _isRecording = false;
     private bool _isDisposed = false;
     private bool _isCleaningUp = false; // 添加清理状态标志
@@ -36,6 +36,7 @@ public class AudioStreamManager : ISharedAudioRecorder, IDisposable
     private AudioStreamManager(ILogger<AudioStreamManager>? logger = null)
     {
         _logger = logger;
+        _audioDistributor = new AudioDataDistributor(logger);
     }
 
     /// <summary>
@@ -135,17 +136,12 @@ public class AudioStreamManager : ISharedAudioRecorder, IDisposable
 
     /// <summary>
     /// 订阅音频数据（参考 py-xiaozhi 的多组件共享模式）
+    /// 使用 Channel 优化的高性能分发
     /// </summary>
     public void SubscribeToAudioData(EventHandler<byte[]> handler)
     {
-        lock (_streamLock)
-        {
-            if (!_dataSubscribers.Contains(handler))
-            {
-                _dataSubscribers.Add(handler);
-                _logger?.LogInformation("新的音频数据订阅者已添加，当前订阅者数量: {Count}", _dataSubscribers.Count);
-            }
-        }
+        _audioDistributor.Subscribe(handler);
+        _logger?.LogInformation("新的音频数据订阅者已添加");
     }
 
     /// <summary>
@@ -153,11 +149,8 @@ public class AudioStreamManager : ISharedAudioRecorder, IDisposable
     /// </summary>
     public void UnsubscribeFromAudioData(EventHandler<byte[]> handler)
     {
-        lock (_streamLock)
-        {
-            _dataSubscribers.Remove(handler);
-            _logger?.LogInformation("音频数据订阅者已移除，当前订阅者数量: {Count}", _dataSubscribers.Count);
-        }
+        _audioDistributor.Unsubscribe(handler);
+        _logger?.LogInformation("音频数据订阅者已移除");
     }
 
     public async Task StartRecordingAsync(int sampleRate = 16000, int channels = 1)
@@ -459,25 +452,8 @@ public class AudioStreamManager : ISharedAudioRecorder, IDisposable
             // 验证音频数据有效性
             if (IsValidAudioData(audioData))
             {
-                // 分发给所有订阅者（参考 py-xiaozhi 的共享模式）
-                lock (_streamLock)
-                {
-                    // 触发主要的 DataAvailable 事件
-                    DataAvailable?.Invoke(this, audioData);
-
-                    // 通知所有额外的订阅者
-                    foreach (var subscriber in _dataSubscribers.ToList())
-                    {
-                        try
-                        {
-                            subscriber?.Invoke(this, audioData);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger?.LogWarning(ex, "音频数据订阅者处理时出错");
-                        }
-                    }
-                }
+                // 使用 Channel 优化的音频数据分发，避免在回调中阻塞
+                _audioDistributor.TryDistributeAudioData(audioData, DataAvailable);
             }
         }
         catch (Exception ex)
@@ -523,9 +499,8 @@ public class AudioStreamManager : ISharedAudioRecorder, IDisposable
                 _isRecording = false;
                 _isCleaningUp = false;
                 
-                // 清理订阅者
-                var subscriberCount = _dataSubscribers.Count;
-                _dataSubscribers.Clear();
+                // 清理 Channel 优化的音频分发器
+                _audioDistributor?.Dispose();
                 
                 // 强制清理流
                 if (_sharedInputStream != null)
@@ -571,7 +546,7 @@ public class AudioStreamManager : ISharedAudioRecorder, IDisposable
                 // 强制清理 PortAudio
                 CleanupPortAudio();
                 
-                _logger?.LogWarning("强制清理完成，已清理 {Count} 个订阅者", subscriberCount);
+                _logger?.LogWarning("强制清理完成");
             }
         }
         catch (Exception ex)
@@ -599,7 +574,8 @@ public class AudioStreamManager : ISharedAudioRecorder, IDisposable
                 _logger?.LogWarning(ex, "Dispose 时停止录制出错");
             }
 
-            _dataSubscribers.Clear();
+            // 释放 Channel 优化的音频分发器
+            _audioDistributor?.Dispose();
             
             // 在最后一个组件释放时清理 PortAudio
             if (_instance == this)

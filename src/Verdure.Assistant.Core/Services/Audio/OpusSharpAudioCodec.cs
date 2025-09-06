@@ -103,7 +103,8 @@ public class OpusSharpAudioCodec : IAudioCodec
                 return Array.Empty<byte>();
             }
         }
-    }public byte[] Decode(byte[] encodedData, int sampleRate, int channels)
+    }    
+    public byte[] Decode(byte[] encodedData, int sampleRate, int channels)
     {
         lock (_lock)
         {
@@ -145,25 +146,30 @@ public class OpusSharpAudioCodec : IAudioCodec
                 int maxFrameSize = sampleRate * 120 / 1000; // 最大120ms帧作为安全缓冲
                 short[] outputBuffer = new short[maxFrameSize * channels];
                 
-                //System.Console.WriteLine($"解码Opus数据: 输入长度={encodedData.Length}字节, 期望帧大小={frameSize}样本");
+                System.Console.WriteLine($"解码Opus数据: 输入长度={encodedData.Length}字节, 期望帧大小={frameSize}样本");
                 
                 // OpusSharp解码 - 使用正确的API，让解码器自动确定帧大小
                 int decodedSamples = _decoder.Decode(encodedData, encodedData.Length, outputBuffer, maxFrameSize, false);
                 
-                //System.Console.WriteLine($"解码结果: 解码了{decodedSamples}样本");
+                System.Console.WriteLine($"解码结果: 解码了{decodedSamples}样本");
                 
                 if (decodedSamples > 0)
                 {
                     // 验证解码出的样本数是否合理
                     if (decodedSamples > maxFrameSize)
                     {
-                        //System.Console.WriteLine($"警告: 解码样本数({decodedSamples})超出最大帧大小({maxFrameSize})");
+                        System.Console.WriteLine($"警告: 解码样本数({decodedSamples})超出最大帧大小({maxFrameSize})");
                         decodedSamples = maxFrameSize;
                     }
                     
-                    // 转换为字节数组
+                    // 转换为字节数组 - 确保正确的字节序
                     byte[] pcmBytes = new byte[decodedSamples * channels * 2];
-                    Buffer.BlockCopy(outputBuffer, 0, pcmBytes, 0, decodedSamples * channels * 2);
+                    for (int i = 0; i < decodedSamples * channels; i++)
+                    {
+                        var bytes = BitConverter.GetBytes(outputBuffer[i]);
+                        pcmBytes[i * 2] = bytes[0];     // 低字节
+                        pcmBytes[i * 2 + 1] = bytes[1]; // 高字节
+                    }
                     
                     // 可选：添加简单的音频质量检查
                     CheckAudioQuality(pcmBytes, $"解码输出PCM，长度={pcmBytes.Length}字节");
@@ -172,13 +178,13 @@ public class OpusSharpAudioCodec : IAudioCodec
                 }
                 else
                 {
-                    //System.Console.WriteLine($"解码失败: 返回的样本数为 {decodedSamples}");
+                    System.Console.WriteLine($"解码失败: 返回的样本数为 {decodedSamples}");
                 }
                 
                 // 返回静音数据而不是空数组，保持音频流连续性
                 int silenceFrameSize = frameSize * channels * 2;
                 byte[] silenceData = new byte[silenceFrameSize];
-                //System.Console.WriteLine($"返回静音数据: {silenceFrameSize}字节");
+                System.Console.WriteLine($"返回静音数据: {silenceFrameSize}字节");
                 return silenceData;
             }
             catch (Exception ex)
