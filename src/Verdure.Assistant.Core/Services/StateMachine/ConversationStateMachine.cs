@@ -11,6 +11,7 @@ public class ConversationStateMachine
 {
     private readonly ILogger<ConversationStateMachine>? _logger;
     private DeviceState _currentState;
+    private DeviceState _previousState;
     private readonly object _stateLock = new object();
 
     /// <summary>
@@ -32,10 +33,25 @@ public class ConversationStateMachine
         }
     }
 
+    /// <summary>
+    /// 旧状态
+    /// </summary>
+    public DeviceState PreviousState
+    {
+        get
+        {
+            lock (_stateLock)
+            {
+                return _previousState;
+            }
+        }
+    }
+
     public ConversationStateMachine(ILogger<ConversationStateMachine>? logger = null)
     {
         _logger = logger;
         _currentState = DeviceState.Idle;
+        _previousState = DeviceState.Idle;
     }
 
     /// <summary>
@@ -69,6 +85,8 @@ public class ConversationStateMachine
                 fromState, toState.Value, trigger, context);
 
             _currentState = toState.Value;
+
+            _previousState = fromState;
 
             // Fire state change event
             var eventArgs = new StateTransitionEventArgs
@@ -120,11 +138,11 @@ public class ConversationStateMachine
             (DeviceState.Idle, ConversationTrigger.KeywordDetected) => DeviceState.Connecting,
             (DeviceState.Idle, ConversationTrigger.ConnectToServer) => DeviceState.Connecting,
             (DeviceState.Idle, ConversationTrigger.ServerDisconnected) => DeviceState.Idle,
-            
+
             // Interrupt handling from Idle state - both manual and VAD interrupts trigger keyword wake-up
             (DeviceState.Idle, ConversationTrigger.ManualInterrupt) => DeviceState.Connecting,
             (DeviceState.Idle, ConversationTrigger.VadInterrupt) => DeviceState.Connecting,
-            
+
             // From Connecting state
             (DeviceState.Connecting, ConversationTrigger.ServerConnected) => DeviceState.Listening,
             (DeviceState.Connecting, ConversationTrigger.ConnectionFailed) => DeviceState.Idle,
@@ -136,7 +154,7 @@ public class ConversationStateMachine
             (DeviceState.Listening, ConversationTrigger.AudioReceived) => DeviceState.Speaking,
             (DeviceState.Listening, ConversationTrigger.ServerDisconnected) => DeviceState.Idle,
             (DeviceState.Listening, ConversationTrigger.KeywordDetected) => DeviceState.Connecting,
-            
+
             // Interrupt handling from Listening state - 聆听中打断进入关键词唤醒
             (DeviceState.Listening, ConversationTrigger.ManualInterrupt) => DeviceState.Connecting,
             (DeviceState.Listening, ConversationTrigger.VadInterrupt) => DeviceState.Connecting,
@@ -148,7 +166,7 @@ public class ConversationStateMachine
             (DeviceState.Speaking, ConversationTrigger.KeywordDetected) => DeviceState.Idle, // Interrupt speaking
             (DeviceState.Speaking, ConversationTrigger.StopVoiceChat) => DeviceState.Idle,
             (DeviceState.Speaking, ConversationTrigger.ServerDisconnected) => DeviceState.Connecting,
-            
+
             // Interrupt handling from Speaking state - 播放语音中打断进入聆听状态
             (DeviceState.Speaking, ConversationTrigger.ManualInterrupt) => DeviceState.Listening,
             (DeviceState.Speaking, ConversationTrigger.VadInterrupt) => DeviceState.Listening,
@@ -191,7 +209,7 @@ public enum ConversationTrigger
 
     // User interaction
     UserInterrupt,
-    
+
     // Interrupt triggers (categorized by requirements)
     ManualInterrupt,    // 手动打断 (API, Hotkey, Manual)
     VadInterrupt,       // VAD打断 (Voice Activity Detection)
