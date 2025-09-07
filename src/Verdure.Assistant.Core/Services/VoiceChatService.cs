@@ -424,31 +424,28 @@ public class VoiceChatService : IVoiceChatService
             ? ConversationTrigger.VadInterrupt 
             : ConversationTrigger.ManualInterrupt;
 
+        // Stop music playback first for all relevant interrupts
+        if (CurrentState == DeviceState.Listening || CurrentState == DeviceState.Speaking)
+        {
+            await StopMusicPlayback($"Interrupt from {e.SourceName}: {e.Description}");
+        }
+
         // Use state machine to handle interrupt based on current state
         switch (CurrentState)
         {
             case DeviceState.Listening:
-                if (IsVadInterrupt(e.InterruptType))
-                {
-                    // VAD interrupt during listening: transition to keyword wake-up and stop music
-                    _stateMachine?.RequestTransition(ConversationTrigger.KeywordDetected, 
-                        $"VAD interrupt during listening: {e.Description}");
-                }
-                else
-                {
-                    // Manual interrupt during listening: transition to keyword wake-up and stop music  
-                    _stateMachine?.RequestTransition(ConversationTrigger.UserInterrupt, 
-                        $"Manual interrupt during listening: {e.Description}");
-                }
+                // 聆听中打断进入关键词唤醒 - Both manual and VAD interrupts should trigger keyword wake-up
+                _stateMachine?.RequestTransition(trigger, 
+                    $"Interrupt during listening: {e.Description}");
                 break;
 
             case DeviceState.Speaking:
-                // Interrupt during speaking or music playback: transition to listening and stop music
+                // 播放语音或音乐中打断进入聆听状态 - Both manual and VAD interrupts should go to listening
                 if (_audioPlayer != null)
                 {
                     await _audioPlayer.StopAsync();
                 }
-                _stateMachine?.RequestTransition(ConversationTrigger.UserInterrupt, 
+                _stateMachine?.RequestTransition(trigger, 
                     $"Interrupt during speaking: {e.Description}");
                 break;
 
@@ -458,7 +455,7 @@ public class VoiceChatService : IVoiceChatService
                 break;
 
             case DeviceState.Connecting:
-                // Cancel connection attempt
+                // Cancel connection attempt - use UserInterrupt for compatibility
                 _stateMachine?.RequestTransition(ConversationTrigger.UserInterrupt, 
                     $"Connection interrupted: {e.Description}");
                 break;
