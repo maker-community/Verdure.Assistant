@@ -48,6 +48,7 @@ public class VoiceChatService : IVoiceChatService
     
     // Music playback state for VAD control
     private bool _isMusicPlaying = false;
+    private readonly IMusicPlayerService? _musicPlayerService;
     
     // Keyword spotting service (Microsoft Cognitive Services based)
     private IKeywordSpottingService _keywordSpottingService;
@@ -108,11 +109,13 @@ public class VoiceChatService : IVoiceChatService
         ISharedAudioRecorder audioStreamManager,
         IAudioPlayer audioPlayer,
         McpServer mcpServer,
+        IMusicPlayerService? musicPlayerService = null,
         ILogger<VoiceChatService>? logger = null)
     {
         _configurationService = configurationService;
         _audioStreamManager = audioStreamManager;
         _logger = logger;
+        _musicPlayerService = musicPlayerService;
 
         // 初始化音频编解码器 - 使用OpusSharp
         _audioCodec = new OpusSharpAudioCodec();
@@ -145,6 +148,17 @@ public class VoiceChatService : IVoiceChatService
         _interruptService = new Interrupt.InterruptService(
             Microsoft.Extensions.Logging.LoggerFactory.Create(builder => {}).CreateLogger<Interrupt.InterruptService>());
         _interruptService.InterruptOccurred += OnInterruptOccurred;
+        
+        // Initialize music player service if provided
+        if (_musicPlayerService != null)
+        {
+            _musicPlayerService.PlaybackStateChanged += OnMusicPlaybackStateChanged;
+            _logger?.LogInformation("MusicPlayerService set for music interruption handling");
+        }
+        else
+        {
+            _logger?.LogWarning("MusicPlayerService not provided - music interruption handling disabled");
+        }
         
         // Initialize state machine
         InitializeStateMachine();     
@@ -325,16 +339,6 @@ public class VoiceChatService : IVoiceChatService
         DeviceStateChanged?.Invoke(this, e.ToState);
 
         _logger?.LogDebug("State synchronized from state machine: {FromState} -> {ToState}", e.FromState, e.ToState);
-    }
-
-    /// <summary>
-    /// Set the music player service to monitor music playback state for VAD control
-    /// </summary>
-    public void SetMusicPlayerService(IMusicPlayerService musicPlayerService)
-    {
-        // Subscribe to music playback state changes to handle music interruption
-        musicPlayerService.PlaybackStateChanged += OnMusicPlaybackStateChanged;
-        _logger?.LogInformation("MusicPlayerService set for music interruption handling");
     }
 
     /// <summary>

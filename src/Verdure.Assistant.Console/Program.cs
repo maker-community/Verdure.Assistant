@@ -43,9 +43,9 @@ class Program
             _voiceChatService.DeviceStateChanged += OnDeviceStateChanged;
             _voiceChatService.ListeningModeChanged += OnListeningModeChanged;
 
-            // Set up music player service for VAD control
-            _voiceChatService.SetMusicPlayerService(musicPlayerService);
-            System.Console.WriteLine("音乐播放服务已设置用于VAD控制");
+            // Music player service is now injected via constructor dependency injection
+            // No need to call SetMusicPlayerService anymore
+            System.Console.WriteLine("音乐播放服务已通过构造函数注入用于VAD控制");
 
             // Initialize MCP IoT devices (new architecture based on xiaozhi-esp32)
             await InitializeMcpDevicesAsync(host.Services);
@@ -106,6 +106,11 @@ class Program
                 // Register services with dependency injection
                 services.AddSingleton<IVerificationService, VerificationService>();
                 services.AddSingleton<IConfigurationService, ConfigurationService>();
+                
+                // Music player service (required for MCP music device) - Register before VoiceChatService
+                services.AddSingleton<IMusicPlayerService, ApiMusicService>();
+                services.AddSingleton<IMusicAudioPlayer, SoundFlowMusicAudioPlayer>();
+                
                 services.AddSingleton<IVoiceChatService, VoiceChatService>();
 
                 // Interrupt architecture (now integrated into VoiceChatService)
@@ -123,10 +128,6 @@ class Program
 
                 services.AddSingleton<IAudioPlayer, SoundFlowAudioPlayer>();
                 services.AddSingleton<ISharedAudioRecorder>(provider => provider.GetRequiredService<SoundFlowAudioRecorder>());
-
-                // Music player service (required for MCP music device)
-                services.AddSingleton<IMusicPlayerService, ApiMusicService>();
-                services.AddSingleton<IMusicAudioPlayer, SoundFlowMusicAudioPlayer>();
                 // Register MCP services (new architecture based on xiaozhi-esp32)
                 services.AddSingleton<McpServer>();
                 services.AddSingleton(provider =>
