@@ -61,4 +61,22 @@ public static class InterruptTypeHelper
             _ => 1
         };
     }
+
+    /// <summary>
+    /// 获取打断类型的类别
+    /// Get the category for an interrupt type
+    /// </summary>
+    /// <param name="interruptType">中断类型</param>
+    /// <returns>中断类别</returns>
+    public static string GetInterruptCategory(string interruptType)
+    {
+        return interruptType switch
+        {
+            InterruptTypes.Hotkey => InterruptCategories.Manual,
+            InterruptTypes.Api => InterruptCategories.Manual,
+            InterruptTypes.Manual => InterruptCategories.Manual,
+            InterruptTypes.VoiceActivity => InterruptCategories.VoiceActivity,
+            _ => InterruptCategories.Manual // Default to manual for other types
+        };
+    }
 }

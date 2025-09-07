@@ -110,11 +110,6 @@ public interface IVoiceChatService : IDisposable
     ConversationStateMachine? StateMachine { get; }
     
     /// <summary>
-    /// Set the music player service to monitor music playback state for VAD control
-    /// </summary>
-    void SetMusicPlayerService(IMusicPlayerService musicPlayerService);
-    
-    /// <summary>
     /// 触发手动打断
     /// </summary>
     Task TriggerManualInterruptAsync(string description, object? data = null);

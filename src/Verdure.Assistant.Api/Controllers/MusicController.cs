@@ -14,12 +14,12 @@ namespace Verdure.Assistant.Api.Controllers
     public class MusicController : ControllerBase
     {
         private readonly ILogger<MusicController> _logger;
-        private readonly ApiMusicService _musicService; // 使用具体类型而不是接口
+        private readonly IMusicPlayerService _musicService; // 使用具体类型而不是接口
 
         public MusicController(ILogger<MusicController> logger, IMusicPlayerService musicService)
         {
             _logger = logger;
-            _musicService = (ApiMusicService)musicService; // 转换为具体类型
+            _musicService = musicService; // 转换为具体类型
         }
 
         /// <summary>

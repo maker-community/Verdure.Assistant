@@ -108,7 +108,7 @@ public partial class App : Application
         services.AddSingleton<IVoiceChatService, VoiceChatService>();
         // Music player service
         services.AddSingleton<IMusicAudioPlayer, WinUIMusicAudioPlayer>();
-        services.AddSingleton<IMusicPlayerService, KugouMusicService>();
+        services.AddSingleton<IMusicPlayerService, KuwoMusicService>();
         // Register MCP services (new architecture based on xiaozhi-esp32)
         services.AddSingleton<McpServer>();
         services.AddSingleton<McpDeviceManager>();
@@ -161,11 +161,11 @@ public partial class App : Application
                 return;
             }
 
-            // Set up music player service for VAD control
+            // VoiceChatService now gets music player service via constructor injection
+            // No need to call SetMusicPlayerService anymore
             if (musicPlayerService != null)
             {
-                voiceChatService.SetMusicPlayerService(musicPlayerService);
-                logger?.LogInformation("音乐播放服务已设置用于VAD控制");
+                logger?.LogInformation("音乐播放服务已通过构造函数注入用于VAD控制");
             }
 
             // Initialize MCP server and device manager

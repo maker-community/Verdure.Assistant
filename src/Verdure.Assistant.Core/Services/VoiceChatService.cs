@@ -5,7 +5,6 @@ using Verdure.Assistant.Core.Events;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Services.MCP;
-using Verdure.Assistant.Core.Services.Interrupt;
 
 namespace Verdure.Assistant.Core.Services;
 
@@ -39,16 +38,17 @@ public class VoiceChatService : IVoiceChatService
 
     // Direct interrupt service management (replaces EnhancedInterruptManager)
     private readonly Interrupt.InterruptService _interruptService;
-    
+
     // Interrupt sources - directly managed by VoiceChatService
     private Interrupt.Sources.ManualInterruptSource? _manualSource;
     private Interrupt.Sources.VoiceActivityInterruptSource? _vadSource;
     private Interrupt.Sources.HotkeyInterruptSource? _hotkeySource;
     private Interrupt.Sources.ApiInterruptSource? _apiSource;
-    
+
     // Music playback state for VAD control
     private bool _isMusicPlaying = false;
-    
+    private readonly IMusicPlayerService? _musicPlayerService;
+
     // Keyword spotting service (Microsoft Cognitive Services based)
     private IKeywordSpottingService _keywordSpottingService;
     private bool _keywordDetectionEnabled = false;
@@ -100,7 +100,10 @@ public class VoiceChatService : IVoiceChatService
     /// </summary>
     public DeviceState CurrentState => _stateMachine?.CurrentState ?? DeviceState.Idle;
 
-
+    /// <summary>
+    /// 旧设备状态 - 直接从状态机获取
+    /// </summary>
+    public DeviceState PreviousState => _stateMachine?.PreviousState ?? DeviceState.Idle;
 
     #region 构造函数和初始化
     public VoiceChatService(IConfigurationService configurationService,
@@ -108,11 +111,13 @@ public class VoiceChatService : IVoiceChatService
         ISharedAudioRecorder audioStreamManager,
         IAudioPlayer audioPlayer,
         McpServer mcpServer,
+        IMusicPlayerService? musicPlayerService = null,
         ILogger<VoiceChatService>? logger = null)
     {
         _configurationService = configurationService;
         _audioStreamManager = audioStreamManager;
         _logger = logger;
+        _musicPlayerService = musicPlayerService;
 
         // 初始化音频编解码器 - 使用OpusSharp
         _audioCodec = new OpusSharpAudioCodec();
@@ -140,14 +145,25 @@ public class VoiceChatService : IVoiceChatService
         _logger?.LogInformation("关键词唤醒服务已设置");
 
         _mcpServer = mcpServer;
-        
+
         // Initialize direct interrupt service management (replaces EnhancedInterruptManager)
         _interruptService = new Interrupt.InterruptService(
-            Microsoft.Extensions.Logging.LoggerFactory.Create(builder => {}).CreateLogger<Interrupt.InterruptService>());
+            Microsoft.Extensions.Logging.LoggerFactory.Create(builder => { }).CreateLogger<Interrupt.InterruptService>());
         _interruptService.InterruptOccurred += OnInterruptOccurred;
-        
+
+        // Initialize music player service if provided
+        if (_musicPlayerService != null)
+        {
+            _musicPlayerService.PlaybackStateChanged += OnMusicPlaybackStateChanged;
+            _logger?.LogInformation("MusicPlayerService set for music interruption handling");
+        }
+        else
+        {
+            _logger?.LogWarning("MusicPlayerService not provided - music interruption handling disabled");
+        }
+
         // Initialize state machine
-        InitializeStateMachine();     
+        InitializeStateMachine();
     }
 
     private void InitializeStateMachine()
@@ -205,17 +221,17 @@ public class VoiceChatService : IVoiceChatService
 
             // Create and register interrupt sources
             _manualSource = new Interrupt.Sources.ManualInterruptSource(
-                Microsoft.Extensions.Logging.LoggerFactory.Create(builder => {}).CreateLogger<Interrupt.Sources.ManualInterruptSource>());
+                Microsoft.Extensions.Logging.LoggerFactory.Create(builder => { }).CreateLogger<Interrupt.Sources.ManualInterruptSource>());
             _interruptService.RegisterInterruptSource(_manualSource);
 
             // Hotkey interrupt source
             _hotkeySource = new Interrupt.Sources.HotkeyInterruptSource(
-                Microsoft.Extensions.Logging.LoggerFactory.Create(builder => {}).CreateLogger<Interrupt.Sources.HotkeyInterruptSource>());
+                Microsoft.Extensions.Logging.LoggerFactory.Create(builder => { }).CreateLogger<Interrupt.Sources.HotkeyInterruptSource>());
             _interruptService.RegisterInterruptSource(_hotkeySource);
 
             // API interrupt source
             _apiSource = new Interrupt.Sources.ApiInterruptSource(
-                Microsoft.Extensions.Logging.LoggerFactory.Create(builder => {}).CreateLogger<Interrupt.Sources.ApiInterruptSource>());
+                Microsoft.Extensions.Logging.LoggerFactory.Create(builder => { }).CreateLogger<Interrupt.Sources.ApiInterruptSource>());
             _interruptService.RegisterInterruptSource(_apiSource);
 
             // Voice activity interrupt source with proper configuration (optional, based on config)
@@ -230,18 +246,18 @@ public class VoiceChatService : IVoiceChatService
                     MaxSilenceDurationMs = 500f,
                     DebugOutput = _logger?.IsEnabled(LogLevel.Debug) ?? false
                 };
-                
+
                 _vadSource = new Interrupt.Sources.VoiceActivityInterruptSource(
-                    _audioStreamManager, 
-                    this, 
+                    _audioStreamManager,
+                    this,
                     vadConfig,
-                    Microsoft.Extensions.Logging.LoggerFactory.Create(builder => {}).CreateLogger<Interrupt.Sources.VoiceActivityInterruptSource>());
+                    Microsoft.Extensions.Logging.LoggerFactory.Create(builder => { }).CreateLogger<Interrupt.Sources.VoiceActivityInterruptSource>());
                 _interruptService.RegisterInterruptSource(_vadSource);
             }
 
             // Start all interrupt sources
             await _interruptService.StartAllAsync();
-            
+
             _logger?.LogInformation("Interrupt sources initialized successfully");
         }
         catch (Exception ex)
@@ -287,7 +303,7 @@ public class VoiceChatService : IVoiceChatService
                 _logger?.LogInformation("正在启动关键词唤醒检测...");
                 await StartKeywordDetectionAsync();
             }
- 
+
         }
         catch (Exception ex)
         {
@@ -328,16 +344,6 @@ public class VoiceChatService : IVoiceChatService
     }
 
     /// <summary>
-    /// Set the music player service to monitor music playback state for VAD control
-    /// </summary>
-    public void SetMusicPlayerService(IMusicPlayerService musicPlayerService)
-    {
-        // Subscribe to music playback state changes to handle music interruption
-        musicPlayerService.PlaybackStateChanged += OnMusicPlaybackStateChanged;
-        _logger?.LogInformation("MusicPlayerService set for music interruption handling");
-    }
-
-    /// <summary>
     /// Handle music playback state changes for VAD control
     /// </summary>
     private void OnMusicPlaybackStateChanged(object? sender, Interfaces.MusicPlaybackEventArgs e)
@@ -355,7 +361,7 @@ public class VoiceChatService : IVoiceChatService
                     }
                     _logger?.LogInformation("Music started playing, VAD interrupt enabled");
                     break;
-                    
+
                 case "paused":
                 case "stopped":
                 case "ended":
@@ -382,7 +388,7 @@ public class VoiceChatService : IVoiceChatService
     {
         try
         {
-            _logger?.LogInformation("Processing interrupt: {Type} from {Source} - {Description}", 
+            _logger?.LogInformation("Processing interrupt: {Type} from {Source} - {Description}",
                 e.InterruptType, e.SourceName, e.Description);
 
             // Check if VAD interrupt should be ignored (only active during music playback)
@@ -420,46 +426,41 @@ public class VoiceChatService : IVoiceChatService
     private async Task HandleInterruptWithStateMachine(Interrupt.InterruptEventArgs e)
     {
         // Determine state machine trigger based on interrupt type
-        var trigger = IsVadInterrupt(e.InterruptType) 
-            ? ConversationTrigger.VadInterrupt 
+        var trigger = IsVadInterrupt(e.InterruptType)
+            ? ConversationTrigger.VadInterrupt
             : ConversationTrigger.ManualInterrupt;
 
         // Use state machine to handle interrupt based on current state
         switch (CurrentState)
         {
             case DeviceState.Listening:
-                if (IsVadInterrupt(e.InterruptType))
+                // 聆听中打断进入关键词唤醒 - Both manual and VAD interrupts should trigger keyword wake-up
+                _stateMachine?.RequestTransition(ConversationTrigger.ServerDisconnected, "Connection lost");
+
+
+                if (_communicationClient != null)
                 {
-                    // VAD interrupt during listening: transition to keyword wake-up and stop music
-                    _stateMachine?.RequestTransition(ConversationTrigger.KeywordDetected, 
-                        $"VAD interrupt during listening: {e.Description}");
-                }
-                else
-                {
-                    // Manual interrupt during listening: transition to keyword wake-up and stop music  
-                    _stateMachine?.RequestTransition(ConversationTrigger.UserInterrupt, 
-                        $"Manual interrupt during listening: {e.Description}");
+                    _logger?.LogInformation("连接断开，尝试断开WebSocket连接");
+                    await _communicationClient.DisconnectAsync();
                 }
                 break;
 
             case DeviceState.Speaking:
-                // Interrupt during speaking or music playback: transition to listening and stop music
-                if (_audioPlayer != null)
-                {
-                    await _audioPlayer.StopAsync();
-                }
-                _stateMachine?.RequestTransition(ConversationTrigger.UserInterrupt, 
-                    $"Interrupt during speaking: {e.Description}");
+                // 播放语音或音乐中打断进入聆听状态 - Both manual and VAD interrupts should go to listening
+                KeepListening = true; // 启用持续监听模式
+                _stateMachine?.RequestTransition(ConversationTrigger.ManualInterrupt, $"Keyword detected in idle state");
                 break;
 
             case DeviceState.Idle:
+                // 聆听中打断进入关键词唤醒 - Both manual and VAD interrupts should trigger keyword wake-up
+                _stateMachine?.RequestTransition(ConversationTrigger.ServerDisconnected, "Connection lost");
                 // Already idle, just log the interrupt
                 _logger?.LogDebug("Interrupt received in idle state, no action needed");
                 break;
 
             case DeviceState.Connecting:
-                // Cancel connection attempt
-                _stateMachine?.RequestTransition(ConversationTrigger.UserInterrupt, 
+                // Cancel connection attempt - use UserInterrupt for compatibility
+                _stateMachine?.RequestTransition(ConversationTrigger.UserInterrupt,
                     $"Connection interrupted: {e.Description}");
                 break;
         }
@@ -480,12 +481,16 @@ public class VoiceChatService : IVoiceChatService
     {
         try
         {
+            if (_musicPlayerService != null)
+            {
+                await _musicPlayerService.StopAsync();
+            }
             _logger?.LogInformation("Stopping music playback: {Reason}", reason);
-            
+
             // Trigger music interruption through manual interrupt
-            await _interruptService.TriggerManualInterruptAsync($"Music interruption: {reason}", 
-                new { Type = "MusicInterruption", Reason = reason });
-                
+            //await _interruptService.TriggerManualInterruptAsync($"Music interruption: {reason}", 
+            //    new { Type = "MusicInterruption", Reason = reason });
+
             // Note: Actual music stopping should be handled by music service coordination
             // The music service should subscribe to interrupt events or be notified through other means
         }
@@ -622,7 +627,7 @@ public class VoiceChatService : IVoiceChatService
                     _logger?.LogInformation("在AI说话时检测到关键词，中断当前对话");
 
                     // Use state machine to handle keyword interrupt
-                    _stateMachine?.RequestTransition(ConversationTrigger.KeywordDetected, $"Keyword '{keyword}' detected during speaking - interrupt");
+                    _stateMachine?.RequestTransition(ConversationTrigger.ManualInterrupt, $"Keyword '{keyword}' detected during speaking - interrupt");
 
                     await Task.Delay(50);
 
@@ -750,14 +755,14 @@ public class VoiceChatService : IVoiceChatService
             {
                 // 新逻辑：不启动/停止录制，而是订阅音频数据流来控制数据传输
                 _logger?.LogDebug("订阅音频数据流用于WebSocket传输...");
-                
+
                 // 确保音频流正在运行（应该在初始化时已经启动）
                 if (!_audioStreamManager.IsRecording)
                 {
                     _logger?.LogWarning("发现音频流未运行，尝试重新启动连续录制模式");
                     await _audioStreamManager.StartRecordingAsync(_config.AudioSampleRate, _config.AudioChannels);
                 }
-                
+
                 _isVoiceChatActive = true;
                 VoiceChatStateChanged?.Invoke(this, true);
                 _logger?.LogInformation("Started listening - audio data will be transmitted to WebSocket");
@@ -1680,12 +1685,12 @@ public class VoiceChatService : IVoiceChatService
             try
             {
                 _audioStreamManager?.ForceCleanup();
-                
+
                 // 强制垃圾回收清理悬挂对象
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 GC.Collect();
-                
+
                 _logger?.LogInformation("音频系统已强制清理");
             }
             catch (Exception cleanupEx)
@@ -1715,7 +1720,7 @@ public class VoiceChatService : IVoiceChatService
                 try
                 {
                     _logger?.LogInformation("尝试重新初始化音频系统...");
-                    
+
                     // 测试性启动和停止，验证音频系统可用性
                     await _audioStreamManager.StartRecordingAsync(_config.AudioSampleRate, _config.AudioChannels);
                     await Task.Delay(500); // 短暂延迟确保启动稳定

@@ -110,6 +110,11 @@ builder.Services.AddLogging(builder =>
 // Register core services
 builder.Services.AddSingleton<IVerificationService, VerificationService>();
 builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
+
+// Music player service (using SoundFlow) - Register before VoiceChatService
+builder.Services.AddSingleton<IMusicAudioPlayer, SoundFlowMusicAudioPlayer>();
+builder.Services.AddSingleton<IMusicPlayerService, KuwoMusicService>();
+
 builder.Services.AddSingleton<IVoiceChatService, VoiceChatService>();
 
 // Interrupt architecture (now integrated into VoiceChatService)
@@ -127,9 +132,6 @@ builder.Services.AddSingleton<SoundFlowAudioRecorder>(provider =>
     return SoundFlowAudioRecorder.GetInstance(logger);
 });
 builder.Services.AddSingleton<ISharedAudioRecorder>(provider => provider.GetRequiredService<SoundFlowAudioRecorder>());
-
-// Music player service (using mpg123)
-builder.Services.AddSingleton<IMusicPlayerService, ApiMusicService>();
 
 // Register Robot Services
 builder.Services.AddSingleton<Verdure.Assistant.Api.Services.Robot.DisplayService>();
@@ -253,11 +255,8 @@ try
 
                         if (voiceChatService != null && keywordSpottingService != null)
                         {
-                            // 设置音乐播放服务以监控音乐播放状态（用于VAD控制）
-                            if (musicPlayerService != null)
-                            {
-                                voiceChatService.SetMusicPlayerService(musicPlayerService);
-                            }
+                            // Music player service is now injected via constructor dependency injection
+                            // No need to call SetMusicPlayerService anymore
 
                             // 连接机器人情感集成服务
                             if (emotionIntegrationService != null)

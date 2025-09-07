@@ -42,6 +42,9 @@ public interface IMusicPlayerService
     /// </summary>
     double CurrentPosition { get; }
 
+    public TimeSpan TotalDuration { get; }
+    public double Progress { get; }
+
     /// <summary>
     /// 搜索并播放歌曲
     /// </summary>
@@ -68,6 +71,10 @@ public interface IMusicPlayerService
     /// <returns>操作结果</returns>
     Task<PlaybackResult> StopAsync();
 
+    Task<PlaybackResult> PlayTrackAsync(MusicTrack track, CancellationToken cancellationToken = default);
+
+    Task PauseAsync(CancellationToken cancellationToken = default);
+    Task ResumeAsync(CancellationToken cancellationToken = default);
     /// <summary>
     /// 跳转到指定位置
     /// </summary>

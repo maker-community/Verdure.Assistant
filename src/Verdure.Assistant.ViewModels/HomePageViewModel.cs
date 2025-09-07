@@ -318,13 +318,13 @@ public partial class HomePageViewModel : ViewModelBase
             _logger?.LogInformation("配置服务验证码事件已绑定");
         }
 
-        // 设置音乐播放服务用于VAD控制（替换EnhancedInterruptManager）
+        // Music player service is now injected via constructor dependency injection
+        // No need to call SetMusicPlayerService anymore
         if (_voiceChatService != null && _musicPlayerService != null)
         {
             try
             {
-                _voiceChatService.SetMusicPlayerService(_musicPlayerService);
-                _logger?.LogInformation("Music player service set for VAD control");
+                _logger?.LogInformation("Music player service injected via constructor for VAD control");
             }
             catch (Exception ex)
             {
@@ -790,11 +790,11 @@ public partial class HomePageViewModel : ViewModelBase
             // 重新绑定事件（因为服务可能被重新初始化）
             await BindEventsAsync();
 
-            // Set up music player service for VAD control
+            // Music player service is now injected via constructor dependency injection
+            // No need to call SetMusicPlayerService anymore
             if (_musicPlayerService != null)
             {
-                _voiceChatService.SetMusicPlayerService(_musicPlayerService);
-                _logger?.LogInformation("Music player service set for VAD control");
+                _logger?.LogInformation("Music player service available via constructor injection for VAD control");
             }
 
             // Use the service's IsConnected property to determine actual connection state
