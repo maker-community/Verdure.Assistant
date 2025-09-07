@@ -72,3 +72,63 @@ public static class InterruptTypes
     public const string Api = "api";
     public const string Custom = "custom";
 }
+
+/// <summary>
+/// 打断类别 - 用于区分不同类型的打断处理方式
+/// Interrupt categories for different interrupt handling approaches
+/// </summary>
+public static class InterruptCategories
+{
+    /// <summary>
+    /// 手动打断类别 - 包括按键、API、手动打断
+    /// Manual interrupt category - includes hotkey, API, and manual interrupts
+    /// </summary>
+    public const string Manual = "manual_category";
+    
+    /// <summary>
+    /// VAD打断类别 - 语音活动检测打断，更敏感，仅在音乐播放时激活
+    /// VAD interrupt category - voice activity detection, more sensitive, only active during music playback
+    /// </summary>
+    public const string VoiceActivity = "vad_category";
+}
+
+///// <summary>
+///// 打断类型分类帮助器
+///// Interrupt type categorization helper
+///// </summary>
+//public static class InterruptTypeHelper
+//{
+//    /// <summary>
+//    /// 获取打断类型的类别
+//    /// Get the category for an interrupt type
+//    /// </summary>
+//    public static string GetInterruptCategory(string interruptType)
+//    {
+//        return interruptType switch
+//        {
+//            InterruptTypes.Hotkey => InterruptCategories.Manual,
+//            InterruptTypes.Api => InterruptCategories.Manual,
+//            InterruptTypes.Manual => InterruptCategories.Manual,
+//            InterruptTypes.VoiceActivity => InterruptCategories.VoiceActivity,
+//            _ => InterruptCategories.Manual // Default to manual for other types
+//        };
+//    }
+    
+//    /// <summary>
+//    /// 检查是否为手动打断类型
+//    /// Check if interrupt type is manual category
+//    /// </summary>
+//    public static bool IsManualInterrupt(string interruptType)
+//    {
+//        return GetInterruptCategory(interruptType) == InterruptCategories.Manual;
+//    }
+    
+//    /// <summary>
+//    /// 检查是否为VAD打断类型
+//    /// Check if interrupt type is VAD category
+//    /// </summary>
+//    public static bool IsVadInterrupt(string interruptType)
+//    {
+//        return GetInterruptCategory(interruptType) == InterruptCategories.VoiceActivity;
+//    }
+//}

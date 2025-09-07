@@ -110,15 +110,29 @@ public interface IVoiceChatService : IDisposable
     ConversationStateMachine? StateMachine { get; }
     
     /// <summary>
-    /// Set enhanced interrupt manager for wake word detector coordination
-    /// This enables py-xiaozhi-like wake word detector pause/resume behavior
+    /// Set the music player service to monitor music playback state for VAD control
     /// </summary>
-    void SetEnhancedInterruptManager(Services.Interrupt.EnhancedInterruptManager enhancedInterruptManager);
+    void SetMusicPlayerService(IMusicPlayerService musicPlayerService);
     
     /// <summary>
-    /// Set the new interrupt service for improved interrupt architecture
+    /// 触发手动打断
     /// </summary>
-    void SetInterruptService(Services.Interrupt.IInterruptService interruptService);
+    Task TriggerManualInterruptAsync(string description, object? data = null);
+    
+    /// <summary>
+    /// 启用或禁用VAD检测
+    /// </summary>
+    Task SetVADEnabledAsync(bool enabled);
+    
+    /// <summary>
+    /// 启用或禁用热键检测
+    /// </summary>
+    Task SetHotkeyEnabledAsync(bool enabled);
+    
+    /// <summary>
+    /// 检查VAD是否应该激活（仅在音乐播放时）
+    /// </summary>
+    bool ShouldVadBeActive();
 
     /// <summary>
     /// 启动关键词唤醒检测

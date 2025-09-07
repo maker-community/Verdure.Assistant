@@ -28,9 +28,6 @@ public partial class HomePageViewModel : ViewModelBase
     // UI thread dispatcher for cross-platform thread marshaling
     private IUIDispatcher _uiDispatcher;
 
-
-    private EnhancedInterruptManager? _enhancedInterruptManager;
-
     #region 可观察属性
 
     [ObservableProperty]
@@ -142,7 +139,6 @@ public partial class HomePageViewModel : ViewModelBase
     public HomePageViewModel(ILogger<HomePageViewModel> logger,
       IVoiceChatService? voiceChatService = null,
       IEmotionManager? emotionManager = null,
-      EnhancedInterruptManager? enhancedInterruptManager = null,
       IKeywordSpottingService? keywordSpottingService = null,
       IVerificationService? verificationService = null,
       IMusicPlayerService? musicPlayerService = null,
@@ -151,7 +147,6 @@ public partial class HomePageViewModel : ViewModelBase
     {
         _voiceChatService = voiceChatService;
         _emotionManager = emotionManager;
-        _enhancedInterruptManager = enhancedInterruptManager;
         _keywordSpottingService = keywordSpottingService;
         _verificationService = verificationService;
         _musicPlayerService = musicPlayerService;
@@ -323,18 +318,17 @@ public partial class HomePageViewModel : ViewModelBase
             _logger?.LogInformation("配置服务验证码事件已绑定");
         }
 
-        // 初始化和绑定EnhancedInterruptManager事件
-        if (_enhancedInterruptManager != null)
+        // 设置音乐播放服务用于VAD控制（替换EnhancedInterruptManager）
+        if (_voiceChatService != null && _musicPlayerService != null)
         {
             try
             {
-                await _enhancedInterruptManager.InitializeAsync();
-                _enhancedInterruptManager.InterruptService.InterruptOccurred += OnInterruptOccurred;
-                _logger?.LogInformation("EnhancedInterruptManager initialized successfully");
+                _voiceChatService.SetMusicPlayerService(_musicPlayerService);
+                _logger?.LogInformation("Music player service set for VAD control");
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Failed to initialize EnhancedInterruptManager");
+                _logger?.LogError(ex, "Failed to set music player service");
             }
         }
     }
@@ -796,11 +790,11 @@ public partial class HomePageViewModel : ViewModelBase
             // 重新绑定事件（因为服务可能被重新初始化）
             await BindEventsAsync();
 
-            // Set up wake word detector coordination
-            if (_enhancedInterruptManager != null)
+            // Set up music player service for VAD control
+            if (_musicPlayerService != null)
             {
-                _voiceChatService.SetEnhancedInterruptManager(_enhancedInterruptManager);
-                _logger?.LogInformation("Enhanced wake word detector coordination enabled");
+                _voiceChatService.SetMusicPlayerService(_musicPlayerService);
+                _logger?.LogInformation("Music player service set for VAD control");
             }
 
             // Use the service's IsConnected property to determine actual connection state
@@ -1775,12 +1769,6 @@ public partial class HomePageViewModel : ViewModelBase
             _voiceChatService.TtsStateChanged -= OnTtsStateChanged;
 
             _logger?.LogInformation("Voice chat service event subscriptions cleaned up");
-        }
-
-        if (_enhancedInterruptManager != null)
-        {
-            _enhancedInterruptManager.InterruptService.InterruptOccurred -= OnInterruptOccurred;
-            _logger?.LogInformation("Enhanced interrupt manager event subscriptions cleaned up");
         }
 
         if (_musicPlayerService != null)

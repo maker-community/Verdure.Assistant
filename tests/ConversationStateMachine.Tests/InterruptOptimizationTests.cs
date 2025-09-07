@@ -1,0 +1,224 @@
+using Microsoft.Extensions.Logging;
+using Verdure.Assistant.Core.Constants;
+using Verdure.Assistant.Core.Services.Interrupt;
+using Verdure.Assistant.Core.Services;
+using Xunit;
+
+namespace ConversationStateMachine.Tests;
+
+/// <summary>
+/// 测试优化后的打断逻辑
+/// Tests for optimized interrupt logic
+/// </summary>
+public class InterruptOptimizationTests
+{
+    private readonly ILogger<Verdure.Assistant.Core.Services.ConversationStateMachine> _logger;
+
+    public InterruptOptimizationTests()
+    {
+        using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
+        _logger = loggerFactory.CreateLogger<Verdure.Assistant.Core.Services.ConversationStateMachine>();
+    }
+
+    [Fact]
+    public void ManualInterrupt_FromListening_ShouldGoToConnecting()
+    {
+        // Arrange
+        var stateMachine = new Verdure.Assistant.Core.Services.ConversationStateMachine(_logger);
+        stateMachine.RequestTransition(ConversationTrigger.StartVoiceChat, "Start listening");
+        Assert.Equal(DeviceState.Listening, stateMachine.CurrentState);
+
+        // Act - Manual interrupt during listening should go to keyword wake-up (Connecting)
+        var result = stateMachine.RequestTransition(ConversationTrigger.ManualInterrupt, "Manual interrupt during listening");
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(DeviceState.Connecting, stateMachine.CurrentState);
+    }
+
+    [Fact]
+    public void VadInterrupt_FromListening_ShouldGoToConnecting()
+    {
+        // Arrange
+        var stateMachine = new Verdure.Assistant.Core.Services.ConversationStateMachine(_logger);
+        stateMachine.RequestTransition(ConversationTrigger.StartVoiceChat, "Start listening");
+        Assert.Equal(DeviceState.Listening, stateMachine.CurrentState);
+
+        // Act - VAD interrupt during listening should go to keyword wake-up (Connecting)
+        var result = stateMachine.RequestTransition(ConversationTrigger.VadInterrupt, "VAD interrupt during listening");
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(DeviceState.Connecting, stateMachine.CurrentState);
+    }
+
+    [Fact]
+    public void ManualInterrupt_FromSpeaking_ShouldGoToListening()
+    {
+        // Arrange
+        var stateMachine = new Verdure.Assistant.Core.Services.ConversationStateMachine(_logger);
+        // Set up speaking state
+        stateMachine.RequestTransition(ConversationTrigger.StartVoiceChat, "Start conversation");
+        stateMachine.RequestTransition(ConversationTrigger.TtsStarted, "Start speaking");
+        Assert.Equal(DeviceState.Speaking, stateMachine.CurrentState);
+
+        // Act - Manual interrupt during speaking should go to listening
+        var result = stateMachine.RequestTransition(ConversationTrigger.ManualInterrupt, "Manual interrupt during speaking");
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(DeviceState.Listening, stateMachine.CurrentState);
+    }
+
+    [Fact]
+    public void VadInterrupt_FromSpeaking_ShouldGoToListening()
+    {
+        // Arrange
+        var stateMachine = new Verdure.Assistant.Core.Services.ConversationStateMachine(_logger);
+        // Set up speaking state
+        stateMachine.RequestTransition(ConversationTrigger.StartVoiceChat, "Start conversation");
+        stateMachine.RequestTransition(ConversationTrigger.TtsStarted, "Start speaking");
+        Assert.Equal(DeviceState.Speaking, stateMachine.CurrentState);
+
+        // Act - VAD interrupt during speaking should go to listening
+        var result = stateMachine.RequestTransition(ConversationTrigger.VadInterrupt, "VAD interrupt during speaking");
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(DeviceState.Listening, stateMachine.CurrentState);
+    }
+
+    [Fact]
+    public void ManualInterrupt_FromIdle_ShouldGoToConnecting()
+    {
+        // Arrange
+        var stateMachine = new Verdure.Assistant.Core.Services.ConversationStateMachine(_logger);
+        Assert.Equal(DeviceState.Idle, stateMachine.CurrentState);
+
+        // Act - Manual interrupt from idle should trigger keyword wake-up (Connecting)
+        var result = stateMachine.RequestTransition(ConversationTrigger.ManualInterrupt, "Manual interrupt from idle");
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(DeviceState.Connecting, stateMachine.CurrentState);
+    }
+
+    [Fact]
+    public void VadInterrupt_FromIdle_ShouldGoToConnecting()
+    {
+        // Arrange
+        var stateMachine = new Verdure.Assistant.Core.Services.ConversationStateMachine(_logger);
+        Assert.Equal(DeviceState.Idle, stateMachine.CurrentState);
+
+        // Act - VAD interrupt from idle should trigger keyword wake-up (Connecting)
+        var result = stateMachine.RequestTransition(ConversationTrigger.VadInterrupt, "VAD interrupt from idle");
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(DeviceState.Connecting, stateMachine.CurrentState);
+    }
+
+    [Fact]
+    public void InterruptTypeHelper_ShouldCategorizeCorrectly()
+    {
+        // Test manual interrupt types
+        Assert.True(InterruptTypeHelper.IsManualInterrupt(InterruptTypes.Api));
+        Assert.True(InterruptTypeHelper.IsManualInterrupt(InterruptTypes.Hotkey));
+        Assert.True(InterruptTypeHelper.IsManualInterrupt(InterruptTypes.Manual));
+        Assert.False(InterruptTypeHelper.IsManualInterrupt(InterruptTypes.VoiceActivity));
+
+        // Test VAD interrupt types
+        Assert.True(InterruptTypeHelper.IsVadInterrupt(InterruptTypes.VoiceActivity));
+        Assert.False(InterruptTypeHelper.IsVadInterrupt(InterruptTypes.Api));
+        Assert.False(InterruptTypeHelper.IsVadInterrupt(InterruptTypes.Hotkey));
+        Assert.False(InterruptTypeHelper.IsVadInterrupt(InterruptTypes.Manual));
+
+        // Test category mapping
+        Assert.Equal(InterruptCategories.Manual, InterruptTypeHelper.GetInterruptCategory(InterruptTypes.Api));
+        Assert.Equal(InterruptCategories.Manual, InterruptTypeHelper.GetInterruptCategory(InterruptTypes.Hotkey));
+        Assert.Equal(InterruptCategories.Manual, InterruptTypeHelper.GetInterruptCategory(InterruptTypes.Manual));
+        Assert.Equal(InterruptCategories.VoiceActivity, InterruptTypeHelper.GetInterruptCategory(InterruptTypes.VoiceActivity));
+    }
+
+    [Fact]
+    public void CompleteInterruptFlow_ManualType_ShouldFollowExpectedPath()
+    {
+        // Arrange
+        var stateMachine = new Verdure.Assistant.Core.Services.ConversationStateMachine(_logger);
+        var stateTransitions = new List<(DeviceState FromState, DeviceState ToState, ConversationTrigger Trigger)>();
+
+        stateMachine.StateChanged += (sender, args) =>
+        {
+            stateTransitions.Add((args.FromState, args.ToState, args.Trigger));
+        };
+
+        // Act - Simulate complete manual interrupt flow
+        // 1. Manual interrupt from idle (should go to keyword wake-up)
+        stateMachine.RequestTransition(ConversationTrigger.ManualInterrupt, "Manual interrupt trigger");
+        
+        // 2. Server connects
+        stateMachine.RequestTransition(ConversationTrigger.ServerConnected, "Connected to server");
+        
+        // 3. Start TTS response
+        stateMachine.RequestTransition(ConversationTrigger.TtsStarted, "AI response");
+        
+        // 4. Another manual interrupt during speaking (should go to listening)
+        stateMachine.RequestTransition(ConversationTrigger.ManualInterrupt, "Manual interrupt during speech");
+
+        // Assert
+        Assert.Equal(DeviceState.Listening, stateMachine.CurrentState);
+        Assert.Equal(4, stateTransitions.Count);
+
+        Assert.Equal((DeviceState.Idle, DeviceState.Connecting, ConversationTrigger.ManualInterrupt), stateTransitions[0]);
+        Assert.Equal((DeviceState.Connecting, DeviceState.Listening, ConversationTrigger.ServerConnected), stateTransitions[1]);
+        Assert.Equal((DeviceState.Listening, DeviceState.Speaking, ConversationTrigger.TtsStarted), stateTransitions[2]);
+        Assert.Equal((DeviceState.Speaking, DeviceState.Listening, ConversationTrigger.ManualInterrupt), stateTransitions[3]);
+    }
+    
+    // Note: EnhancedInterruptManager has been removed and integrated into VoiceChatService
+    // These tests are commented out as the functionality is now tested through VoiceChatService integration tests
+    
+    /*
+    [Fact]
+    public void EnhancedInterruptManager_VadActivation_ShouldOnlyBeActiveDuringMusicPlayback()
+    {
+        // Arrange
+        var manager = new EnhancedInterruptManager();
+        
+        // Initially VAD should not be active (no music playing)
+        Assert.False(manager.ShouldVadBeActive());
+        
+        // Simulate music start - we can't easily test the actual event without mock setup
+        // but we can verify the logic is in place
+        // For a complete integration test, we'd need to set up a mock music player service
+        
+        // This test validates that the ShouldVadBeActive method exists and returns a boolean
+        // The actual music state integration would be tested in integration tests
+        var shouldBeActive = manager.ShouldVadBeActive();
+        Assert.True(shouldBeActive is true or false); // Just verify it returns a boolean
+        
+        manager.Dispose();
+    }
+
+    [Fact]
+    public async Task EnhancedInterruptManager_CategorizedInterrupts_ShouldProvidePublicInterface()
+    {
+        // Arrange
+        var manager = new EnhancedInterruptManager();
+        
+        // Act & Assert - Test that categorized interrupt methods exist and can be called
+        // These methods should handle the interrupts according to the categorization rules
+        
+        // Manual interrupt should always be processed
+        await manager.TriggerCategorizedManualInterruptAsync("TestSource", "Test manual interrupt");
+        
+        // VAD interrupt should only be processed if music is playing (currently false)
+        await manager.TriggerCategorizedVadInterruptAsync("TestVADSource", "Test VAD interrupt");
+        
+        // Verify the manager doesn't throw exceptions when these methods are called
+        Assert.True(true); // If we get here without exceptions, the interface works
+        
+        manager.Dispose();
+    }
+    */
+}
