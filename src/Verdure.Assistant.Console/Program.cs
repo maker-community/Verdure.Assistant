@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Verdure.Assistant.Console.Audio;
-using Verdure.Assistant.Console.Services;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Services;
@@ -106,11 +105,11 @@ class Program
                 // Register services with dependency injection
                 services.AddSingleton<IVerificationService, VerificationService>();
                 services.AddSingleton<IConfigurationService, ConfigurationService>();
-                
+
                 // Music player service (required for MCP music device) - Register before VoiceChatService
-                services.AddSingleton<IMusicPlayerService, ApiMusicService>();
+                services.AddSingleton<IMusicPlayerService, KuwoMusicService>();
                 services.AddSingleton<IMusicAudioPlayer, SoundFlowMusicAudioPlayer>();
-                
+
                 services.AddSingleton<IVoiceChatService, VoiceChatService>();
 
                 // Interrupt architecture (now integrated into VoiceChatService)

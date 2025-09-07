@@ -1,14 +1,6 @@
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 
@@ -18,7 +10,7 @@ namespace Verdure.Assistant.Core.Services
     /// 酷我音乐播放服务实现 - 兼容py-xiaozhi的酷我API
     /// 基于py-xiaozhi的音乐播放器实现，提供音乐搜索、播放、缓存等功能
     /// </summary>
-    public class KugouMusicService : IMusicPlayerService, IDisposable
+    public class KuwoMusicService : IMusicPlayerService, IDisposable
     {
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -28,12 +20,12 @@ namespace Verdure.Assistant.Core.Services
             ReadCommentHandling = JsonCommentHandling.Skip,
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
-        private readonly ILogger<KugouMusicService> _logger;
+        private readonly ILogger<KuwoMusicService> _logger;
         private readonly HttpClient _httpClient;
         private readonly IMusicAudioPlayer _audioPlayer;
         private readonly Timer _progressTimer;
-        private readonly SemaphoreSlim _operationSemaphore;        
-        
+        private readonly SemaphoreSlim _operationSemaphore;
+
         // 播放状态
         private MusicTrack? _currentTrack;
         private List<LyricLine> _currentLyrics = new();
@@ -44,8 +36,8 @@ namespace Verdure.Assistant.Core.Services
         private readonly Dictionary<string, string> _urlCache = new();
 
         // 配置
-        private readonly KugouMusicConfig _config;        
-        
+        private readonly KugouMusicConfig _config;
+
         public event EventHandler<MusicPlaybackEventArgs>? PlaybackStateChanged;
         public event EventHandler<LyricUpdateEventArgs>? LyricUpdated;
         public event EventHandler<ProgressUpdateEventArgs>? ProgressUpdated;
@@ -56,11 +48,11 @@ namespace Verdure.Assistant.Core.Services
         public IReadOnlyList<LyricLine> CurrentLyrics => _currentLyrics.AsReadOnly();
         public double CurrentPosition => _audioPlayer.CurrentPosition.TotalSeconds;
         public TimeSpan TotalDuration => _audioPlayer.Duration;
-        public double Progress => TotalDuration.TotalSeconds > 0 ? 
+        public double Progress => TotalDuration.TotalSeconds > 0 ?
             CurrentPosition / TotalDuration.TotalSeconds * 100 : 0;
 
-        public KugouMusicService(
-            ILogger<KugouMusicService> logger,
+        public KuwoMusicService(
+            ILogger<KuwoMusicService> logger,
             IMusicAudioPlayer audioPlayer,
             string? cacheDirectory = null)
         {
@@ -87,7 +79,7 @@ namespace Verdure.Assistant.Core.Services
             try
             {
                 _logger.LogInformation("搜索并播放歌曲: {SongName}", songName);
-                
+
                 // 搜索歌曲
                 var searchResult = await SearchSongAsync(songName, cancellationToken);
                 if (!searchResult.Success || searchResult.Track == null)
@@ -150,7 +142,7 @@ namespace Verdure.Assistant.Core.Services
                 _logger.LogInformation("搜索URL: {SearchUrl}", searchUrl);
 
                 var response = await _httpClient.GetStringAsync(searchUrl, cancellationToken);
-                
+
                 _logger.LogDebug("搜索API响应内容: {Response}", response.Substring(0, Math.Min(200, response.Length)));
 
                 // 处理响应文本 - 酷我API可能返回不标准的JSON
@@ -167,7 +159,7 @@ namespace Verdure.Assistant.Core.Services
                 var artist = ExtractFieldFromResponse(responseText, "ARTIST") ?? "";
                 var album = ExtractFieldFromResponse(responseText, "ALBUM") ?? "";
                 var durationStr = ExtractFieldFromResponse(responseText, "DURATION") ?? "0";
-                
+
                 if (!int.TryParse(durationStr, out var duration))
                 {
                     duration = 0;
@@ -210,8 +202,8 @@ namespace Verdure.Assistant.Core.Services
             //await _operationSemaphore.WaitAsync(cancellationToken);
             try
             {
-                _logger.LogInformation("播放歌曲: {TrackName} - {Artist}", track.Name, track.Artist);                
-                
+                _logger.LogInformation("播放歌曲: {TrackName} - {Artist}", track.Name, track.Artist);
+
                 // 获取播放URL
                 var playUrl = await GetPlayUrlAsync(track.Id, cancellationToken);
 
@@ -223,10 +215,10 @@ namespace Verdure.Assistant.Core.Services
                 // 获取歌词
                 var lyrics = await GetLyricsAsync(track.Id, cancellationToken);
                 _currentLyrics = lyrics ?? new List<LyricLine>();
-                _currentLyricIndex = -1;                
-                  // 检查缓存
+                _currentLyricIndex = -1;
+                // 检查缓存
                 var cachedFile = await GetCachedFileAsync(track.Id, playUrl, cancellationToken);
-                
+
                 if (!string.IsNullOrEmpty(cachedFile))
                 {
                     await _audioPlayer.LoadAsync(cachedFile);
@@ -238,7 +230,7 @@ namespace Verdure.Assistant.Core.Services
 
                 await _audioPlayer.PlayAsync();
                 _currentTrack = track;
-                
+
                 OnPlaybackStateChanged("Playing", null);
                 return new PlaybackResult { Success = true };
             }
@@ -299,7 +291,7 @@ namespace Verdure.Assistant.Core.Services
                 return PlaybackResult.CreateError("stop", ex.Message);
             }
         }
-        
+
         public async Task<PlaybackResult> SeekAsync(double position, CancellationToken cancellationToken = default)
         {
             try
@@ -381,7 +373,7 @@ namespace Verdure.Assistant.Core.Services
         private void ConfigureHttpClient()
         {
             _httpClient.DefaultRequestHeaders.Clear();
-            
+
             // 添加所有必要的请求头
             foreach (var header in _config.Headers)
             {
@@ -394,7 +386,7 @@ namespace Verdure.Assistant.Core.Services
                     _httpClient.DefaultRequestHeaders.Add(header.Key, header.Value);
                 }
             }
-            
+
             _httpClient.Timeout = _config.Timeout;
         }
 
@@ -410,7 +402,7 @@ namespace Verdure.Assistant.Core.Services
             {
                 var playApiUrl = $"{_config.PlayUrl}?ID={songId}";
                 _logger.LogInformation("获取播放URL: {PlayApiUrl}", playApiUrl);
-                
+
                 var response = await _httpClient.GetStringAsync(playApiUrl, cancellationToken);
                 var playUrl = response.Trim();
 
@@ -439,9 +431,9 @@ namespace Verdure.Assistant.Core.Services
             {
                 var lyricsUrl = $"{_config.LyricUrl}?musicId={songId}";
                 _logger.LogInformation("获取歌词URL: {LyricsUrl}", lyricsUrl);
-                
+
                 var response = await _httpClient.GetStringAsync(lyricsUrl, cancellationToken);
-                
+
                 var jsonDoc = JsonDocument.Parse(response);
                 var root = jsonDoc.RootElement;
 
@@ -450,7 +442,7 @@ namespace Verdure.Assistant.Core.Services
                     dataElement.TryGetProperty("lrclist", out var lrcListElement))
                 {
                     var lyrics = new List<LyricLine>();
-                    
+
                     foreach (var lrcItem in lrcListElement.EnumerateArray())
                     {
                         if (lrcItem.TryGetProperty("time", out var timeElement) &&
@@ -458,10 +450,10 @@ namespace Verdure.Assistant.Core.Services
                         {
                             var timeSec = timeElement.GetString();
                             var text = textElement.GetString()?.Trim();
-                              // 跳过空歌词和元信息歌词
-                            if (!string.IsNullOrEmpty(text) && 
-                                !text.StartsWith("作词") && 
-                                !text.StartsWith("作曲") && 
+                            // 跳过空歌词和元信息歌词
+                            if (!string.IsNullOrEmpty(text) &&
+                                !text.StartsWith("作词") &&
+                                !text.StartsWith("作曲") &&
                                 !text.StartsWith("编曲"))
                             {
                                 lyrics.Add(new LyricLine
@@ -472,7 +464,7 @@ namespace Verdure.Assistant.Core.Services
                             }
                         }
                     }
-                    
+
                     _logger.LogInformation("成功获取歌词，共 {Count} 行", lyrics.Count);
                     return lyrics;
                 }
@@ -493,7 +485,7 @@ namespace Verdure.Assistant.Core.Services
             {
                 var cacheFileName = $"{songId}.mp3";
                 var filePath = Path.Combine(_cacheDirectory, cacheFileName);
-                
+
                 if (File.Exists(filePath))
                 {
                     _logger.LogInformation("使用缓存文件: {FilePath}", filePath);
@@ -536,8 +528,8 @@ namespace Verdure.Assistant.Core.Services
             };
 
             OnPlaybackStateChanged(state, e.ErrorMessage);
-        }        
-        
+        }
+
         private void OnAudioPlayerProgressUpdated(object? sender, MusicPlayerProgressEventArgs e)
         {
             var args = new ProgressUpdateEventArgs
@@ -548,7 +540,7 @@ namespace Verdure.Assistant.Core.Services
             };
             ProgressUpdated?.Invoke(this, args);
         }
-        
+
         private void OnPlaybackStateChanged(string state, string? errorMessage)
         {
             var args = new MusicPlaybackEventArgs
@@ -559,7 +551,7 @@ namespace Verdure.Assistant.Core.Services
                 Message = errorMessage ?? string.Empty
             };
             PlaybackStateChanged?.Invoke(this, args);
-        }        
+        }
 
         private void UpdateProgress(object? state)
         {
@@ -568,10 +560,10 @@ namespace Verdure.Assistant.Core.Services
             try
             {
                 var currentPos = CurrentPosition;
-                
+
                 // 更新歌词
                 UpdateCurrentLyric(currentPos);
-                
+
                 // 触发进度更新事件
                 var args = new ProgressUpdateEventArgs
                 {
@@ -585,8 +577,8 @@ namespace Verdure.Assistant.Core.Services
             {
                 _logger.LogError(ex, "更新播放进度失败");
             }
-        }        
-          private void UpdateCurrentLyric(double currentPosition)
+        }
+        private void UpdateCurrentLyric(double currentPosition)
         {
             if (_currentLyrics.Count == 0) return;
 
@@ -623,5 +615,5 @@ namespace Verdure.Assistant.Core.Services
             _httpClient?.Dispose();
             _operationSemaphore?.Dispose();
         }
-    }    
+    }
 }

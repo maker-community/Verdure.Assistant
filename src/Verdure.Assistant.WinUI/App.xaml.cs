@@ -108,7 +108,7 @@ public partial class App : Application
         services.AddSingleton<IVoiceChatService, VoiceChatService>();
         // Music player service
         services.AddSingleton<IMusicAudioPlayer, WinUIMusicAudioPlayer>();
-        services.AddSingleton<IMusicPlayerService, KugouMusicService>();
+        services.AddSingleton<IMusicPlayerService, KuwoMusicService>();
         // Register MCP services (new architecture based on xiaozhi-esp32)
         services.AddSingleton<McpServer>();
         services.AddSingleton<McpDeviceManager>();

@@ -229,7 +229,7 @@ public static class WebSocketProtocol
         {
             AbortReason.WakeWordDetected => "wake_word_detected",
             AbortReason.UserInterruption => "user_interruption",
-            _ => null
+            _ => "user_interruption"
         };
 
         var message = new AbortMessage

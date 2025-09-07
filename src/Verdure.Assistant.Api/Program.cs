@@ -111,8 +111,9 @@ builder.Services.AddLogging(builder =>
 builder.Services.AddSingleton<IVerificationService, VerificationService>();
 builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
 
-// Music player service (using mpg123) - Register before VoiceChatService
-builder.Services.AddSingleton<IMusicPlayerService, ApiMusicService>();
+// Music player service (using SoundFlow) - Register before VoiceChatService
+builder.Services.AddSingleton<IMusicAudioPlayer, SoundFlowMusicAudioPlayer>();
+builder.Services.AddSingleton<IMusicPlayerService, KuwoMusicService>();
 
 builder.Services.AddSingleton<IVoiceChatService, VoiceChatService>();
 

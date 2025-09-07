@@ -428,12 +428,6 @@ public class VoiceChatService : IVoiceChatService
             ? ConversationTrigger.VadInterrupt 
             : ConversationTrigger.ManualInterrupt;
 
-        // Stop music playback first for all relevant interrupts
-        if (CurrentState == DeviceState.Listening || CurrentState == DeviceState.Speaking)
-        {
-            await StopMusicPlayback($"Interrupt from {e.SourceName}: {e.Description}");
-        }
-
         // Use state machine to handle interrupt based on current state
         switch (CurrentState)
         {
@@ -481,11 +475,15 @@ public class VoiceChatService : IVoiceChatService
     {
         try
         {
+            if (_musicPlayerService != null)
+            {
+                await _musicPlayerService.StopAsync();
+            }           
             _logger?.LogInformation("Stopping music playback: {Reason}", reason);
             
             // Trigger music interruption through manual interrupt
-            await _interruptService.TriggerManualInterruptAsync($"Music interruption: {reason}", 
-                new { Type = "MusicInterruption", Reason = reason });
+            //await _interruptService.TriggerManualInterruptAsync($"Music interruption: {reason}", 
+            //    new { Type = "MusicInterruption", Reason = reason });
                 
             // Note: Actual music stopping should be handled by music service coordination
             // The music service should subscribe to interrupt events or be notified through other means
