@@ -112,8 +112,8 @@ builder.Services.AddSingleton<IVerificationService, VerificationService>();
 builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
 builder.Services.AddSingleton<IVoiceChatService, VoiceChatService>();
 
-// Add EnhancedInterruptManager for wake word detector coordination
-builder.Services.AddSingleton<Verdure.Assistant.Core.Services.Interrupt.EnhancedInterruptManager>();
+// Interrupt architecture (now integrated into VoiceChatService)
+// EnhancedInterruptManager has been removed - functionality integrated into VoiceChatService
 
 // Add Microsoft Cognitive Services keyword spotting service
 builder.Services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
@@ -250,17 +250,18 @@ try
                         Console.WriteLine("[语音聊天] 自动启动语音聊天功能...");
 
                         var voiceChatService = app.Services.GetService<IVoiceChatService>();
-                        var enhancedInterruptManager = app.Services.GetService<Verdure.Assistant.Core.Services.Interrupt.EnhancedInterruptManager>();
+                        var musicPlayerService = app.Services.GetService<IMusicPlayerService>();
                         var keywordSpottingService = app.Services.GetService<IKeywordSpottingService>();
                         var musicVoiceCoordinationService = app.Services.GetService<MusicVoiceCoordinationService>();
                         var emotionIntegrationService = app.Services.GetService<Verdure.Assistant.Api.Services.EmotionIntegrationService>();
 
-                        if (voiceChatService != null && enhancedInterruptManager != null && keywordSpottingService != null)
+                        if (voiceChatService != null && keywordSpottingService != null)
                         {
-                            // 设置语音聊天服务的各种组件（类似Console项目）
-                            voiceChatService.SetEnhancedInterruptManager(enhancedInterruptManager);
-
-                            await enhancedInterruptManager.InitializeAsync();
+                            // 设置音乐播放服务以监控音乐播放状态（用于VAD控制）
+                            if (musicPlayerService != null)
+                            {
+                                voiceChatService.SetMusicPlayerService(musicPlayerService);
+                            }
 
                             // 连接机器人情感集成服务
                             if (emotionIntegrationService != null)

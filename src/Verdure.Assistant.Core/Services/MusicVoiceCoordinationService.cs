@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Constants;
-using Verdure.Assistant.Core.Services.Interrupt;
 
 namespace Verdure.Assistant.Core.Services;
 
@@ -16,7 +15,6 @@ public class MusicVoiceCoordinationService : IDisposable
     private IMusicPlayerService? _musicPlayerService;
     private IVoiceChatService? _voiceChatService;
     private IKeywordSpottingService? _keywordSpottingService;
-    private EnhancedInterruptManager? _enhancedInterruptManager;
     
     private bool _isMusicPlaying = false;
     private bool _wasVoiceRecognitionEnabled = false;
@@ -28,12 +26,10 @@ public class MusicVoiceCoordinationService : IDisposable
     public MusicVoiceCoordinationService(
         IMusicPlayerService? musicPlayerService = null,
         IKeywordSpottingService? keywordSpottingService = null,
-        EnhancedInterruptManager? enhancedInterruptManager = null,
         ILogger<MusicVoiceCoordinationService>? logger = null)
     {
         _musicPlayerService = musicPlayerService;
         _keywordSpottingService = keywordSpottingService;
-        _enhancedInterruptManager = enhancedInterruptManager;
         _logger = logger;
 
         Initialize();
@@ -110,11 +106,18 @@ public class MusicVoiceCoordinationService : IDisposable
                 _logger?.LogDebug("关键词唤醒检测已暂停");
             }
             
-            // 暂停VAD检测
-            if (_enhancedInterruptManager != null)
+            // 使用VoiceChatService暂停VAD检测
+            if (_voiceChatService != null)
             {
-                await _enhancedInterruptManager.PauseVADAsync();
-                _logger?.LogDebug("VAD检测已暂停");
+                try
+                {
+                    await _voiceChatService.SetVADEnabledAsync(false);
+                    _logger?.LogDebug("VAD检测已暂停");
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "暂停VAD检测时出错");
+                }
             }
             
             // 如果当前正在监听用户输入，停止监听
@@ -155,11 +158,18 @@ public class MusicVoiceCoordinationService : IDisposable
             // 延迟一小段时间确保音频系统稳定
             await Task.Delay(200); // 等待音频系统稳定
             
-            // 恢复VAD检测
-            if (_enhancedInterruptManager != null)
+            // 使用VoiceChatService恢复VAD检测
+            if (_voiceChatService != null)
             {
-                await _enhancedInterruptManager.ResumeVADAsync();
-                _logger?.LogDebug("VAD检测已恢复");
+                try
+                {
+                    await _voiceChatService.SetVADEnabledAsync(true);
+                    _logger?.LogDebug("VAD检测已恢复");
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "恢复VAD检测时出错");
+                }
             }
             
             // 恢复关键词唤醒检测
@@ -203,15 +213,6 @@ public class MusicVoiceCoordinationService : IDisposable
     {
         _voiceChatService = voiceChatService;
         _logger?.LogInformation("语音聊天服务已设置");
-    }
-
-    /// <summary>
-    /// 手动设置增强中断管理器（用于打破循环依赖）
-    /// </summary>
-    public void SetEnhancedInterruptManager(EnhancedInterruptManager enhancedInterruptManager)
-    {
-        _enhancedInterruptManager = enhancedInterruptManager;
-        _logger?.LogInformation("增强中断管理器已设置");
     }
 
     /// <summary>

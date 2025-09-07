@@ -113,7 +113,8 @@ public partial class App : Application
         services.AddSingleton<McpServer>();
         services.AddSingleton<McpDeviceManager>();
         // Interrupt manager and related services (using enhanced architecture)
-        services.AddSingleton<EnhancedInterruptManager>();
+        // Interrupt architecture (now integrated into VoiceChatService)
+        // EnhancedInterruptManager has been removed - functionality integrated into VoiceChatService
 
         // Microsoft Cognitive Services keyword spotting service (matches py-xiaozhi wake word detector)
         services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
@@ -148,7 +149,7 @@ public partial class App : Application
             var mcpServer = GetService<McpServer>();
             var mcpDeviceManager = GetService<McpDeviceManager>();
             var voiceChatService = GetService<IVoiceChatService>();
-            var enhancedInterruptManager = GetService<EnhancedInterruptManager>();
+            var musicPlayerService = GetService<IMusicPlayerService>();
             var keywordSpottingService = GetService<IKeywordSpottingService>();
             var musicVoiceCoordinationService = GetService<MusicVoiceCoordinationService>();
 
@@ -164,22 +165,17 @@ public partial class App : Application
                 return;
             }
 
-            // Set up enhanced interrupt manager and keyword spotting service
-            if (enhancedInterruptManager != null)
+            // Set up music player service for VAD control
+            if (musicPlayerService != null)
             {
-                voiceChatService.SetEnhancedInterruptManager(enhancedInterruptManager);
-                await enhancedInterruptManager.InitializeAsync();
-                logger?.LogInformation("增强中断管理器已设置并初始化");
+                voiceChatService.SetMusicPlayerService(musicPlayerService);
+                logger?.LogInformation("音乐播放服务已设置用于VAD控制");
             }
 
             // Set up music voice coordination service (resolve circular dependency)
             if (musicVoiceCoordinationService != null)
             {
                 musicVoiceCoordinationService.SetVoiceChatService(voiceChatService);
-                if (enhancedInterruptManager != null)
-                {
-                    musicVoiceCoordinationService.SetEnhancedInterruptManager(enhancedInterruptManager);
-                }
                 logger?.LogInformation("音乐语音协调服务已设置语音聊天服务引用");
             }
 

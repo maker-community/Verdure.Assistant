@@ -92,43 +92,43 @@ public static class InterruptCategories
     public const string VoiceActivity = "vad_category";
 }
 
-/// <summary>
-/// 打断类型分类帮助器
-/// Interrupt type categorization helper
-/// </summary>
-public static class InterruptTypeHelper
-{
-    /// <summary>
-    /// 获取打断类型的类别
-    /// Get the category for an interrupt type
-    /// </summary>
-    public static string GetInterruptCategory(string interruptType)
-    {
-        return interruptType switch
-        {
-            InterruptTypes.Hotkey => InterruptCategories.Manual,
-            InterruptTypes.Api => InterruptCategories.Manual,
-            InterruptTypes.Manual => InterruptCategories.Manual,
-            InterruptTypes.VoiceActivity => InterruptCategories.VoiceActivity,
-            _ => InterruptCategories.Manual // Default to manual for other types
-        };
-    }
+///// <summary>
+///// 打断类型分类帮助器
+///// Interrupt type categorization helper
+///// </summary>
+//public static class InterruptTypeHelper
+//{
+//    /// <summary>
+//    /// 获取打断类型的类别
+//    /// Get the category for an interrupt type
+//    /// </summary>
+//    public static string GetInterruptCategory(string interruptType)
+//    {
+//        return interruptType switch
+//        {
+//            InterruptTypes.Hotkey => InterruptCategories.Manual,
+//            InterruptTypes.Api => InterruptCategories.Manual,
+//            InterruptTypes.Manual => InterruptCategories.Manual,
+//            InterruptTypes.VoiceActivity => InterruptCategories.VoiceActivity,
+//            _ => InterruptCategories.Manual // Default to manual for other types
+//        };
+//    }
     
-    /// <summary>
-    /// 检查是否为手动打断类型
-    /// Check if interrupt type is manual category
-    /// </summary>
-    public static bool IsManualInterrupt(string interruptType)
-    {
-        return GetInterruptCategory(interruptType) == InterruptCategories.Manual;
-    }
+//    /// <summary>
+//    /// 检查是否为手动打断类型
+//    /// Check if interrupt type is manual category
+//    /// </summary>
+//    public static bool IsManualInterrupt(string interruptType)
+//    {
+//        return GetInterruptCategory(interruptType) == InterruptCategories.Manual;
+//    }
     
-    /// <summary>
-    /// 检查是否为VAD打断类型
-    /// Check if interrupt type is VAD category
-    /// </summary>
-    public static bool IsVadInterrupt(string interruptType)
-    {
-        return GetInterruptCategory(interruptType) == InterruptCategories.VoiceActivity;
-    }
-}
+//    /// <summary>
+//    /// 检查是否为VAD打断类型
+//    /// Check if interrupt type is VAD category
+//    /// </summary>
+//    public static bool IsVadInterrupt(string interruptType)
+//    {
+//        return GetInterruptCategory(interruptType) == InterruptCategories.VoiceActivity;
+//    }
+//}
