@@ -119,9 +119,6 @@ public partial class App : Application
         // Microsoft Cognitive Services keyword spotting service (matches py-xiaozhi wake word detector)
         services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
 
-        // Add Music-Voice Coordination Service for automatic pause/resume synchronization
-        services.AddSingleton<MusicVoiceCoordinationService>();
-
         // Emotion Manager
         services.AddSingleton<IEmotionManager, EmotionManager>();
 
@@ -151,7 +148,6 @@ public partial class App : Application
             var voiceChatService = GetService<IVoiceChatService>();
             var musicPlayerService = GetService<IMusicPlayerService>();
             var keywordSpottingService = GetService<IKeywordSpottingService>();
-            var musicVoiceCoordinationService = GetService<MusicVoiceCoordinationService>();
 
             if (mcpServer == null || mcpDeviceManager == null)
             {
@@ -170,13 +166,6 @@ public partial class App : Application
             {
                 voiceChatService.SetMusicPlayerService(musicPlayerService);
                 logger?.LogInformation("音乐播放服务已设置用于VAD控制");
-            }
-
-            // Set up music voice coordination service (resolve circular dependency)
-            if (musicVoiceCoordinationService != null)
-            {
-                musicVoiceCoordinationService.SetVoiceChatService(voiceChatService);
-                logger?.LogInformation("音乐语音协调服务已设置语音聊天服务引用");
             }
 
             // Initialize MCP server and device manager

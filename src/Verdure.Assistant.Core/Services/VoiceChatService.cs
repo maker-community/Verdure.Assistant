@@ -55,9 +55,6 @@ public class VoiceChatService : IVoiceChatService
 
     private readonly McpServer _mcpServer;
 
-    // Music voice coordination service
-    private MusicVoiceCoordinationService? _musicVoiceCoordinationService;
-
 
     public event EventHandler<bool>? VoiceChatStateChanged;
     public event EventHandler<ChatMessage>? MessageReceived;
@@ -111,7 +108,6 @@ public class VoiceChatService : IVoiceChatService
         ISharedAudioRecorder audioStreamManager,
         IAudioPlayer audioPlayer,
         McpServer mcpServer,
-        MusicVoiceCoordinationService musicVoiceCoordinationService,
         ILogger<VoiceChatService>? logger = null)
     {
         _configurationService = configurationService;
@@ -143,11 +139,7 @@ public class VoiceChatService : IVoiceChatService
 
         _logger?.LogInformation("关键词唤醒服务已设置");
 
-        _musicVoiceCoordinationService = musicVoiceCoordinationService;
         _mcpServer = mcpServer;
-        
-        // 设置循环引用（打破循环依赖）
-        _musicVoiceCoordinationService?.SetVoiceChatService(this);
         
         // Initialize direct interrupt service management (replaces EnhancedInterruptManager)
         _interruptService = new Interrupt.InterruptService(
@@ -1618,21 +1610,7 @@ public class VoiceChatService : IVoiceChatService
                 }
             }
 
-            // 8. 释放音乐语音协调服务
-            if (_musicVoiceCoordinationService != null)
-            {
-                try
-                {
-                    _musicVoiceCoordinationService.Dispose();
-                    _musicVoiceCoordinationService = null;
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogWarning(ex, "释放音乐语音协调服务时出错");
-                }
-            }
-
-            // 9. 释放中断服务和中断源（替换增强的打断管理器）
+            // 8. 释放中断服务和中断源（替换增强的打断管理器）
             if (_interruptService != null)
             {
                 try

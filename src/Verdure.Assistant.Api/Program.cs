@@ -118,9 +118,6 @@ builder.Services.AddSingleton<IVoiceChatService, VoiceChatService>();
 // Add Microsoft Cognitive Services keyword spotting service
 builder.Services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
 
-// Add Music-Voice Coordination Service for automatic pause/resume synchronization
-builder.Services.AddSingleton<MusicVoiceCoordinationService>();
-
 builder.Services.AddSingleton<IAudioPlayer, SoundFlowAudioPlayer>();
 
 // Register SoundFlow audio components as singleton using factory pattern
@@ -252,7 +249,6 @@ try
                         var voiceChatService = app.Services.GetService<IVoiceChatService>();
                         var musicPlayerService = app.Services.GetService<IMusicPlayerService>();
                         var keywordSpottingService = app.Services.GetService<IKeywordSpottingService>();
-                        var musicVoiceCoordinationService = app.Services.GetService<MusicVoiceCoordinationService>();
                         var emotionIntegrationService = app.Services.GetService<Verdure.Assistant.Api.Services.EmotionIntegrationService>();
 
                         if (voiceChatService != null && keywordSpottingService != null)

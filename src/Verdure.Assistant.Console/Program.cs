@@ -47,10 +47,6 @@ class Program
             _voiceChatService.SetMusicPlayerService(musicPlayerService);
             System.Console.WriteLine("音乐播放服务已设置用于VAD控制");
 
-            // Set up music voice coordination service (resolve circular dependency)
-            var musicVoiceCoordinationService = host.Services.GetRequiredService<MusicVoiceCoordinationService>();
-            musicVoiceCoordinationService.SetVoiceChatService(_voiceChatService);
-
             // Initialize MCP IoT devices (new architecture based on xiaozhi-esp32)
             await InitializeMcpDevicesAsync(host.Services);
 
@@ -116,9 +112,6 @@ class Program
                 // EnhancedInterruptManager has been removed - functionality integrated into VoiceChatService
                 // Add Microsoft Cognitive Services keyword spotting service
                 services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
-
-                // Add Music-Voice Coordination Service for automatic pause/resume synchronization
-                services.AddSingleton<MusicVoiceCoordinationService>();
 
                 // Register SoundFlow audio components as singleton using factory pattern
                 services.AddSingleton<SoundFlowAudioRecorder>(provider =>
