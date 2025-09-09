@@ -116,9 +116,6 @@ public partial class App : Application
         // New Emotion Playback System
         services.AddWinUIEmotionServices();
 
-        // Legacy Emotion Manager (for backward compatibility)
-        services.AddSingleton<IEmotionManager, EmotionManager>();
-
         // ViewModels
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<HomePageViewModel>();

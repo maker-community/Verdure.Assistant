@@ -17,9 +17,7 @@ namespace Verdure.Assistant.ViewModels;
 public partial class HomePageViewModel : ViewModelBase
 {
     private readonly IVoiceChatService? _voiceChatService;
-    private readonly IEmotionManager? _emotionManager;
     private readonly IEmotionPlaybackCoordinator? _emotionPlaybackCoordinator;
-    private readonly IKeywordSpottingService? _keywordSpottingService;
     private readonly IVerificationService? _verificationService;
     private readonly IMusicPlayerService? _musicPlayerService;
     private readonly IConfigurationService? _configurationService;
@@ -139,18 +137,14 @@ public partial class HomePageViewModel : ViewModelBase
     #endregion
     public HomePageViewModel(ILogger<HomePageViewModel> logger,
       IVoiceChatService? voiceChatService = null,
-      IEmotionManager? emotionManager = null,
       IEmotionPlaybackCoordinator? emotionPlaybackCoordinator = null,
-      IKeywordSpottingService? keywordSpottingService = null,
       IVerificationService? verificationService = null,
       IMusicPlayerService? musicPlayerService = null,
       IConfigurationService? configurationService = null,
       IUIDispatcher? uiDispatcher = null) : base(logger)
     {
         _voiceChatService = voiceChatService;
-        _emotionManager = emotionManager;
         _emotionPlaybackCoordinator = emotionPlaybackCoordinator;
-        _keywordSpottingService = keywordSpottingService;
         _verificationService = verificationService;
         _musicPlayerService = musicPlayerService;
         _configurationService = configurationService;
@@ -188,7 +182,7 @@ public partial class HomePageViewModel : ViewModelBase
         ModeToggleText = "手动";
         ManualButtonText = "按住说话";
         AutoButtonText = "开始对话";
-        SetEmotion("neutral");
+        //SetEmotion("neutral");
 
         // 确保按钮状态正确初始化
         OnPropertyChanged(nameof(IsConnectButtonEnabled));
@@ -199,20 +193,6 @@ public partial class HomePageViewModel : ViewModelBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-
-        // 初始化EmotionManager
-        if (_emotionManager != null)
-        {
-            try
-            {
-                await _emotionManager.InitializeAsync();
-                _logger?.LogInformation("EmotionManager initialized successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to initialize EmotionManager");
-            }
-        }
 
         // 绑定服务事件
         await BindEventsAsync();
@@ -1553,10 +1533,21 @@ public partial class HomePageViewModel : ViewModelBase
     {
         try
         {
-            if (_emotionManager != null)
+            // 使用新的播放协调器设置情感（如果可用）
+            if (_emotionPlaybackCoordinator != null)
             {
-                var emoji = _emotionManager.GetEmotionEmoji(emotionName);
-                DefaultEmotionText = emoji;
+                // 异步调用，但不等待以避免阻塞UI
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _emotionPlaybackCoordinator.PlayEmotionAsync(emotionName);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Failed to play emotion asynchronously: {EmotionName}", emotionName);
+                    }
+                });
             }
         }
         catch (Exception ex)
@@ -1566,62 +1557,26 @@ public partial class HomePageViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 更新表情显示，优先使用新的播放协调器
+    /// 更新表情显示，使用新的播放协调器
     /// </summary>
     public async Task UpdateEmotionDisplayAsync(string emotionName)
     {
         try
         {
-            // 优先使用新的播放协调器
+            // 使用新的播放协调器
             if (_emotionPlaybackCoordinator != null)
             {
                 await _emotionPlaybackCoordinator.PlayEmotionAsync(emotionName);
-                _logger?.LogDebug($"Updated emotion using new coordinator: {emotionName}");
-                return;
+                _logger?.LogDebug($"Updated emotion using coordinator: {emotionName}");
             }
-
-            // 回退到旧的EmotionManager
-            if (_emotionManager != null)
+            else
             {
-                // 首先尝试获取GIF动画路径
-                var gifPath = await _emotionManager.GetEmotionImageAsync(emotionName);
-
-                if (!string.IsNullOrEmpty(gifPath))
-                {
-                    // 有GIF动画可用，通知View切换到动画显示
-                    EmotionGifPathChanged?.Invoke(this, new EmotionGifPathEventArgs
-                    {
-                        GifPath = gifPath,
-                        EmotionName = emotionName
-                    });
-
-                    _logger?.LogDebug($"Updated emotion to GIF: {emotionName} -> {gifPath}");
-                }
-                else
-                {
-                    // 没有GIF动画，使用表情符号作为后备
-                    var emoji = _emotionManager.GetEmotionEmoji(emotionName);
-                    CurrentEmotion = emoji;
-                    DefaultEmotionText = emoji;
-
-                    // 通知View切换回文本显示
-                    EmotionGifPathChanged?.Invoke(this, new EmotionGifPathEventArgs
-                    {
-                        GifPath = null,
-                        EmotionName = emotionName
-                    });
-
-                    _logger?.LogDebug($"Updated emotion to emoji: {emotionName} -> {emoji}");
-                }
+                _logger?.LogWarning("No emotion playback coordinator available");
             }
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to update emotion display: {EmotionName}", emotionName);
-
-            // 出错时回退到简单表情符号
-            CurrentEmotion = ConvertEmotionToEmoji(emotionName);
-            DefaultEmotionText = CurrentEmotion;
         }
     }
 
