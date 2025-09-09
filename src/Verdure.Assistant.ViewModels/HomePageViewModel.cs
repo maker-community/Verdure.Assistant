@@ -18,6 +18,7 @@ public partial class HomePageViewModel : ViewModelBase
 {
     private readonly IVoiceChatService? _voiceChatService;
     private readonly IEmotionManager? _emotionManager;
+    private readonly IEmotionPlaybackCoordinator? _emotionPlaybackCoordinator;
     private readonly IKeywordSpottingService? _keywordSpottingService;
     private readonly IVerificationService? _verificationService;
     private readonly IMusicPlayerService? _musicPlayerService;
@@ -139,6 +140,7 @@ public partial class HomePageViewModel : ViewModelBase
     public HomePageViewModel(ILogger<HomePageViewModel> logger,
       IVoiceChatService? voiceChatService = null,
       IEmotionManager? emotionManager = null,
+      IEmotionPlaybackCoordinator? emotionPlaybackCoordinator = null,
       IKeywordSpottingService? keywordSpottingService = null,
       IVerificationService? verificationService = null,
       IMusicPlayerService? musicPlayerService = null,
@@ -147,6 +149,7 @@ public partial class HomePageViewModel : ViewModelBase
     {
         _voiceChatService = voiceChatService;
         _emotionManager = emotionManager;
+        _emotionPlaybackCoordinator = emotionPlaybackCoordinator;
         _keywordSpottingService = keywordSpottingService;
         _verificationService = verificationService;
         _musicPlayerService = musicPlayerService;
@@ -1563,12 +1566,21 @@ public partial class HomePageViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 更新表情显示，优先使用GIF动画，类似py-xiaozhi的表情切换
+    /// 更新表情显示，优先使用新的播放协调器
     /// </summary>
-    private async Task UpdateEmotionDisplayAsync(string emotionName)
+    public async Task UpdateEmotionDisplayAsync(string emotionName)
     {
         try
         {
+            // 优先使用新的播放协调器
+            if (_emotionPlaybackCoordinator != null)
+            {
+                await _emotionPlaybackCoordinator.PlayEmotionAsync(emotionName);
+                _logger?.LogDebug($"Updated emotion using new coordinator: {emotionName}");
+                return;
+            }
+
+            // 回退到旧的EmotionManager
             if (_emotionManager != null)
             {
                 // 首先尝试获取GIF动画路径
