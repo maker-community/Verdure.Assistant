@@ -580,11 +580,32 @@
                                 Padding="12"
                                 Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
                                 CornerRadius="8">
-                                <TextBlock
-                                    HorizontalAlignment="Center"
-                                    FontSize="48"
-                                    Text="{x:Bind ViewModel.CurrentEmotion, Mode=OneWay}" />
+                                <Grid>
+                                    <!-- GIF显示控件 -->
+                                    <Image
+                                        x:Name="EmotionImage"
+                                        Width="48"
+                                        Height="48"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Visibility="Collapsed" />
+                                    
+                                    <!-- 文本表情显示控件 -->
+                                    <TextBlock
+                                        x:Name="DefaultEmotionText"
+                                        HorizontalAlignment="Center"
+                                        FontSize="48"
+                                        Text="{x:Bind ViewModel.CurrentEmotion, Mode=OneWay}" />
+                                </Grid>
                             </Border>
+
+                            <!-- 表情测试按钮 -->
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8" Margin="0,8,0,0">
+                                <Button x:Name="TestHappyButton" Content="😊" Width="40" Height="40" Click="TestHappyButton_Click" />
+                                <Button x:Name="TestSadButton" Content="😢" Width="40" Height="40" Click="TestSadButton_Click" />
+                                <Button x:Name="TestAngryButton" Content="😠" Width="40" Height="40" Click="TestAngryButton_Click" />
+                                <Button x:Name="TestNeutralButton" Content="😐" Width="40" Height="40" Click="TestNeutralButton_Click" />
+                            </StackPanel>
 
                             <!--  TTS Text Display  -->
                             <Border

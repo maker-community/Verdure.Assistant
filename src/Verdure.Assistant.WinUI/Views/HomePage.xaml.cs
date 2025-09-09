@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Services;
 using Verdure.Assistant.ViewModels;
+using Verdure.Assistant.WinUI.Services;
 
 namespace Verdure.Assistant.WinUI.Views;
 
@@ -43,6 +44,9 @@ public sealed partial class HomePage : Page
         // 绑定ViewModel事件
         BindViewModelEvents();
 
+        // 订阅新的渲染器事件
+        BindRendererEvents();
+
         // 初始化ViewModel
         _ = _viewModel.InitializeAsync();
 
@@ -54,6 +58,17 @@ public sealed partial class HomePage : Page
     {
         // 初始化连接指示器状态
         UpdateConnectionIndicator();
+    }
+    
+    private void BindRendererEvents()
+    {
+        // 订阅GIF渲染器事件
+        WinUIGifEmotionRenderer.GifRenderRequested += OnGifRenderRequested;
+        WinUIGifEmotionRenderer.GifRenderStopped += OnGifRenderStopped;
+        
+        // 订阅Emoji渲染器事件
+        WinUIEmojiEmotionRenderer.EmojiRenderRequested += OnEmojiRenderRequested;
+        WinUIEmojiEmotionRenderer.EmojiRenderStopped += OnEmojiRenderStopped;
     }    private void BindViewModelEvents()
     {
         _viewModel.InterruptTriggered += OnInterruptTriggered;
@@ -436,6 +451,191 @@ public sealed partial class HomePage : Page
             _logger?.LogError(ex, "Error in UpdateEmotionDisplayAsync");
         }
     }
+
+    #region 新的渲染器事件处理
+
+    private void OnGifRenderRequested(object? sender, GifRenderEventArgs e)
+    {
+        this.DispatcherQueue.TryEnqueue(() =>
+        {
+            try
+            {
+                _logger?.LogDebug($"Displaying GIF emotion: {e.EmotionType} -> {e.AssetPath}");
+                
+                // 这里需要根据实际的XAML控件来更新UI
+                // 假设有一个名为EmotionImage的Image控件
+                if (EmotionImage != null)
+                {
+                    EmotionImage.Source = e.GifSource;
+                    EmotionImage.Visibility = Visibility.Visible;
+                }
+                
+                // 隐藏文本表情
+                if (DefaultEmotionText != null)
+                {
+                    DefaultEmotionText.Visibility = Visibility.Collapsed;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to display GIF emotion: {EmotionType}", e.EmotionType);
+            }
+        });
+    }
+
+    private void OnGifRenderStopped(object? sender, EventArgs e)
+    {
+        this.DispatcherQueue.TryEnqueue(() =>
+        {
+            try
+            {
+                _logger?.LogDebug("Stopping GIF emotion display");
+                
+                // 隐藏GIF显示
+                if (EmotionImage != null)
+                {
+                    EmotionImage.Visibility = Visibility.Collapsed;
+                    EmotionImage.Source = null;
+                }
+                
+                // 显示默认文本表情
+                if (DefaultEmotionText != null)
+                {
+                    DefaultEmotionText.Visibility = Visibility.Visible;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to stop GIF emotion display");
+            }
+        });
+    }
+
+    private void OnEmojiRenderRequested(object? sender, EmojiRenderEventArgs e)
+    {
+        this.DispatcherQueue.TryEnqueue(() =>
+        {
+            try
+            {
+                _logger?.LogDebug($"Displaying Emoji emotion: {e.EmotionType} -> {e.EmojiText}");
+                
+                // 隐藏GIF显示
+                if (EmotionImage != null)
+                {
+                    EmotionImage.Visibility = Visibility.Collapsed;
+                    EmotionImage.Source = null;
+                }
+                
+                // 显示表情符号
+                if (DefaultEmotionText != null)
+                {
+                    DefaultEmotionText.Text = e.EmojiText;
+                    DefaultEmotionText.Visibility = Visibility.Visible;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to display Emoji emotion: {EmotionType}", e.EmotionType);
+            }
+        });
+    }
+
+    private void OnEmojiRenderStopped(object? sender, EventArgs e)
+    {
+        this.DispatcherQueue.TryEnqueue(() =>
+        {
+            try
+            {
+                _logger?.LogDebug("Stopping Emoji emotion display");
+                
+                // 恢复默认表情
+                if (DefaultEmotionText != null)
+                {
+                    DefaultEmotionText.Text = "😊";
+                    DefaultEmotionText.Visibility = Visibility.Visible;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to stop Emoji emotion display");
+            }
+        });
+    }
+
+    #endregion
+
+    #region 表情测试按钮事件处理
+
+    private async void TestHappyButton_Click(object sender, RoutedEventArgs e)
+    {
+        await TestEmotionAsync("happy");
+        await ViewModel.UpdateEmotionDisplayAsync("happy");
+    }
+
+    private async void TestSadButton_Click(object sender, RoutedEventArgs e)
+    {
+        await TestEmotionAsync("sad");
+        await ViewModel.UpdateEmotionDisplayAsync("sad");
+    }
+
+    private async void TestAngryButton_Click(object sender, RoutedEventArgs e)
+    {
+        await TestEmotionAsync("angry");
+        await ViewModel.UpdateEmotionDisplayAsync("angry");
+    }
+
+    private async void TestNeutralButton_Click(object sender, RoutedEventArgs e)
+    {
+        await TestEmotionAsync("neutral");
+        await ViewModel.UpdateEmotionDisplayAsync("neutral");
+    }
+
+    private async Task TestEmotionAsync(string emotionType)
+    {
+        try
+        {
+            _logger?.LogInformation($"测试播放表情: {emotionType}");
+            
+            // 简单的表情映射
+            string emoji = emotionType switch
+            {
+                "happy" => "😊",
+                "sad" => "😢", 
+                "angry" => "😠",
+                "neutral" => "😐",
+                _ => "🤔"
+            };
+            
+            // 在UI线程上更新表情
+            this.DispatcherQueue.TryEnqueue(() =>
+            {
+                try
+                {
+                    // 更新ViewModel的CurrentEmotion属性
+                    _viewModel.CurrentEmotion = emoji;
+                    _logger?.LogInformation($"成功显示表情: {emotionType} -> {emoji}");
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "更新表情显示失败");
+                }
+            });
+            
+            // 模拟表情持续2秒，然后恢复默认
+            //await Task.Delay(2000);
+            
+            this.DispatcherQueue.TryEnqueue(() =>
+            {
+                _viewModel.CurrentEmotion = "😊";
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, $"播放表情失败: {emotionType}");
+        }
+    }
+
+    #endregion
 
     #endregion
 }

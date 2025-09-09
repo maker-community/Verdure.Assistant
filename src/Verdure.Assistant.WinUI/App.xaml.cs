@@ -8,6 +8,7 @@ using Verdure.Assistant.Core.Services.MCP;
 using Verdure.Assistant.Core.Services.Interrupt;
 using Verdure.Assistant.ViewModels;
 using Verdure.Assistant.WinUI.Services;
+using Verdure.Assistant.WinUI.Views;
 using Windows.Storage;
 
 namespace Verdure.Assistant.WinUI;
@@ -84,13 +85,6 @@ public partial class App : Application
         services.AddSingleton<IAudioPlayer, SoundFlowAudioPlayer>();
         services.AddSingleton<IAudioCodec, OpusSharpAudioCodec>();
 
-        // Communication services
-        services.AddSingleton<ICommunicationClient, MqttNetClient>(provider =>
-        {
-            var logger = provider.GetService<ILogger<MqttNetClient>>();
-            return new MqttNetClient("localhost", 1883, "winui-client", "verdure/chat", logger);
-        });
-
         // UI Dispatcher for thread-safe UI operations
         services.AddSingleton<IUIDispatcher>(provider =>
         {
@@ -118,8 +112,8 @@ public partial class App : Application
         // Microsoft Cognitive Services keyword spotting service (matches py-xiaozhi wake word detector)
         services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
 
-        // Emotion Manager
-        services.AddSingleton<IEmotionManager, EmotionManager>();
+        // New Emotion Playback System
+        services.AddWinUIEmotionServices();
 
         // ViewModels
         services.AddTransient<MainWindowViewModel>();
