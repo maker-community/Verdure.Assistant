@@ -72,7 +72,6 @@ public partial class App : Application
         services.AddSingleton<ThemeService>();
 
         // Core services
-        services.AddSingleton<IVerificationService, VerificationService>();
         services.AddSingleton<IConfigurationService, ConfigurationService>();
         // Audio services - Register AudioStreamManager as singleton using factory pattern
         services.AddSingleton<SoundFlowAudioRecorder>(provider =>

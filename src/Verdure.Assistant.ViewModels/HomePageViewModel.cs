@@ -19,7 +19,6 @@ public partial class HomePageViewModel : ViewModelBase
     private readonly IVoiceChatService? _voiceChatService;
     private readonly IEmotionManager? _emotionManager;
     private readonly IKeywordSpottingService? _keywordSpottingService;
-    private readonly IVerificationService? _verificationService;
     private readonly IMusicPlayerService? _musicPlayerService;
     private readonly IConfigurationService? _configurationService;
 
@@ -140,7 +139,6 @@ public partial class HomePageViewModel : ViewModelBase
       IVoiceChatService? voiceChatService = null,
       IEmotionManager? emotionManager = null,
       IKeywordSpottingService? keywordSpottingService = null,
-      IVerificationService? verificationService = null,
       IMusicPlayerService? musicPlayerService = null,
       IConfigurationService? configurationService = null,
       IUIDispatcher? uiDispatcher = null) : base(logger)
@@ -148,7 +146,6 @@ public partial class HomePageViewModel : ViewModelBase
         _voiceChatService = voiceChatService;
         _emotionManager = emotionManager;
         _keywordSpottingService = keywordSpottingService;
-        _verificationService = verificationService;
         _musicPlayerService = musicPlayerService;
         _configurationService = configurationService;
 
@@ -1166,15 +1163,15 @@ public partial class HomePageViewModel : ViewModelBase
     [RelayCommand]
     private async Task CopyVerificationCodeAsync()
     {
-        if (_verificationService == null || string.IsNullOrEmpty(VerificationCode))
+        if (_configurationService == null || string.IsNullOrEmpty(VerificationCode))
         {
-            _logger?.LogWarning("验证码服务未设置或验证码为空");
+            _logger?.LogWarning("配置服务未设置或验证码为空");
             return;
         }
 
         try
         {
-            await _verificationService.CopyToClipboardAsync(VerificationCode);
+            await _configurationService.CopyToClipboardAsync(VerificationCode);
             AddMessage($"✅ 验证码 {VerificationCode} 已复制到剪贴板");
             _logger?.LogInformation("验证码已复制到剪贴板: {Code}", VerificationCode);
         }
@@ -1188,15 +1185,15 @@ public partial class HomePageViewModel : ViewModelBase
     [RelayCommand]
     private async Task OpenLoginPageAsync()
     {
-        if (_verificationService == null)
+        if (_configurationService == null)
         {
-            _logger?.LogWarning("验证码服务未设置");
+            _logger?.LogWarning("配置服务未设置");
             return;
         }
 
         try
         {
-            await _verificationService.OpenBrowserAsync("https://xiaozhi.me/login");
+            await _configurationService.OpenBrowserAsync("https://xiaozhi.me/login");
             AddMessage("🌐 已打开登录页面");
             _logger?.LogInformation("已打开登录页面");
         }
@@ -1646,9 +1643,9 @@ public partial class HomePageViewModel : ViewModelBase
     /// </summary>
     private async Task HandleVerificationCodeFromConfigurationAsync(string verificationCode)
     {
-        if (_verificationService == null)
+        if (_configurationService == null)
         {
-            _logger?.LogWarning("验证码服务未设置，无法处理验证码");
+            _logger?.LogWarning("配置服务未设置，无法处理验证码");
             return;
         }
 
@@ -1662,7 +1659,7 @@ public partial class HomePageViewModel : ViewModelBase
             // 自动复制到剪贴板
             try
             {
-                await _verificationService.CopyToClipboardAsync(verificationCode);
+                await _configurationService.CopyToClipboardAsync(verificationCode);
                 AddMessage($"🔑 验证码 {verificationCode} 已通过配置服务自动获取并复制到剪贴板");
                 _logger?.LogInformation("验证码已通过配置服务获取并复制到剪贴板: {Code}", verificationCode);
             }
@@ -1675,7 +1672,7 @@ public partial class HomePageViewModel : ViewModelBase
             // 尝试打开浏览器（可选）
             try
             {
-                await _verificationService.OpenBrowserAsync("https://xiaozhi.me/login");
+                await _configurationService.OpenBrowserAsync("https://xiaozhi.me/login");
                 AddMessage("🌐 已自动打开登录页面");
                 _logger?.LogInformation("已自动打开登录页面");
             }
@@ -1697,16 +1694,16 @@ public partial class HomePageViewModel : ViewModelBase
     /// </summary>
     private async Task HandleVerificationCodeAsync(string text)
     {
-        if (_verificationService == null)
+        if (_configurationService == null)
         {
-            _logger?.LogWarning("验证码服务未设置，无法处理验证码");
+            _logger?.LogWarning("配置服务未设置，无法处理验证码");
             return;
         }
 
         try
         {
-            // 使用验证码服务提取验证码
-            var code = await _verificationService.ExtractVerificationCodeAsync(text);
+            // 使用配置服务提取验证码
+            var code = await _configurationService.ExtractVerificationCodeAsync(text);
             if (!string.IsNullOrEmpty(code))
             {
                 // 设置验证码相关属性
@@ -1717,7 +1714,7 @@ public partial class HomePageViewModel : ViewModelBase
                 // 自动复制到剪贴板
                 try
                 {
-                    await _verificationService.CopyToClipboardAsync(code);
+                    await _configurationService.CopyToClipboardAsync(code);
                     AddMessage($"🔑 验证码 {code} 已提取并复制到剪贴板");
                     _logger?.LogInformation("验证码已提取并复制到剪贴板: {Code}", code);
                 }
@@ -1730,7 +1727,7 @@ public partial class HomePageViewModel : ViewModelBase
                 // 尝试打开浏览器（可选）
                 try
                 {
-                    await _verificationService.OpenBrowserAsync("https://xiaozhi.me/login");
+                    await _configurationService.OpenBrowserAsync("https://xiaozhi.me/login");
                     AddMessage("🌐 已自动打开登录页面");
                     _logger?.LogInformation("已自动打开登录页面");
                 }
