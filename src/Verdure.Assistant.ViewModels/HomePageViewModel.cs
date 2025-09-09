@@ -203,18 +203,18 @@ public partial class HomePageViewModel : ViewModelBase
             _configurationService.VerificationCodeReceived += OnConfigurationVerificationCodeReceived;
             _logger?.LogInformation("配置服务验证码事件已绑定");
         }
-        // 绑定语音服务事件 - 优化后直接订阅状态机事件
+        
+        // 绑定语音服务事件 - 优化：统一使用状态机事件，避免重复订阅
         if (_voiceChatService != null)
         {
-            // 直接订阅状态机事件，简化状态管理
+            // 主要状态管理：仅订阅状态机事件，统一处理所有状态变化
             if (_voiceChatService.StateMachine != null)
             {
                 _voiceChatService.StateMachine.StateChanged += OnStateMachineStateChanged;
-                _logger?.LogInformation("已直接订阅状态机状态变化事件，简化状态管理架构");
+                _logger?.LogInformation("已订阅状态机状态变化事件，统一状态管理");
             }
 
-            // 保留必要的服务层事件
-            _voiceChatService.VoiceChatStateChanged += OnVoiceChatStateChanged;
+            // 数据和消息事件：仅订阅必要的业务逻辑事件
             _voiceChatService.MessageReceived += OnMessageReceived;
             _voiceChatService.ErrorOccurred += OnErrorOccurred;
             _voiceChatService.MusicMessageReceived += OnMusicMessageReceived;
@@ -222,8 +222,12 @@ public partial class HomePageViewModel : ViewModelBase
             _voiceChatService.LlmMessageReceived += OnLlmMessageReceived;
             _voiceChatService.TtsStateChanged += OnTtsStateChanged;
 
+            // 移除重复的VoiceChatStateChanged订阅，状态变化由StateMachine统一处理
+
             await _voiceChatService.InitializeAsync(_config);
-        }        // 绑定音乐播放服务事件
+        }
+        
+        // 绑定音乐播放服务事件
         if (_musicPlayerService != null)
         {
             _musicPlayerService.PlaybackStateChanged += OnMusicPlaybackStateChanged;
@@ -272,20 +276,28 @@ public partial class HomePageViewModel : ViewModelBase
             {
                 case DeviceState.Listening:
                     IsConnected = true; // 确保连接状态正确
+                    IsListening = true; // 同步监听状态
                     if (IsConnected) // 确保只在连接状态下更新
                     {
                         StatusText = "正在聆听";
                         SetEmotion("listening");
                         ShowMicrophoneVisualizer = true;
 
-                        // 确保按钮状态正确
-                        if (IsPushToTalkActive)
+                        // 更新自动模式按钮文本
+                        if (IsAutoMode && _voiceChatService?.KeepListening == true)
+                        {
+                            AutoButtonText = "停止对话";
+                        }
+
+                        // 确保手动模式按钮状态正确
+                        if (!IsAutoMode && IsPushToTalkActive)
                         {
                             SetManualButtonRecordingState();
                         }
                     }
                     break;
                 case DeviceState.Speaking:
+                    IsListening = false; // 说话时不监听
                     if (IsConnected)
                     {
                         StatusText = "正在播放";
@@ -293,7 +305,7 @@ public partial class HomePageViewModel : ViewModelBase
                         ShowMicrophoneVisualizer = false;
 
                         // 如果是手动模式且在等待响应，更新按钮状态
-                        if (IsWaitingForResponse)
+                        if (!IsAutoMode && IsWaitingForResponse)
                         {
                             SetManualButtonProcessingState();
                         }
@@ -303,14 +315,22 @@ public partial class HomePageViewModel : ViewModelBase
                     StatusText = "连接中";
                     SetEmotion("thinking");
                     ShowMicrophoneVisualizer = false;
+                    IsListening = false;
                     break;
                 case DeviceState.Idle:
                 default:
+                    IsListening = false; // 空闲时不监听
                     if (IsConnected)
                     {
                         StatusText = "待命";
                         SetEmotion("neutral");
                         ShowMicrophoneVisualizer = false;
+
+                        // 更新自动模式按钮文本
+                        if (IsAutoMode)
+                        {
+                            AutoButtonText = "开始对话";
+                        }
 
                         // Reset push-to-talk state when AI response completes
                         if (IsWaitingForResponse)
@@ -322,8 +342,8 @@ public partial class HomePageViewModel : ViewModelBase
                             _logger?.LogInformation("AI response completed, manual button restored");
                         }
 
-                        // 确保按钮状态正确
-                        if (IsPushToTalkActive)
+                        // 确保手动模式按钮状态正确
+                        if (!IsAutoMode && IsPushToTalkActive)
                         {
                             IsPushToTalkActive = false;
                             RestoreManualButtonState();
@@ -359,73 +379,6 @@ public partial class HomePageViewModel : ViewModelBase
             {
                 _logger?.LogWarning("Inconsistent state detected: Device state is {DeviceState} but IsConnected is false", state);
             }
-        });
-    }
-
-    private void OnVoiceChatStateChanged(object? sender, bool isActive)
-    {
-        // 使用UI调度器确保线程安全的事件处理
-        _ = _uiDispatcher.InvokeAsync(() =>
-        {
-            var currentDeviceState = _voiceChatService?.CurrentState ?? DeviceState.Idle;
-
-
-            _logger?.LogDebug("Voice chat state changed: IsActive={IsActive}, Connected={Connected}, DeviceState={DeviceState}",
-                isActive, IsConnected, currentDeviceState);
-
-            // 只在连接状态下处理语音聊天状态变化
-            if (!IsConnected)
-            {
-                IsListening = false;
-                ShowMicrophoneVisualizer = false;
-                _logger?.LogWarning("Voice chat state change ignored due to disconnected state");
-                return;
-            }
-
-            IsListening = isActive;
-            ShowMicrophoneVisualizer = isActive;
-
-            // Update auto button text when in auto mode
-            if (IsAutoMode)
-            {
-                if (_voiceChatService?.KeepListening == true && IsListening)
-                {
-                    AutoButtonText = "停止对话";
-                }
-                else if (_voiceChatService?.KeepListening == false || !IsListening)
-                {
-                    AutoButtonText = "开始对话";
-                }
-            }
-
-            // 更新手动按钮状态
-            if (!IsAutoMode)
-            {
-                if (isActive && IsPushToTalkActive)
-                {
-                    SetManualButtonRecordingState();
-                }
-                else if (!isActive && IsWaitingForResponse)
-                {
-                    SetManualButtonProcessingState();
-                }
-                else if (!isActive && !IsWaitingForResponse)
-                {
-                    RestoreManualButtonState();
-                }
-            }
-
-            // 更新UI可用状态
-            OnPropertyChanged(nameof(IsManualButtonEnabled));
-
-            // 验证状态一致性：语音聊天状态应该与设备状态匹配
-            var expectedListening = (currentDeviceState == DeviceState.Listening);
-            if (isActive != expectedListening)
-            {
-                _logger?.LogWarning("State inconsistency detected - VoiceChat IsActive: {IsActive}, Device State: {DeviceState}, Expected Listening: {ExpectedListening}",
-                    isActive, currentDeviceState, expectedListening);
-            }
-
         });
     }
 
@@ -1584,9 +1537,8 @@ public partial class HomePageViewModel : ViewModelBase
                 _logger?.LogInformation("状态机事件订阅已清理");
             }
 
-            // 清理服务层事件订阅
+            // 清理服务层事件订阅（移除了重复的VoiceChatStateChanged）
             _voiceChatService.MessageReceived -= OnMessageReceived;
-            _voiceChatService.VoiceChatStateChanged -= OnVoiceChatStateChanged;
             _voiceChatService.ErrorOccurred -= OnErrorOccurred;
             _voiceChatService.MusicMessageReceived -= OnMusicMessageReceived;
             _voiceChatService.SystemStatusMessageReceived -= OnSystemStatusMessageReceived;

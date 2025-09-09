@@ -379,12 +379,20 @@ public sealed partial class HomePage : Page
     private void HomePage_Unloaded(object sender, RoutedEventArgs e)
     {
         // 清理ViewModel
-        _viewModel.Cleanup();        // 清理UI事件订阅
+        _viewModel.Cleanup();
+        
+        // 清理UI事件订阅
         _viewModel.InterruptTriggered -= OnInterruptTriggered;
         _viewModel.ScrollToBottomRequested -= OnScrollToBottomRequested;
         _viewModel.ManualButtonStateChanged -= OnManualButtonStateChanged;
         _viewModel.EmotionGifPathChanged -= OnEmotionGifPathChanged;
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        
+        // 清理静态渲染器事件订阅（修复内存泄漏）
+        WinUIGifEmotionRenderer.GifRenderRequested -= OnGifRenderRequested;
+        WinUIGifEmotionRenderer.GifRenderStopped -= OnGifRenderStopped;
+        WinUIEmojiEmotionRenderer.EmojiRenderRequested -= OnEmojiRenderRequested;
+        WinUIEmojiEmotionRenderer.EmojiRenderStopped -= OnEmojiRenderStopped;
     }    
     
     #endregion
