@@ -273,6 +273,7 @@ public class VoiceChatService : IVoiceChatService
         _config = config;
         try
         {
+            await _configurationService.CheckOtaUpdateAsync();
             // 将配置传递给关键词检测服务
             if (_keywordSpottingService != null)
             {

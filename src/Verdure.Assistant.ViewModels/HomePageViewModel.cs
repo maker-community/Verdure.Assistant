@@ -267,7 +267,13 @@ public partial class HomePageViewModel : ViewModelBase
     }
 
     private async Task BindEventsAsync()
-    {        // 绑定语音服务事件 - 优化后直接订阅状态机事件
+    {
+        if (_configurationService != null)
+        {
+            _configurationService.VerificationCodeReceived += OnConfigurationVerificationCodeReceived;
+            _logger?.LogInformation("配置服务验证码事件已绑定");
+        }
+        // 绑定语音服务事件 - 优化后直接订阅状态机事件
         if (_voiceChatService != null)
         {
             // 直接订阅状态机事件，简化状态管理
@@ -295,11 +301,6 @@ public partial class HomePageViewModel : ViewModelBase
             _musicPlayerService.ProgressUpdated += OnMusicProgressUpdated;
             _logger?.LogInformation("音乐播放服务事件已绑定");
         }        // 绑定配置服务事件 - 验证码接收事件
-        if (_configurationService != null)
-        {
-            _configurationService.VerificationCodeReceived += OnConfigurationVerificationCodeReceived;
-            _logger?.LogInformation("配置服务验证码事件已绑定");
-        }
 
         // Music player service is now injected via constructor dependency injection
         // No need to call SetMusicPlayerService anymore
