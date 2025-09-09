@@ -6,8 +6,6 @@ using Verdure.Assistant.Core.Constants;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Services;
-using Verdure.Assistant.Core.Services.Interrupt;
-using Verdure.Assistant.Core.Events;
 
 namespace Verdure.Assistant.ViewModels;
 
@@ -196,74 +194,6 @@ public partial class HomePageViewModel : ViewModelBase
 
         // 绑定服务事件
         await BindEventsAsync();
-
-        // 检查自动连接设置并触发连接
-        //await TryAutoConnectAsync();
-    }
-
-    /// <summary>
-    /// 尝试自动连接到语音助手服务
-    /// </summary>
-    private async Task TryAutoConnectAsync()
-    {
-        try
-        {
-            // 从设置服务获取自动连接配置
-            bool shouldAutoConnect = true; // 默认启用自动连接
-
-            // TODO: 这里可以扩展从配置服务或设置系统获取自动连接设置的逻辑
-            // 例如：shouldAutoConnect = await GetAutoConnectSettingAsync();
-
-            if (shouldAutoConnect && !IsConnected && _voiceChatService != null)
-            {
-                _logger?.LogInformation("启动时自动连接功能启用，开始连接到语音助手服务");
-
-                // 延迟一小段时间以确保所有服务都已初始化完成
-                await Task.Delay(800);
-
-                // 检查是否仍然需要连接（用户可能手动取消了）
-                if (!IsConnected && !_isConnecting)
-                {
-                    AddMessage("🚀 启动自动连接...", false);
-
-                    // 更新按钮状态以反映自动连接开始
-                    OnPropertyChanged(nameof(IsConnectButtonEnabled));
-                    OnPropertyChanged(nameof(IsDisconnectButtonEnabled));
-
-                    await ConnectCommand.ExecuteAsync(null);
-                }
-            }
-            else
-            {
-                _logger?.LogInformation("自动连接未启用或条件不满足 - AutoConnect: {ShouldAutoConnect}, Connected: {IsConnected}, Service: {HasService}",
-                    shouldAutoConnect, IsConnected, _voiceChatService != null);
-
-                // 确保按钮状态正确（应该是连接按钮可用，断开按钮不可用）
-                OnPropertyChanged(nameof(IsConnectButtonEnabled));
-                OnPropertyChanged(nameof(IsDisconnectButtonEnabled));
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "自动连接过程中发生错误");
-            AddMessage($"⚠️ 自动连接失败: {ex.Message}", true);
-            // 自动连接失败不应该阻止应用启动，只记录错误
-
-            // 确保按钮状态正确
-            OnPropertyChanged(nameof(IsConnectButtonEnabled));
-            OnPropertyChanged(nameof(IsDisconnectButtonEnabled));
-        }
-    }
-
-    /// <summary>
-    /// 获取自动连接设置（预留接口）
-    /// </summary>
-    private async Task<bool> GetAutoConnectSettingAsync()
-    {
-        // TODO: 从设置服务或配置文件获取自动连接设置
-        // 现在暂时返回默认值
-        await Task.CompletedTask;
-        return true;
     }
 
     private async Task BindEventsAsync()
@@ -300,20 +230,6 @@ public partial class HomePageViewModel : ViewModelBase
             _musicPlayerService.LyricUpdated += OnMusicLyricUpdated;
             _musicPlayerService.ProgressUpdated += OnMusicProgressUpdated;
             _logger?.LogInformation("音乐播放服务事件已绑定");
-        }        // 绑定配置服务事件 - 验证码接收事件
-
-        // Music player service is now injected via constructor dependency injection
-        // No need to call SetMusicPlayerService anymore
-        if (_voiceChatService != null && _musicPlayerService != null)
-        {
-            try
-            {
-                _logger?.LogInformation("Music player service injected via constructor for VAD control");
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to set music player service");
-            }
         }
     }
 
@@ -453,7 +369,7 @@ public partial class HomePageViewModel : ViewModelBase
         {
             var currentDeviceState = _voiceChatService?.CurrentState ?? DeviceState.Idle;
 
-            
+
             _logger?.LogDebug("Voice chat state changed: IsActive={IsActive}, Connected={Connected}, DeviceState={DeviceState}",
                 isActive, IsConnected, currentDeviceState);
 
@@ -531,9 +447,6 @@ public partial class HomePageViewModel : ViewModelBase
             if (message.Role == "assistant")
             {
                 TtsText = message.Content;
-
-                // 检查是否包含验证码
-                _ = HandleVerificationCodeAsync(message.Content);
             }
         });
     }
@@ -1660,62 +1573,6 @@ public partial class HomePageViewModel : ViewModelBase
         }
     }
 
-    /// <summary>
-    /// 处理验证码信息（对应py-xiaozhi的_handle_verification_code功能）
-    /// </summary>
-    private async Task HandleVerificationCodeAsync(string text)
-    {
-        if (_configurationService == null)
-        {
-            _logger?.LogWarning("配置服务未设置，无法处理验证码");
-            return;
-        }
-
-        try
-        {
-            // 使用配置服务提取验证码
-            var code = await _configurationService.ExtractVerificationCodeAsync(text);
-            if (!string.IsNullOrEmpty(code))
-            {
-                // 设置验证码相关属性
-                VerificationCode = code;
-                VerificationCodeMessage = $"您的验证码是: {code}";
-                IsVerificationCodeVisible = true;
-
-                // 自动复制到剪贴板
-                try
-                {
-                    await _configurationService.CopyToClipboardAsync(code);
-                    AddMessage($"🔑 验证码 {code} 已提取并复制到剪贴板");
-                    _logger?.LogInformation("验证码已提取并复制到剪贴板: {Code}", code);
-                }
-                catch (Exception copyEx)
-                {
-                    _logger?.LogWarning(copyEx, "复制验证码到剪贴板失败");
-                    AddMessage($"🔑 验证码 {code} 已提取，但复制到剪贴板失败");
-                }
-
-                // 尝试打开浏览器（可选）
-                try
-                {
-                    await _configurationService.OpenBrowserAsync("https://xiaozhi.me/login");
-                    AddMessage("🌐 已自动打开登录页面");
-                    _logger?.LogInformation("已自动打开登录页面");
-                }
-                catch (Exception browserEx)
-                {
-                    _logger?.LogWarning(browserEx, "打开浏览器失败");
-                    // 不显示错误消息，因为这是可选操作
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "处理验证码时发生错误");
-            AddMessage("❌ 处理验证码时发生错误", true);
-        }
-    }
-
     private void CleanupEventSubscriptions()
     {
         if (_voiceChatService != null)
@@ -1845,9 +1702,9 @@ public partial class HomePageViewModel : ViewModelBase
         }
 
         _logger?.LogInformation("Switching keyword model to: {ModelFileName}", modelFileName);
-        
+
         var result = await _voiceChatService.SwitchKeywordModelAsync(modelFileName);
-        
+
         if (result)
         {
             // 更新配置中的当前模型
@@ -1860,7 +1717,7 @@ public partial class HomePageViewModel : ViewModelBase
             AddMessage($"[系统] 切换关键词模型失败: {modelFileName}", false);
             _logger?.LogError("Failed to switch keyword model");
         }
-        
+
         return result;
     }
 

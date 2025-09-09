@@ -1120,37 +1120,6 @@ public class VoiceChatService : IVoiceChatService
         }
     }
 
-    private async void OnMessageReceived(object? sender, ChatMessage message)
-    {
-        try
-        {
-            MessageReceived?.Invoke(this, message);
-
-            // Start speaking mode when receiving audio response
-            if (message.AudioData != null)
-            {
-                // Use state machine to transition to speaking when audio is received
-                _stateMachine?.RequestTransition(ConversationTrigger.AudioReceived, "Audio response received");
-
-                if (_audioPlayer != null && _audioCodec != null && _config != null)
-                {
-                    var pcmData = _audioCodec.Decode(message.AudioData, _config.AudioOutputSampleRate, _config.AudioChannels);
-                    await _audioPlayer.PlayAsync(pcmData, _config.AudioOutputSampleRate, _config.AudioChannels);
-                }
-
-                // 注意：不要在这里立即停止播放，因为可能还有更多音频数据要来
-                // 播放完成应该由播放器的PlaybackStopped事件或者明确的停止指令来触发
-            }
-
-            _logger?.LogInformation("收到消息: {Type} - {Content}", message.Type, message.Content);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "处理接收消息失败");
-            ErrorOccurred?.Invoke(this, $"处理接收消息失败: {ex.Message}");
-        }
-    }
-
     private async void OnConnectionStateChanged(object? sender, bool isConnected)
     {
         _logger?.LogInformation("连接状态变化: {IsConnected}", isConnected);
