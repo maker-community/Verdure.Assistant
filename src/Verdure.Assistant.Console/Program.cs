@@ -103,7 +103,6 @@ class Program
                 });
 
                 // Register services with dependency injection
-                services.AddSingleton<IVerificationService, VerificationService>();
                 services.AddSingleton<IConfigurationService, ConfigurationService>();
 
                 // Music player service (required for MCP music device) - Register before VoiceChatService

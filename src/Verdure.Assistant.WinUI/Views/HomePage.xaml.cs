@@ -1,14 +1,10 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Media.Imaging;
-using System;
-using System.IO;
-using System.Threading.Tasks;
-using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Services;
 using Verdure.Assistant.ViewModels;
+using Verdure.Assistant.WinUI.Services;
 
 namespace Verdure.Assistant.WinUI.Views;
 
@@ -25,7 +21,7 @@ public sealed partial class HomePage : Page
 
     public HomePage()
     {
-        InitializeComponent();        
+        InitializeComponent();
         try
         {
             _logger = App.GetService<ILogger<HomePage>>();
@@ -39,9 +35,12 @@ public sealed partial class HomePage : Page
         }
 
         // 设置DataContext
-        this.DataContext = _viewModel;        
+        this.DataContext = _viewModel;
         // 绑定ViewModel事件
         BindViewModelEvents();
+
+        // 订阅新的渲染器事件
+        BindRendererEvents();
 
         // 初始化ViewModel
         _ = _viewModel.InitializeAsync();
@@ -53,15 +52,106 @@ public sealed partial class HomePage : Page
     private void OnPageLoaded(object sender, RoutedEventArgs e)
     {
         // 初始化连接指示器状态
-        UpdateConnectionIndicator();
-    }    private void BindViewModelEvents()
+        //UpdateConnectionIndicator();
+    }
+
+    private void BindRendererEvents()
+    {
+        // 订阅GIF渲染器事件
+        WinUIGifEmotionRenderer.GifRenderRequested += OnGifRenderRequested;
+        WinUIGifEmotionRenderer.GifRenderStopped += OnGifRenderStopped;
+
+        // 订阅Emoji渲染器事件
+        WinUIEmojiEmotionRenderer.EmojiRenderRequested += OnEmojiRenderRequested;
+        WinUIEmojiEmotionRenderer.EmojiRenderStopped += OnEmojiRenderStopped;
+    }
+
+    private void BindViewModelEvents()
     {
         _viewModel.InterruptTriggered += OnInterruptTriggered;
         _viewModel.ScrollToBottomRequested += OnScrollToBottomRequested;
         _viewModel.ManualButtonStateChanged += OnManualButtonStateChanged;
         _viewModel.EmotionGifPathChanged += OnEmotionGifPathChanged;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+
+        // 绑定情感状态变化事件以触发动画
+        _viewModel.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(HomePageViewModel.CurrentEmotion))
+            {
+                this.DispatcherQueue.TryEnqueue(() => TriggerEmotionAnimation());
+            }
+            if (e.PropertyName == nameof(HomePageViewModel.IsListening))
+            {
+                this.DispatcherQueue.TryEnqueue(() => UpdateEmotionAnimationState());
+            }
+        };
     }
+
+    #region 动画控制方法
+
+    private void TriggerEmotionAnimation()
+    {
+        try
+        {
+            // 停止当前动画
+            StopEmotionAnimations();
+
+            // 根据当前情感状态触发不同动画
+            var emotionBounceStoryboard = Resources["EmotionBounceAnimation"] as Storyboard;
+            emotionBounceStoryboard?.Begin();
+
+            _logger?.LogDebug("Emotion bounce animation triggered for: {Emotion}", _viewModel.CurrentEmotion);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error triggering emotion animation");
+        }
+    }
+
+    private void UpdateEmotionAnimationState()
+    {
+        try
+        {
+            if (_viewModel.IsListening)
+            {
+                // 聆听状态下启动脉冲动画
+                StopEmotionAnimations();
+                var pulseStoryboard = Resources["EmotionPulseAnimation"] as Storyboard;
+                pulseStoryboard?.Begin();
+
+                _logger?.LogDebug("Emotion pulse animation started for listening state");
+            }
+            else
+            {
+                // 停止聆听时停止脉冲动画
+                StopEmotionAnimations();
+                _logger?.LogDebug("Emotion animations stopped");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error updating emotion animation state");
+        }
+    }
+
+    private void StopEmotionAnimations()
+    {
+        try
+        {
+            var pulseStoryboard = Resources["EmotionPulseAnimation"] as Storyboard;
+            var bounceStoryboard = Resources["EmotionBounceAnimation"] as Storyboard;
+
+            pulseStoryboard?.Stop();
+            bounceStoryboard?.Stop();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error stopping emotion animations");
+        }
+    }
+
+    #endregion
 
     #region ViewModel事件处理
     private async void OnInterruptTriggered(object? sender, InterruptEventArgs e)
@@ -78,15 +168,20 @@ public sealed partial class HomePage : Page
 
     private void OnScrollToBottomRequested(object? sender, EventArgs e)
     {
-        // 滚动到底部
+        // 滚动到底部 - 由于移除了消息面板，这个方法现在为空
+        // 将来如果需要其他滚动操作可以在这里实现
         this.DispatcherQueue.TryEnqueue(() =>
         {
-            MessagesScrollViewer.ChangeView(null, MessagesScrollViewer.ScrollableHeight, null);
-        });      
-    }    
-    
+            // MessagesScrollViewer.ChangeView(null, MessagesScrollViewer.ScrollableHeight, null);
+            _logger?.LogDebug("Scroll to bottom requested - currently disabled");
+        });
+    }
+
     private void OnManualButtonStateChanged(object? sender, ManualButtonStateEventArgs e)
     {
+        // 手动按钮已被移除，这个方法现在为空
+        // 如果将来需要类似功能可以在这里重新实现
+        /*
         switch (e.State)
         {
             case ManualButtonState.Normal:
@@ -99,6 +194,7 @@ public sealed partial class HomePage : Page
                 SetManualButtonProcessingVisualState();
                 break;
         }    
+        */
     }
 
     private async void OnEmotionGifPathChanged(object? sender, EmotionGifPathEventArgs e)
@@ -111,8 +207,8 @@ public sealed partial class HomePage : Page
         {
             _logger?.LogError(ex, "Failed to update emotion display: {EmotionName}", e.EmotionName);
         }
-    }    
-    
+    }
+
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         // 在UI线程上执行
@@ -121,13 +217,13 @@ public sealed partial class HomePage : Page
             try
             {
                 // 更新连接状态指示器颜色
-                if (e.PropertyName == nameof(HomePageViewModel.IsConnected) || 
+                if (e.PropertyName == nameof(HomePageViewModel.IsConnected) ||
                     e.PropertyName == nameof(HomePageViewModel.ConnectionStatusText))
                 {
                     UpdateConnectionIndicator();
                     _logger?.LogDebug("Connection indicator updated for property: {PropertyName}", e.PropertyName);
                 }
-                
+
                 // 更新音乐播放按钮图标
                 if (e.PropertyName == nameof(HomePageViewModel.MusicStatus))
                 {
@@ -141,8 +237,8 @@ public sealed partial class HomePage : Page
         });
     }
 
-    #endregion 
-    
+    #endregion
+
 
     #region UI状态更新辅助方法
 
@@ -150,18 +246,18 @@ public sealed partial class HomePage : Page
     {
         try
         {
-            if (ConnectionIndicator != null)
-            {
-                // 根据连接状态设置指示器颜色
-                var resourceKey = _viewModel.IsConnected
-                    ? "SystemFillColorSuccessBrush"  // 绿色 - 已连接
-                    : "SystemFillColorCriticalBrush"; // 红色 - 未连接
+            //if (ConnectionIndicator != null)
+            //{
+            //    // 根据连接状态设置指示器颜色
+            //    var resourceKey = _viewModel.IsConnected
+            //        ? "SystemFillColorSuccessBrush"  // 绿色 - 已连接
+            //        : "SystemFillColorCriticalBrush"; // 红色 - 未连接
 
-                if (Application.Current.Resources.TryGetValue(resourceKey, out var brush))
-                {
-                    ConnectionIndicator.Background = brush as Microsoft.UI.Xaml.Media.Brush;
-                }
-            }        
+            //    if (Application.Current.Resources.TryGetValue(resourceKey, out var brush))
+            //    {
+            //        ConnectionIndicator.Background = brush as Microsoft.UI.Xaml.Media.Brush;
+            //    }
+            //}        
         }
         catch (Exception ex)
         {
@@ -176,10 +272,10 @@ public sealed partial class HomePage : Page
             if (PlayPauseIcon != null)
             {
                 // 根据音乐状态设置播放/暂停图标
-                var glyph = _viewModel.MusicStatus == "播放中" 
+                var glyph = _viewModel.MusicStatus == "播放中"
                     ? "&#xE769;" // 暂停图标
                     : "&#xE768;"; // 播放图标
-                
+
                 PlayPauseIcon.Glyph = glyph;
             }
         }
@@ -191,6 +287,8 @@ public sealed partial class HomePage : Page
 
     private void RestoreManualButtonVisualState()
     {
+        // 手动按钮已被移除，此方法现在为空
+        /*
         try
         {
             if (ManualButton != null)
@@ -204,10 +302,13 @@ public sealed partial class HomePage : Page
         {
             _logger?.LogError(ex, "Error restoring manual button visual state");
         }
+        */
     }
 
     private void SetManualButtonRecordingVisualState()
     {
+        // 手动按钮已被移除，此方法现在为空
+        /*
         try
         {
             if (ManualButton != null)
@@ -221,10 +322,13 @@ public sealed partial class HomePage : Page
         {
             _logger?.LogError(ex, "Error setting manual button recording visual state");
         }
+        */
     }
 
     private void SetManualButtonProcessingVisualState()
     {
+        // 手动按钮已被移除，此方法现在为空
+        /*
         try
         {
             if (ManualButton != null)
@@ -238,6 +342,7 @@ public sealed partial class HomePage : Page
         {
             _logger?.LogError(ex, "Error setting manual button processing visual state");
         }
+        */
     }
 
     #endregion
@@ -260,8 +365,8 @@ public sealed partial class HomePage : Page
     {
         // 当指针捕获丢失时，也要停止录音
         _ = _viewModel.StopManualRecordingCommand.ExecuteAsync(null);
-    }    
-    
+    }
+
     private void MessageTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (e.Key == Windows.System.VirtualKey.Enter)
@@ -270,9 +375,10 @@ public sealed partial class HomePage : Page
         }
     }
 
+    #endregion
 
     #region 音乐控制事件处理
-    
+
     private void PlayPauseButton_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -307,8 +413,8 @@ public sealed partial class HomePage : Page
         {
             _logger?.LogError(ex, "音乐进度条跳转失败");
         }
-    }    
-    
+    }
+
     private void VolumeSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
     {
         //try
@@ -324,19 +430,25 @@ public sealed partial class HomePage : Page
 
     private void MusicSearchTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
     {
+        // 音乐搜索功能已被移除，此方法现在为空
+        /*
         if (e.Key == Windows.System.VirtualKey.Enter)
         {
             PerformMusicSearch();
         }
+        */
     }
 
     private void SearchMusicButton_Click(object sender, RoutedEventArgs e)
     {
-        PerformMusicSearch();
+        // 音乐搜索功能已被移除，此方法现在为空
+        // PerformMusicSearch();
     }
 
     private void PerformMusicSearch()
     {
+        // 音乐搜索功能已被移除，此方法现在为空
+        /*
         try
         {
             var searchQuery = MusicSearchTextBox?.Text?.Trim();
@@ -354,9 +466,8 @@ public sealed partial class HomePage : Page
         {
             _logger?.LogError(ex, "音乐搜索失败");
         }
+        */
     }
-
-    #endregion
 
     #endregion
 
@@ -364,14 +475,22 @@ public sealed partial class HomePage : Page
     private void HomePage_Unloaded(object sender, RoutedEventArgs e)
     {
         // 清理ViewModel
-        _viewModel.Cleanup();        // 清理UI事件订阅
+        _viewModel.Cleanup();
+
+        // 清理UI事件订阅
         _viewModel.InterruptTriggered -= OnInterruptTriggered;
         _viewModel.ScrollToBottomRequested -= OnScrollToBottomRequested;
         _viewModel.ManualButtonStateChanged -= OnManualButtonStateChanged;
         _viewModel.EmotionGifPathChanged -= OnEmotionGifPathChanged;
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
-    }    
-    
+
+        // 清理静态渲染器事件订阅（修复内存泄漏）
+        WinUIGifEmotionRenderer.GifRenderRequested -= OnGifRenderRequested;
+        WinUIGifEmotionRenderer.GifRenderStopped -= OnGifRenderStopped;
+        WinUIEmojiEmotionRenderer.EmojiRenderRequested -= OnEmojiRenderRequested;
+        WinUIEmojiEmotionRenderer.EmojiRenderStopped -= OnEmojiRenderStopped;
+    }
+
     #endregion
 
     #region 表情动画处理    
@@ -384,7 +503,7 @@ public sealed partial class HomePage : Page
         {
             // 使用TaskCompletionSource确保在UI线程上执行
             var tcs = new TaskCompletionSource<bool>();
-            
+
             this.DispatcherQueue.TryEnqueue(() =>
             {
                 try
@@ -396,17 +515,17 @@ public sealed partial class HomePage : Page
                         {
                             var bitmapImage = new BitmapImage();
                             bitmapImage.UriSource = new Uri(gifPath);
-                            
-                            //EmotionImage.Source = bitmapImage;
-                            //EmotionImage.Visibility = Visibility.Visible;
-                            //DefaultEmotionText.Visibility = Visibility.Collapsed;
-                            
+
+                            EmotionImage.Source = bitmapImage;
+                            EmotionImage.Visibility = Visibility.Visible;
+                            DefaultEmotionText.Visibility = Visibility.Collapsed;
+
                             _logger?.LogDebug($"Switched to GIF emotion: {emotionName} -> {gifPath}");
                         }
                         catch (Exception ex)
                         {
                             _logger?.LogWarning(ex, "Failed to load GIF emotion: {GifPath}", gifPath);
-                            
+
                             // 回退到文本显示
                             //EmotionImage.Visibility = Visibility.Collapsed;
                             //DefaultEmotionText.Visibility = Visibility.Visible;
@@ -417,10 +536,10 @@ public sealed partial class HomePage : Page
                         // 显示文本表情
                         //EmotionImage.Visibility = Visibility.Collapsed;
                         //DefaultEmotionText.Visibility = Visibility.Visible;
-                        
+
                         _logger?.LogDebug($"Switched to text emotion: {emotionName}");
                     }
-                    
+
                     tcs.SetResult(true);
                 }
                 catch (Exception ex)
@@ -428,12 +547,154 @@ public sealed partial class HomePage : Page
                     tcs.SetException(ex);
                 }
             });
-            
+
             await tcs.Task;
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error in UpdateEmotionDisplayAsync");
+        }
+    }
+
+    #endregion
+
+    #region 新的渲染器事件处理
+
+    private void OnGifRenderRequested(object? sender, GifRenderEventArgs e)
+    {
+        this.DispatcherQueue.TryEnqueue(async () =>
+        {
+            try
+            {
+                _logger?.LogDebug($"Displaying GIF emotion: {e.EmotionType} -> {e.AssetPath}");
+                // UI 更新将在 XAML 编译完成后实现
+                await UpdateEmotionDisplayAsync(e.AssetPath, e.EmotionType);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to display GIF emotion: {EmotionType}", e.EmotionType);
+            }
+        });
+    }
+
+    private void OnGifRenderStopped(object? sender, EventArgs e)
+    {
+        this.DispatcherQueue.TryEnqueue(() =>
+        {
+            try
+            {
+                _logger?.LogDebug("Stopping GIF emotion display");
+                // UI 更新将在 XAML 编译完成后实现
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to stop GIF emotion display");
+            }
+        });
+    }
+
+    private void OnEmojiRenderRequested(object? sender, EmojiRenderEventArgs e)
+    {
+        this.DispatcherQueue.TryEnqueue(() =>
+        {
+            try
+            {
+                _logger?.LogDebug($"Displaying Emoji emotion: {e.EmotionType} -> {e.EmojiText}");
+                // UI 更新将在 XAML 编译完成后实现
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to display Emoji emotion: {EmotionType}", e.EmotionType);
+            }
+        });
+    }
+
+    private void OnEmojiRenderStopped(object? sender, EventArgs e)
+    {
+        this.DispatcherQueue.TryEnqueue(() =>
+        {
+            try
+            {
+                _logger?.LogDebug("Stopping Emoji emotion display");
+                // UI 更新将在 XAML 编译完成后实现
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to stop Emoji emotion display");
+            }
+        });
+    }
+
+    #endregion
+
+    #region 表情测试按钮事件处理
+
+    private async void TestHappyButton_Click(object sender, RoutedEventArgs e)
+    {
+        await TestEmotionAsync("happy");
+        await ViewModel.UpdateEmotionDisplayAsync("happy");
+    }
+
+    private async void TestSadButton_Click(object sender, RoutedEventArgs e)
+    {
+        await TestEmotionAsync("sad");
+        await ViewModel.UpdateEmotionDisplayAsync("sad");
+    }
+
+    private async void TestAngryButton_Click(object sender, RoutedEventArgs e)
+    {
+        await TestEmotionAsync("angry");
+        await ViewModel.UpdateEmotionDisplayAsync("angry");
+    }
+
+    private async void TestNeutralButton_Click(object sender, RoutedEventArgs e)
+    {
+        await TestEmotionAsync("neutral");
+        await ViewModel.UpdateEmotionDisplayAsync("neutral");
+    }
+
+    private async Task TestEmotionAsync(string emotionType)
+    {
+        try
+        {
+            _logger?.LogInformation($"测试播放表情: {emotionType}");
+
+            // 简单的表情映射
+            string emoji = emotionType switch
+            {
+                "happy" => "😊",
+                "sad" => "😢",
+                "angry" => "😠",
+                "neutral" => "😐",
+                _ => "🤔"
+            };
+
+            // 在UI线程上更新表情
+            this.DispatcherQueue.TryEnqueue(() =>
+            {
+                try
+                {
+                    // 更新ViewModel的CurrentEmotion属性
+                    _viewModel.CurrentEmotion = emoji;
+                    _logger?.LogInformation($"成功显示表情: {emotionType} -> {emoji}");
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "更新表情显示失败");
+                }
+            });
+
+            // 模拟表情持续2秒，然后恢复默认
+            await Task.Delay(1000);
+
+            this.DispatcherQueue.TryEnqueue(() =>
+            {
+                _viewModel.CurrentEmotion = "😊";
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, $"播放表情失败: {emotionType}");
         }
     }
 

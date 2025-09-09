@@ -108,7 +108,6 @@ builder.Services.AddLogging(builder =>
 });
 
 // Register core services
-builder.Services.AddSingleton<IVerificationService, VerificationService>();
 builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
 
 // Music player service (using SoundFlow) - Register before VoiceChatService

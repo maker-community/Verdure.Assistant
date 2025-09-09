@@ -132,12 +132,12 @@ public class EmotionIntegrationService : IDisposable
     /// <summary>
     /// 处理情感，将LLM情感映射到机器人表情和动作
     /// </summary>
-    private async Task HandleEmotionAsync(string emotion)
+    private Task HandleEmotionAsync(string emotion)
     {
         if (string.IsNullOrWhiteSpace(emotion))
         {
             _logger.LogDebug("接收到空的情感，跳过处理");
-            return;
+            return Task.CompletedTask;
         }
 
         var originalEmotion = emotion.Trim();
@@ -213,6 +213,7 @@ public class EmotionIntegrationService : IDisposable
                 }
             });
         }
+        return Task.CompletedTask;
     }
 
     /// <summary>
