@@ -12,29 +12,43 @@
         <converters:BoolNegationConverter x:Key="BoolNegationConverter" />
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
 
-        <!--  Emotion Animations  -->
+        <!--  Enhanced Emotion Animations  -->
         <Storyboard x:Key="EmotionPulseAnimation" RepeatBehavior="Forever">
-            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EmotionScaleTransform" Storyboard.TargetProperty="ScaleX">
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EmotionTransform" Storyboard.TargetProperty="ScaleX">
                 <DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="1.0" />
-                <EasingDoubleKeyFrame KeyTime="0:0:0.5" Value="1.1">
+                <EasingDoubleKeyFrame KeyTime="0:0:0.8" Value="1.15">
                     <EasingDoubleKeyFrame.EasingFunction>
                         <SineEase EasingMode="EaseInOut" />
                     </EasingDoubleKeyFrame.EasingFunction>
                 </EasingDoubleKeyFrame>
-                <EasingDoubleKeyFrame KeyTime="0:0:1" Value="1.0">
+                <EasingDoubleKeyFrame KeyTime="0:0:1.6" Value="1.0">
                     <EasingDoubleKeyFrame.EasingFunction>
                         <SineEase EasingMode="EaseInOut" />
                     </EasingDoubleKeyFrame.EasingFunction>
                 </EasingDoubleKeyFrame>
             </DoubleAnimationUsingKeyFrames>
-            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EmotionScaleTransform" Storyboard.TargetProperty="ScaleY">
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EmotionTransform" Storyboard.TargetProperty="ScaleY">
                 <DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="1.0" />
-                <EasingDoubleKeyFrame KeyTime="0:0:0.5" Value="1.1">
+                <EasingDoubleKeyFrame KeyTime="0:0:0.8" Value="1.15">
                     <EasingDoubleKeyFrame.EasingFunction>
                         <SineEase EasingMode="EaseInOut" />
                     </EasingDoubleKeyFrame.EasingFunction>
                 </EasingDoubleKeyFrame>
-                <EasingDoubleKeyFrame KeyTime="0:0:1" Value="1.0">
+                <EasingDoubleKeyFrame KeyTime="0:0:1.6" Value="1.0">
+                    <EasingDoubleKeyFrame.EasingFunction>
+                        <SineEase EasingMode="EaseInOut" />
+                    </EasingDoubleKeyFrame.EasingFunction>
+                </EasingDoubleKeyFrame>
+            </DoubleAnimationUsingKeyFrames>
+            <!-- Background circle pulse -->
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EmotionBackgroundCircle" Storyboard.TargetProperty="Opacity">
+                <DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="0.3" />
+                <EasingDoubleKeyFrame KeyTime="0:0:0.8" Value="0.6">
+                    <EasingDoubleKeyFrame.EasingFunction>
+                        <SineEase EasingMode="EaseInOut" />
+                    </EasingDoubleKeyFrame.EasingFunction>
+                </EasingDoubleKeyFrame>
+                <EasingDoubleKeyFrame KeyTime="0:0:1.6" Value="0.3">
                     <EasingDoubleKeyFrame.EasingFunction>
                         <SineEase EasingMode="EaseInOut" />
                     </EasingDoubleKeyFrame.EasingFunction>
@@ -43,29 +57,46 @@
         </Storyboard>
 
         <Storyboard x:Key="EmotionBounceAnimation">
-            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EmotionScaleTransform" Storyboard.TargetProperty="ScaleX">
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EmotionTransform" Storyboard.TargetProperty="ScaleX">
                 <DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="1.0" />
-                <EasingDoubleKeyFrame KeyTime="0:0:0.2" Value="1.3">
+                <EasingDoubleKeyFrame KeyTime="0:0:0.3" Value="1.4">
                     <EasingDoubleKeyFrame.EasingFunction>
-                        <BackEase EasingMode="EaseOut" Amplitude="0.5" />
+                        <BackEase EasingMode="EaseOut" Amplitude="0.7" />
                     </EasingDoubleKeyFrame.EasingFunction>
                 </EasingDoubleKeyFrame>
-                <EasingDoubleKeyFrame KeyTime="0:0:0.5" Value="1.0">
+                <EasingDoubleKeyFrame KeyTime="0:0:0.8" Value="1.0">
                     <EasingDoubleKeyFrame.EasingFunction>
-                        <ElasticEase EasingMode="EaseOut" Oscillations="2" Springiness="5" />
+                        <ElasticEase EasingMode="EaseOut" Oscillations="3" Springiness="8" />
                     </EasingDoubleKeyFrame.EasingFunction>
                 </EasingDoubleKeyFrame>
             </DoubleAnimationUsingKeyFrames>
-            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EmotionScaleTransform" Storyboard.TargetProperty="ScaleY">
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EmotionTransform" Storyboard.TargetProperty="ScaleY">
                 <DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="1.0" />
-                <EasingDoubleKeyFrame KeyTime="0:0:0.2" Value="1.3">
+                <EasingDoubleKeyFrame KeyTime="0:0:0.3" Value="1.4">
                     <EasingDoubleKeyFrame.EasingFunction>
-                        <BackEase EasingMode="EaseOut" Amplitude="0.5" />
+                        <BackEase EasingMode="EaseOut" Amplitude="0.7" />
                     </EasingDoubleKeyFrame.EasingFunction>
                 </EasingDoubleKeyFrame>
-                <EasingDoubleKeyFrame KeyTime="0:0:0.5" Value="1.0">
+                <EasingDoubleKeyFrame KeyTime="0:0:0.8" Value="1.0">
                     <EasingDoubleKeyFrame.EasingFunction>
-                        <ElasticEase EasingMode="EaseOut" Oscillations="2" Springiness="5" />
+                        <ElasticEase EasingMode="EaseOut" Oscillations="3" Springiness="8" />
+                    </EasingDoubleKeyFrame.EasingFunction>
+                </EasingDoubleKeyFrame>
+            </DoubleAnimationUsingKeyFrames>
+        </Storyboard>
+
+        <!-- Connection indicator pulse animation -->
+        <Storyboard x:Key="ConnectionPulseAnimation" RepeatBehavior="Forever">
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="ConnectionIndicator" Storyboard.TargetProperty="Opacity">
+                <DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="1.0" />
+                <EasingDoubleKeyFrame KeyTime="0:0:1" Value="0.4">
+                    <EasingDoubleKeyFrame.EasingFunction>
+                        <SineEase EasingMode="EaseInOut" />
+                    </EasingDoubleKeyFrame.EasingFunction>
+                </EasingDoubleKeyFrame>
+                <EasingDoubleKeyFrame KeyTime="0:0:2" Value="1.0">
+                    <EasingDoubleKeyFrame.EasingFunction>
+                        <SineEase EasingMode="EaseInOut" />
                     </EasingDoubleKeyFrame.EasingFunction>
                 </EasingDoubleKeyFrame>
             </DoubleAnimationUsingKeyFrames>
@@ -171,7 +202,7 @@
                         <ColumnDefinition Width="1*" />
                     </Grid.ColumnDefinitions>
 
-                    <!--  Status Card  -->
+                    <!--  Status Card - Enhanced with Modern Design  -->
                     <Border Grid.Column="0" Style="{StaticResource AccentCardStyle}">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -182,109 +213,143 @@
                             <StackPanel
                                 Grid.Column="0"
                                 Orientation="Horizontal"
-                                Spacing="12">
+                                Spacing="16">
                                 <Border
-                                    Width="40"
-                                    Height="40"
+                                    Width="48"
+                                    Height="48"
                                     Background="{ThemeResource SystemAccentColor}"
-                                    CornerRadius="20">
+                                    CornerRadius="24">
                                     <FontIcon
                                         x:Name="StatusIcon"
-                                        FontSize="20"
+                                        FontSize="24"
                                         Foreground="White"
                                         Glyph="&#xE916;" />
+                                    <Border.Shadow>
+                                        <ThemeShadow />
+                                    </Border.Shadow>
                                 </Border>
-                                <StackPanel VerticalAlignment="Center" Spacing="2">
+                                <StackPanel VerticalAlignment="Center" Spacing="4">
                                     <TextBlock
                                         FontSize="14"
                                         FontWeight="SemiBold"
                                         Foreground="{ThemeResource SystemAccentColorDark1}"
-                                        Text="语音助手状态" />
+                                        Text="语音助手" />
                                     <TextBlock
                                         x:Name="StatusText"
-                                        FontSize="16"
+                                        FontSize="18"
                                         FontWeight="Bold"
                                         Foreground="{ThemeResource SystemAccentColorDark2}"
-                                        Text="{x:Bind ViewModel.StatusText, Mode=OneWay}" />
+                                        Text="{x:Bind ViewModel.KeywordWakeStatusText, Mode=OneWay}" />
                                 </StackPanel>
                             </StackPanel>
 
+                            <!-- Enhanced Connection Status -->
                             <StackPanel
                                 Grid.Column="2"
                                 VerticalAlignment="Center"
-                                Spacing="6">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Border
+                                Spacing="8">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <!--<Border
                                         x:Name="ConnectionIndicator"
-                                        Width="12"
-                                        Height="12"
+                                        Width="16"
+                                        Height="16"
                                         Background="{ThemeResource SystemFillColorCriticalBrush}"
-                                        CornerRadius="6"
+                                        CornerRadius="8"
                                         ToolTipService.ToolTip="{x:Bind ViewModel.ConnectionStatusText, Mode=OneWay}">
-                                        <!-- Add a subtle animation for better visibility -->
                                         <Border.Shadow>
                                             <ThemeShadow />
                                         </Border.Shadow>
-                                    </Border>
-                                    <StackPanel Spacing="2">
+                                    </Border>-->
+                                    <!--<StackPanel Spacing="2">
                                         <TextBlock
                                             x:Name="ConnectionStatusText"
-                                            FontSize="12"
+                                            FontSize="13"
                                             FontWeight="SemiBold"
                                             Foreground="{ThemeResource SystemAccentColorDark1}"
                                             Text="{x:Bind ViewModel.ConnectionStatusText, Mode=OneWay}" />
                                         <TextBlock
-                                            FontSize="10"
+                                            FontSize="11"
                                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                             Text="连接状态" />
-                                    </StackPanel>
+                                    </StackPanel>-->
                                 </StackPanel>
+                                
+                                <!-- Status Prompt Text -->
+                                <!--<Border
+                                    Padding="12,6"
+                                    Background="{ThemeResource SystemAccentColorLight3}"
+                                    CornerRadius="6"
+                                    MaxWidth="200">
+                                    <TextBlock
+                                        FontSize="11"
+                                        Foreground="{ThemeResource SystemAccentColorDark1}"
+                                        Text="{x:Bind ViewModel.KeywordWakePromptText, Mode=OneWay}"
+                                        TextAlignment="Center"
+                                        TextWrapping="Wrap" />
+                                </Border>-->
                             </StackPanel>
                         </Grid>
-                    </Border>                    <!--  Keyword Wake Status  -->
+                    </Border>                    <!--  Keyword Wake Status - Modern Minimalist Design  -->
                     <Border Grid.Column="2" Style="{StaticResource CardStyle}">
-                        <StackPanel Spacing="12">
-                            <TextBlock
-                                Margin="0,0,0,4"
-                                FontSize="14"
-                                Style="{StaticResource SectionHeaderStyle}"
-                                Text="唤醒状态" />
-
+                        <StackPanel Spacing="16">
                             <StackPanel Spacing="8">
+                                <TextBlock
+                                    FontSize="16"
+                                    FontWeight="SemiBold"
+                                    HorizontalAlignment="Center"
+                                    Foreground="{ThemeResource SystemAccentColor}"
+                                    Text="💫 智能唤醒" />
+
+                                <!-- Modern Status Display -->
                                 <Border
-                                    Padding="12,8"
+                                    Padding="16,12"
                                     Background="{ThemeResource SystemAccentColorLight3}"
-                                    CornerRadius="6">
-                                    <StackPanel Spacing="4">
-                                        <TextBlock
-                                            FontSize="12"
-                                            FontWeight="SemiBold"
-                                            HorizontalAlignment="Center"
-                                            Foreground="{ThemeResource SystemAccentColorDark1}"
-                                            Text="关键词唤醒" />
+                                    CornerRadius="12"
+                                    BorderBrush="{ThemeResource SystemAccentColorLight1}"
+                                    BorderThickness="1">
+                                    <StackPanel Spacing="6">
                                         <TextBlock
                                             x:Name="KeywordWakeStatusText"
-                                            FontSize="14"
+                                            FontSize="16"
                                             FontWeight="Bold"
                                             HorizontalAlignment="Center"
                                             Foreground="{ThemeResource SystemAccentColorDark2}"
                                             Text="{x:Bind ViewModel.KeywordWakeStatusText, Mode=OneWay}" />
+                                        <TextBlock
+                                            FontSize="12"
+                                            FontWeight="Medium"
+                                            HorizontalAlignment="Center"
+                                            Foreground="{ThemeResource SystemAccentColorDark1}"
+                                            Text="{x:Bind ViewModel.KeywordWakePromptText, Mode=OneWay}"
+                                            TextAlignment="Center"
+                                            TextWrapping="Wrap" />
                                     </StackPanel>
-                                </Border>
-
-                                <Border
-                                    Padding="8,6"
-                                    Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
-                                    CornerRadius="6">
-                                    <TextBlock
-                                        FontSize="11"
-                                        HorizontalAlignment="Center"
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Text="{x:Bind ViewModel.KeywordWakePromptText, Mode=OneWay}"
-                                        TextAlignment="Center"
-                                        TextWrapping="Wrap" />
+                                    <Border.Shadow>
+                                        <ThemeShadow />
+                                    </Border.Shadow>
                                 </Border>
                             </StackPanel>
+
+                            <!-- Wake Word Visualization -->
+                            <Border
+                                Padding="12,8"
+                                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                CornerRadius="8">
+                                <StackPanel Spacing="4">
+                                    <TextBlock
+                                        FontSize="11"
+                                        FontWeight="SemiBold"
+                                        HorizontalAlignment="Center"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="唤醒词" />
+                                    <TextBlock
+                                        FontSize="18"
+                                        FontWeight="Bold"
+                                        HorizontalAlignment="Center"
+                                        Foreground="{ThemeResource SystemAccentColor}"
+                                        Text="小电" />
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </Border>
                 </Grid>                
@@ -418,26 +483,44 @@
                         <ColumnDefinition Width="2*" />
                         <ColumnDefinition Width="16" />
                         <ColumnDefinition Width="1*" />
-                    </Grid.ColumnDefinitions>                    <!--  System Status Card  -->
+                    </Grid.ColumnDefinitions>                    <!--  System Status Card - Modern Minimalist  -->
                     <Border
                         x:Name="SystemStatusCard"
                         Grid.Column="0"
                         Style="{StaticResource CardStyle}">
-                        <StackPanel Spacing="10">
-                            <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="📊 系统状态" />
+                        <StackPanel Spacing="16">
+                            <StackPanel Spacing="6">
+                                <TextBlock 
+                                    FontSize="16"
+                                    FontWeight="SemiBold"
+                                    HorizontalAlignment="Center"
+                                    Foreground="{ThemeResource SystemAccentColor}"
+                                    Text="📊 系统监控" />
+                                <Rectangle 
+                                    Height="1" 
+                                    HorizontalAlignment="Center"
+                                    Width="60"
+                                    Fill="{ThemeResource SystemAccentColorLight1}"
+                                    RadiusX="0.5" RadiusY="0.5" />
+                            </StackPanel>
 
-                            <StackPanel Spacing="8">
+                            <StackPanel Spacing="12">
                                 <Border
-                                    Padding="8,6"
+                                    Padding="12,10"
                                     Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
-                                    CornerRadius="6">
-                                    <StackPanel Spacing="4">
+                                    CornerRadius="8"
+                                    BorderBrush="{ThemeResource SystemAccentColorLight2}"
+                                    BorderThickness="1">
+                                    <StackPanel Spacing="6">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon FontSize="14" Glyph="&#xE950;" Foreground="{ThemeResource SystemAccentColor}" />
+                                            <TextBlock
+                                                FontSize="13"
+                                                FontWeight="SemiBold"
+                                                Text="系统状态" />
+                                        </StackPanel>
                                         <TextBlock
                                             FontSize="12"
-                                            FontWeight="SemiBold"
-                                            Text="系统运行状态" />
-                                        <TextBlock
-                                            FontSize="11"
                                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                             Text="{x:Bind ViewModel.SystemStatusText, Mode=OneWay}"
                                             TextWrapping="Wrap" />
@@ -445,16 +528,21 @@
                                 </Border>
 
                                 <Border
-                                    Padding="8,6"
+                                    Padding="12,10"
                                     Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
-                                    CornerRadius="6">
-                                    <StackPanel Spacing="4">
+                                    CornerRadius="8"
+                                    BorderBrush="{ThemeResource SystemAccentColorLight2}"
+                                    BorderThickness="1">
+                                    <StackPanel Spacing="6">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon FontSize="14" Glyph="&#xE968;" Foreground="{ThemeResource SystemAccentColor}" />
+                                            <TextBlock
+                                                FontSize="13"
+                                                FontWeight="SemiBold"
+                                                Text="物联网设备" />
+                                        </StackPanel>
                                         <TextBlock
                                             FontSize="12"
-                                            FontWeight="SemiBold"
-                                            Text="物联网设备" />
-                                        <TextBlock
-                                            FontSize="11"
                                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                             Text="{x:Bind ViewModel.IotStatusText, Mode=OneWay}"
                                             TextWrapping="Wrap" />
@@ -464,25 +552,48 @@
                         </StackPanel>
                     </Border>
                     
-                    <!--  Enhanced Emotion Status Card - Featured Center  -->
+                    <!--  Enhanced Emotion Status Center - Modern & Animated  -->
                     <Border
                         x:Name="EmotionStatusCard"
                         Grid.Column="2"
-                        Style="{StaticResource AccentCardStyle}">
-                        <StackPanel Spacing="16">
-                            <TextBlock 
-                                Style="{StaticResource SectionHeaderStyle}" 
-                                Text="😊 情感状态中心"
-                                FontSize="18"
-                                HorizontalAlignment="Center" />
+                        Background="{ThemeResource SystemAccentColorLight2}"
+                        CornerRadius="16"
+                        Padding="20"
+                        BorderBrush="{ThemeResource SystemAccentColor}"
+                        BorderThickness="2"
+                        Margin="0,0,0,8">
+                        <Border.Shadow>
+                            <ThemeShadow />
+                        </Border.Shadow>
+                        
+                        <StackPanel Spacing="20">
+                            <!-- Header with Gradient Effect -->
+                            <StackPanel Spacing="8">
+                                <TextBlock 
+                                    FontSize="20"
+                                    FontWeight="Bold"
+                                    HorizontalAlignment="Center"
+                                    Foreground="{ThemeResource SystemAccentColorDark2}"
+                                    Text="✨ 情感中心" />
+                                <Rectangle 
+                                    Height="2" 
+                                    HorizontalAlignment="Center"
+                                    Width="80"
+                                    Fill="{ThemeResource SystemAccentColor}"
+                                    RadiusX="1" RadiusY="1" />
+                            </StackPanel>
 
-                            <!-- Main Emotion Display -->
+                            <!-- Main Emotion Display with Enhanced Animation -->
                             <Border
-                                Padding="24"
-                                Background="{ThemeResource SystemAccentColorLight2}"
-                                CornerRadius="16"
-                                BorderBrush="{ThemeResource SystemAccentColor}"
-                                BorderThickness="2">
+                                Padding="32"
+                                Background="{ThemeResource SystemAccentColorLight1}"
+                                CornerRadius="20"
+                                BorderBrush="{ThemeResource SystemAccentColorDark1}"
+                                BorderThickness="1">
+                                <Border.Shadow>
+                                    <ThemeShadow/>
+                                </Border.Shadow>
+                                
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
@@ -492,10 +603,18 @@
                                     <!-- Emotion Animation Container -->
                                     <Viewbox 
                                         Grid.Row="0"
-                                        Width="120" 
-                                        Height="120" 
+                                        Width="140" 
+                                        Height="140" 
                                         HorizontalAlignment="Center">
                                         <Grid>
+                                            <!-- Background Circle for Pulse Effect -->
+                                            <Ellipse
+                                                x:Name="EmotionBackgroundCircle"
+                                                Fill="{ThemeResource SystemAccentColorLight3}"
+                                                Opacity="0.3"
+                                                Width="120"
+                                                Height="120" />
+                                            
                                             <!-- GIF显示控件 -->
                                             <Image
                                                 x:Name="EmotionImage"
@@ -503,79 +622,93 @@
                                                 VerticalAlignment="Center"
                                                 Visibility="Collapsed" />
                                             
-                                            <!-- 文本表情显示控件 with Animation -->
+                                            <!-- 文本表情显示控件 with Enhanced Animation -->
                                             <TextBlock
                                                 x:Name="DefaultEmotionText"
                                                 HorizontalAlignment="Center"
                                                 VerticalAlignment="Center"
                                                 FontSize="96"
                                                 Text="{x:Bind ViewModel.CurrentEmotion, Mode=OneWay}">
-                                                <TextBlock.RenderTransform>
-                                                    <ScaleTransform x:Name="EmotionScaleTransform" ScaleX="1" ScaleY="1" />
-                                                </TextBlock.RenderTransform>
                                             </TextBlock>
                                         </Grid>
                                     </Viewbox>
                                     
-                                    <!-- Status Indicator -->
+                                    <!-- Enhanced Status Indicator -->
                                     <Border
                                         Grid.Row="1"
-                                        Margin="0,16,0,0"
-                                        Padding="12,8"
-                                        Background="{ThemeResource SystemAccentColorLight1}"
-                                        CornerRadius="8"
+                                        Margin="0,20,0,0"
+                                        Padding="16,10"
+                                        Background="{ThemeResource SystemAccentColor}"
+                                        CornerRadius="12"
                                         HorizontalAlignment="Center">
                                         <TextBlock
-                                            FontSize="14"
+                                            FontSize="15"
                                             FontWeight="SemiBold"
-                                            Foreground="{ThemeResource SystemAccentColorDark2}"
+                                            Foreground="White"
                                             Text="{x:Bind ViewModel.EmotionStatusText, Mode=OneWay}"
                                             HorizontalAlignment="Center" />
+                                        <Border.Shadow>
+                                            <ThemeShadow />
+                                        </Border.Shadow>
                                     </Border>
                                 </Grid>
                             </Border>
 
-                            <!-- 表情测试按钮 - 重新设计 -->
-                            <Border
-                                Padding="16"
+                            <!-- Compact Emotion Test Controls -->
+                            <!--<Border
+                                Padding="16,12"
                                 Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
-                                CornerRadius="8">
-                                <StackPanel Spacing="8">
+                                CornerRadius="12"
+                                BorderBrush="{ThemeResource SystemAccentColorLight1}"
+                                BorderThickness="1">
+                                <StackPanel Spacing="10">
                                     <TextBlock
-                                        FontSize="12"
+                                        FontSize="13"
                                         FontWeight="SemiBold"
                                         HorizontalAlignment="Center"
-                                        Text="情感测试" />
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
-                                        <Button x:Name="TestHappyButton" Content="😊" Width="48" Height="48" 
+                                        Foreground="{ThemeResource SystemAccentColor}"
+                                        Text="🎭 情感测试" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button Grid.Column="0" x:Name="TestHappyButton" Content="😊" Width="44" Height="44" 
                                                 Click="TestHappyButton_Click" Style="{ThemeResource AccentButtonStyle}"
-                                                ToolTipService.ToolTip="开心" />
-                                        <Button x:Name="TestSadButton" Content="😢" Width="48" Height="48" 
-                                                Click="TestSadButton_Click" ToolTipService.ToolTip="难过" />
-                                        <Button x:Name="TestAngryButton" Content="😠" Width="48" Height="48" 
-                                                Click="TestAngryButton_Click" ToolTipService.ToolTip="愤怒" />
-                                        <Button x:Name="TestNeutralButton" Content="😐" Width="48" Height="48" 
-                                                Click="TestNeutralButton_Click" ToolTipService.ToolTip="平静" />
-                                    </StackPanel>
+                                                ToolTipService.ToolTip="开心" CornerRadius="22" Margin="2" />
+                                        <Button Grid.Column="1" x:Name="TestSadButton" Content="😢" Width="44" Height="44" 
+                                                Click="TestSadButton_Click" ToolTipService.ToolTip="难过" CornerRadius="22" Margin="2" />
+                                        <Button Grid.Column="2" x:Name="TestAngryButton" Content="😠" Width="44" Height="44" 
+                                                Click="TestAngryButton_Click" ToolTipService.ToolTip="愤怒" CornerRadius="22" Margin="2" />
+                                        <Button Grid.Column="3" x:Name="TestNeutralButton" Content="😐" Width="44" Height="44" 
+                                                Click="TestNeutralButton_Click" ToolTipService.ToolTip="平静" CornerRadius="22" Margin="2" />
+                                    </Grid>
                                 </StackPanel>
-                            </Border>
+                            </Border>-->
 
-                            <!--  TTS Text Display - Enhanced  -->
+                            <!--  Enhanced TTS Status Display  -->
                             <Border
-                                Padding="12,8"
+                                Padding="16,12"
                                 Background="{ThemeResource SystemAccentColorLight3}"
-                                CornerRadius="8">
-                                <StackPanel Spacing="4">
-                                    <TextBlock
-                                        FontSize="12"
-                                        FontWeight="SemiBold"
-                                        HorizontalAlignment="Center"
-                                        Foreground="{ThemeResource SystemAccentColorDark1}"
-                                        Text="语音状态" />
-                                    <ScrollViewer MaxHeight="80" VerticalScrollBarVisibility="Auto">
+                                CornerRadius="12"
+                                BorderBrush="{ThemeResource SystemAccentColorLight1}"
+                                BorderThickness="1">
+                                <StackPanel Spacing="6">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+                                        <FontIcon FontSize="14" Glyph="&#xE720;" Foreground="{ThemeResource SystemAccentColor}" />
+                                        <TextBlock
+                                            FontSize="13"
+                                            FontWeight="SemiBold"
+                                            Foreground="{ThemeResource SystemAccentColorDark1}"
+                                            Text="语音状态" />
+                                    </StackPanel>
+                                    <ScrollViewer MaxHeight="90" VerticalScrollBarVisibility="Auto">
                                         <TextBlock
                                             x:Name="TtsText"
-                                            FontSize="12"
+                                            FontSize="13"
+                                            FontWeight="Medium"
                                             Foreground="{ThemeResource SystemAccentColorDark1}"
                                             Text="{x:Bind ViewModel.TtsText, Mode=OneWay}"
                                             TextAlignment="Center"
@@ -586,31 +719,53 @@
                         </StackPanel>
                     </Border>
                     
-                    <!--  Music Center - Simplified  -->
+                    <!--  Music Center - Compact Modern Design  -->
                     <Border
                         x:Name="MusicCenter"
                         Grid.Column="4"
                         Style="{StaticResource CardStyle}">
-                        <StackPanel Spacing="12">
-                            <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="🎵 音乐播放" />
+                        <StackPanel Spacing="16">
+                            <StackPanel Spacing="6">
+                                <TextBlock 
+                                    FontSize="16"
+                                    FontWeight="SemiBold"
+                                    HorizontalAlignment="Center"
+                                    Foreground="{ThemeResource SystemAccentColor}"
+                                    Text="🎵 音乐播放" />
+                                <Rectangle 
+                                    Height="1" 
+                                    HorizontalAlignment="Center"
+                                    Width="60"
+                                    Fill="{ThemeResource SystemAccentColorLight1}"
+                                    RadiusX="0.5" RadiusY="0.5" />
+                            </StackPanel>
 
                             <!--  Music Player Section - Compact  -->
-                            <StackPanel Spacing="8">
-                                <!--  Song Info  -->
-                                <StackPanel Spacing="4">
-                                    <TextBlock
-                                        FontSize="12"
-                                        FontWeight="SemiBold"
-                                        MaxLines="1"
-                                        Text="{x:Bind ViewModel.CurrentSongName, Mode=OneWay}"
-                                        TextTrimming="CharacterEllipsis" />
-                                    <TextBlock
-                                        FontSize="10"
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        MaxLines="1"
-                                        Text="{x:Bind ViewModel.CurrentArtist, Mode=OneWay}"
-                                        TextTrimming="CharacterEllipsis" />
-                                </StackPanel>
+                            <StackPanel Spacing="12">
+                                <!--  Song Info Card  -->
+                                <Border
+                                    Padding="12,10"
+                                    Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                    CornerRadius="8"
+                                    BorderBrush="{ThemeResource SystemAccentColorLight2}"
+                                    BorderThickness="1">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock
+                                            FontSize="13"
+                                            FontWeight="SemiBold"
+                                            MaxLines="1"
+                                            Text="{x:Bind ViewModel.CurrentSongName, Mode=OneWay}"
+                                            TextTrimming="CharacterEllipsis"
+                                            HorizontalAlignment="Center" />
+                                        <TextBlock
+                                            FontSize="11"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            MaxLines="1"
+                                            Text="{x:Bind ViewModel.CurrentArtist, Mode=OneWay}"
+                                            TextTrimming="CharacterEllipsis"
+                                            HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Border>
 
                                 <!--  Progress Slider  -->
                                 <Slider
@@ -620,54 +775,47 @@
                                     Minimum="0"
                                     PointerReleased="MusicProgressSlider_PointerReleased"
                                     Value="{x:Bind ViewModel.MusicPosition, Mode=OneWay}" />
-                                    
-                                <!--  Compact Controls  -->
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
 
-                                    <Button
-                                        x:Name="PlayPauseButton"
-                                        Grid.Column="0"
-                                        Width="36"
-                                        Height="36"
-                                        Margin="0,0,6,0"
-                                        Click="PlayPauseButton_Click"
-                                        Style="{ThemeResource AccentButtonStyle}">
-                                        <FontIcon
-                                            x:Name="PlayPauseIcon"
-                                            FontSize="12"
-                                            Glyph="&#xE768;" />
-                                    </Button>
-                                    
-                                    <Button
-                                        x:Name="StopMusicButton"
-                                        Grid.Column="1"
-                                        Width="36"
-                                        Height="36"
-                                        Command="{x:Bind ViewModel.StopMusicCommand}">
-                                        <FontIcon x:Name="StopMusicIcon" FontSize="12" Glyph="&#xE71A;" />
-                                    </Button>
-                                    
+                                <!--  Compact Controls  -->
+                                <StackPanel Spacing="8">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+                                        <Button
+                                            x:Name="PlayPauseButton"
+                                            Width="40"
+                                            Height="40"
+                                            Click="PlayPauseButton_Click"
+                                            Style="{ThemeResource AccentButtonStyle}"
+                                            CornerRadius="20">
+                                            <FontIcon
+                                                x:Name="PlayPauseIcon"
+                                                FontSize="16"
+                                                Glyph="&#xE768;" />
+                                        </Button>
+
+                                        <Button
+                                            x:Name="StopMusicButton"
+                                            Width="40"
+                                            Height="40"
+                                            Command="{x:Bind ViewModel.StopMusicCommand}"
+                                            CornerRadius="20">
+                                            <FontIcon x:Name="StopMusicIcon" FontSize="16" Glyph="&#xE71A;" />
+                                        </Button>
+                                    </StackPanel>
+
                                     <TextBlock
-                                        Grid.Column="2"
-                                        Margin="8,0,0,0"
-                                        VerticalAlignment="Center"
-                                        FontSize="10"
+                                        HorizontalAlignment="Center"
+                                        FontSize="11"
                                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                         Text="{x:Bind ViewModel.MusicStatus, Mode=OneWay}" />
-                                </Grid>
+                                </StackPanel>
 
                                 <!--  Current Lyric  -->
                                 <Border
-                                    Padding="8,6"
-                                    Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
-                                    CornerRadius="6">
+                                    Padding="10,8"
+                                    Background="{ThemeResource SystemAccentColorLight3}"
+                                    CornerRadius="8">
                                     <TextBlock
-                                        FontSize="10"
+                                        FontSize="11"
                                         Foreground="{ThemeResource SystemAccentColor}"
                                         Text="{x:Bind ViewModel.CurrentLyric, Mode=OneWay}"
                                         TextAlignment="Center"
@@ -677,70 +825,106 @@
                         </StackPanel>
                     </Border>
                 </Grid>                
-                <!--  Voice Control & Chat Section - Hidden as per requirements  -->
-                <!-- 
-                <Grid x:Name="VoiceControlGrid" Grid.Row="3" Visibility="Collapsed">
-                    ... Voice Control and Chat content hidden ...
-                </Grid>
-                -->
             </Grid>
         </ScrollViewer>
         <VisualStateManager.VisualStateGroups>            
             <VisualStateGroup x:Name="AdaptiveStates">
+                <!-- Extra Wide State - For very large screens -->
+                <VisualState x:Name="ExtraWideState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="1400" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="MainScrollViewer.Padding" Value="40,20" />
+                        <Setter Target="DashboardGrid.ColumnDefinitions[0].Width" Value="1.2*" />
+                        <Setter Target="DashboardGrid.ColumnDefinitions[2].Width" Value="2.5*" />
+                        <Setter Target="DashboardGrid.ColumnDefinitions[4].Width" Value="1.2*" />
+                    </VisualState.Setters>
+                </VisualState>
+
+                <!-- Wide State - Standard desktop -->
                 <VisualState x:Name="WideState">
                     <VisualState.StateTriggers>
                         <AdaptiveTrigger MinWindowWidth="1000" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
-                        <!--  Use full layout for wide screens  -->
-                        <Setter Target="MainScrollViewer.Padding" Value="20" />
-                    </VisualState.Setters>
-                </VisualState>
-
-                <VisualState x:Name="MediumState">
-                    <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="700" />
-                    </VisualState.StateTriggers>
-                    <VisualState.Setters>
-                        <!--  Adjust dashboard column layout for medium screens  -->
+                        <Setter Target="MainScrollViewer.Padding" Value="24,16" />
                         <Setter Target="DashboardGrid.ColumnDefinitions[0].Width" Value="1*" />
                         <Setter Target="DashboardGrid.ColumnDefinitions[2].Width" Value="2*" />
                         <Setter Target="DashboardGrid.ColumnDefinitions[4].Width" Value="1*" />
-                        <Setter Target="MainScrollViewer.Padding" Value="16" />
-                        <!--  Reduce margins for medium screens  -->
-                        <Setter Target="HeaderSection.Margin" Value="0,0,0,12" />
-                        <Setter Target="DashboardGrid.Margin" Value="0,0,0,12" />
                     </VisualState.Setters>
                 </VisualState>
 
-                <VisualState x:Name="NarrowState">
+                <!-- Medium State - Small desktop/large tablet -->
+                <VisualState x:Name="MediumState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="800" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="MainScrollViewer.Padding" Value="16,12" />
+                        <Setter Target="DashboardGrid.ColumnDefinitions[0].Width" Value="0.8*" />
+                        <Setter Target="DashboardGrid.ColumnDefinitions[2].Width" Value="2.5*" />
+                        <Setter Target="DashboardGrid.ColumnDefinitions[4].Width" Value="0.8*" />
+                        <Setter Target="HeaderSection.Margin" Value="0,0,0,16" />
+                        <Setter Target="DashboardGrid.Margin" Value="0,0,0,16" />
+                        
+                        <!-- Adjust emotion center for medium screens -->
+                        <Setter Target="EmotionStatusCard.Padding" Value="16" />
+                    </VisualState.Setters>
+                </VisualState>
+
+                <!-- Tablet State - Standard tablet -->
+                <VisualState x:Name="TabletState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="600" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="MainScrollViewer.Padding" Value="12,8" />
+                        
+                        <!-- Modify grid for tablet layout -->
+                        <Setter Target="DashboardGrid.RowDefinitions" Value="Auto,Auto" />
+                        <Setter Target="DashboardGrid.ColumnDefinitions" Value="*,16,*" />
+                        
+                        <!-- Emotion center spans full width on top -->
+                        <Setter Target="EmotionStatusCard.(Grid.Column)" Value="0" />
+                        <Setter Target="EmotionStatusCard.(Grid.Row)" Value="0" />
+                        <Setter Target="EmotionStatusCard.(Grid.ColumnSpan)" Value="3" />
+                        <Setter Target="EmotionStatusCard.Padding" Value="20,16" />
+                        
+                        <!-- Side panels on bottom row -->
+                        <Setter Target="SystemStatusCard.(Grid.Column)" Value="0" />
+                        <Setter Target="SystemStatusCard.(Grid.Row)" Value="1" />
+                        <Setter Target="MusicCenter.(Grid.Column)" Value="2" />
+                        <Setter Target="MusicCenter.(Grid.Row)" Value="1" />
+                    </VisualState.Setters>
+                </VisualState>
+
+                <!-- Mobile State - Small tablet/large phone -->
+                <VisualState x:Name="MobileState">
                     <VisualState.StateTriggers>
                         <AdaptiveTrigger MinWindowWidth="0" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
-                        <!--  Stack cards vertically on narrow screens  -->
-                        <Setter Target="DashboardGrid.RowDefinitions[0].Height" Value="Auto" />
-                        <Setter Target="DashboardGrid.ColumnDefinitions[0].Width" Value="*" />
-                        <Setter Target="DashboardGrid.ColumnDefinitions[1].Width" Value="0" />
-                        <Setter Target="DashboardGrid.ColumnDefinitions[2].Width" Value="0" />
-                        <Setter Target="DashboardGrid.ColumnDefinitions[3].Width" Value="0" />
-                        <Setter Target="DashboardGrid.ColumnDefinitions[4].Width" Value="0" />
-
-                        <!--  Reposition cards for narrow layout  -->
-                        <Setter Target="SystemStatusCard.(Grid.Column)" Value="0" />
-                        <Setter Target="SystemStatusCard.(Grid.Row)" Value="0" />
+                        <Setter Target="MainScrollViewer.Padding" Value="8,6" />
+                        
+                        <!-- Stack all cards vertically -->
+                        <Setter Target="DashboardGrid.RowDefinitions" Value="Auto,Auto,Auto" />
+                        <Setter Target="DashboardGrid.ColumnDefinitions" Value="*" />
+                        
+                        <!-- All cards in single column -->
                         <Setter Target="EmotionStatusCard.(Grid.Column)" Value="0" />
-                        <Setter Target="EmotionStatusCard.(Grid.Row)" Value="1" />
+                        <Setter Target="EmotionStatusCard.(Grid.Row)" Value="0" />
+                        <Setter Target="EmotionStatusCard.Padding" Value="16,12" />
+                        
+                        <Setter Target="SystemStatusCard.(Grid.Column)" Value="0" />
+                        <Setter Target="SystemStatusCard.(Grid.Row)" Value="1" />
+                        
                         <Setter Target="MusicCenter.(Grid.Column)" Value="0" />
                         <Setter Target="MusicCenter.(Grid.Row)" Value="2" />
-
-                        <!--  Compact styling for narrow screens  -->
-                        <Setter Target="MainScrollViewer.Padding" Value="12" />
-                        <Setter Target="HeaderSection.Margin" Value="0,0,0,8" />
-                        <Setter Target="DashboardGrid.Margin" Value="0,0,0,8" />
-                        <Setter Target="SystemStatusCard.Style" Value="{StaticResource CompactCardStyle}" />
-                        <Setter Target="EmotionStatusCard.Style" Value="{StaticResource CompactCardStyle}" />
-                        <Setter Target="MusicCenter.Style" Value="{StaticResource CompactCardStyle}" />
+                        
+                        <!-- Compact styling for mobile -->
+                        <Setter Target="HeaderSection.Margin" Value="0,0,0,12" />
+                        <Setter Target="DashboardGrid.Margin" Value="0,0,0,12" />
                     </VisualState.Setters>
                 </VisualState>
             </VisualStateGroup>
