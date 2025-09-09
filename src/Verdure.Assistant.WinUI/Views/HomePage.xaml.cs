@@ -76,6 +76,15 @@ public sealed partial class HomePage : Page
         _viewModel.ManualButtonStateChanged += OnManualButtonStateChanged;
         _viewModel.EmotionGifPathChanged += OnEmotionGifPathChanged;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        
+        // 绑定情感状态变化事件以触发动画
+        _viewModel.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(HomePageViewModel.CurrentEmotion))
+            {
+                this.DispatcherQueue.TryEnqueue(() => TriggerEmotionAnimation());
+            }
+        };
     }
 
     #region ViewModel事件处理
@@ -93,15 +102,20 @@ public sealed partial class HomePage : Page
 
     private void OnScrollToBottomRequested(object? sender, EventArgs e)
     {
-        // 滚动到底部
+        // 滚动到底部 - 由于移除了消息面板，这个方法现在为空
+        // 将来如果需要其他滚动操作可以在这里实现
         this.DispatcherQueue.TryEnqueue(() =>
         {
-            MessagesScrollViewer.ChangeView(null, MessagesScrollViewer.ScrollableHeight, null);
+            // MessagesScrollViewer.ChangeView(null, MessagesScrollViewer.ScrollableHeight, null);
+            _logger?.LogDebug("Scroll to bottom requested - currently disabled");
         });      
     }    
     
     private void OnManualButtonStateChanged(object? sender, ManualButtonStateEventArgs e)
     {
+        // 手动按钮已被移除，这个方法现在为空
+        // 如果将来需要类似功能可以在这里重新实现
+        /*
         switch (e.State)
         {
             case ManualButtonState.Normal:
@@ -114,6 +128,7 @@ public sealed partial class HomePage : Page
                 SetManualButtonProcessingVisualState();
                 break;
         }    
+        */
     }
 
     private async void OnEmotionGifPathChanged(object? sender, EmotionGifPathEventArgs e)
@@ -206,6 +221,8 @@ public sealed partial class HomePage : Page
 
     private void RestoreManualButtonVisualState()
     {
+        // 手动按钮已被移除，此方法现在为空
+        /*
         try
         {
             if (ManualButton != null)
@@ -219,10 +236,13 @@ public sealed partial class HomePage : Page
         {
             _logger?.LogError(ex, "Error restoring manual button visual state");
         }
+        */
     }
 
     private void SetManualButtonRecordingVisualState()
     {
+        // 手动按钮已被移除，此方法现在为空
+        /*
         try
         {
             if (ManualButton != null)
@@ -236,10 +256,13 @@ public sealed partial class HomePage : Page
         {
             _logger?.LogError(ex, "Error setting manual button recording visual state");
         }
+        */
     }
 
     private void SetManualButtonProcessingVisualState()
     {
+        // 手动按钮已被移除，此方法现在为空
+        /*
         try
         {
             if (ManualButton != null)
@@ -253,6 +276,7 @@ public sealed partial class HomePage : Page
         {
             _logger?.LogError(ex, "Error setting manual button processing visual state");
         }
+        */
     }
 
     #endregion
@@ -339,19 +363,25 @@ public sealed partial class HomePage : Page
 
     private void MusicSearchTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
     {
+        // 音乐搜索功能已被移除，此方法现在为空
+        /*
         if (e.Key == Windows.System.VirtualKey.Enter)
         {
             PerformMusicSearch();
         }
+        */
     }
 
     private void SearchMusicButton_Click(object sender, RoutedEventArgs e)
     {
-        PerformMusicSearch();
+        // 音乐搜索功能已被移除，此方法现在为空
+        // PerformMusicSearch();
     }
 
     private void PerformMusicSearch()
     {
+        // 音乐搜索功能已被移除，此方法现在为空
+        /*
         try
         {
             var searchQuery = MusicSearchTextBox?.Text?.Trim();
@@ -369,6 +399,7 @@ public sealed partial class HomePage : Page
         {
             _logger?.LogError(ex, "音乐搜索失败");
         }
+        */
     }
 
     #endregion
@@ -642,6 +673,68 @@ public sealed partial class HomePage : Page
             _logger?.LogError(ex, $"播放表情失败: {emotionType}");
         }
     }
+
+    #region 情感动画控制方法
+
+    /// <summary>
+    /// 触发情感动画
+    /// </summary>
+    private void TriggerEmotionAnimation()
+    {
+        try
+        {
+            // 获取动画资源
+            var pulseAnimation = Resources["EmotionPulseAnimation"] as Microsoft.UI.Xaml.Media.Animation.Storyboard;
+            var bounceAnimation = Resources["EmotionBounceAnimation"] as Microsoft.UI.Xaml.Media.Animation.Storyboard;
+
+            // 停止当前动画
+            pulseAnimation?.Stop();
+            bounceAnimation?.Stop();
+
+            // 根据当前情感状态选择动画
+            var currentEmotion = _viewModel.CurrentEmotion;
+            var emotionStatus = _viewModel.EmotionStatusText;
+
+            if (emotionStatus.Contains("聆听") || emotionStatus.Contains("交流"))
+            {
+                // 活跃状态使用脉冲动画
+                pulseAnimation?.Begin();
+            }
+            else if (!emotionStatus.Contains("待机") && !emotionStatus.Contains("离线"))
+            {
+                // 状态变化时使用弹跳动画
+                bounceAnimation?.Begin();
+            }
+            // 待机状态不播放动画
+
+            _logger?.LogDebug("情感动画触发: {Emotion} - {Status}", currentEmotion, emotionStatus);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "触发情感动画失败");
+        }
+    }
+
+    /// <summary>
+    /// 停止所有情感动画
+    /// </summary>
+    private void StopEmotionAnimations()
+    {
+        try
+        {
+            var pulseAnimation = Resources["EmotionPulseAnimation"] as Microsoft.UI.Xaml.Media.Animation.Storyboard;
+            var bounceAnimation = Resources["EmotionBounceAnimation"] as Microsoft.UI.Xaml.Media.Animation.Storyboard;
+
+            pulseAnimation?.Stop();
+            bounceAnimation?.Stop();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "停止情感动画失败");
+        }
+    }
+
+    #endregion
 
     #endregion
 

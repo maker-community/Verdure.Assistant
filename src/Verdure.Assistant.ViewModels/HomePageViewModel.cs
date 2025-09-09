@@ -117,6 +117,17 @@ public partial class HomePageViewModel : ViewModelBase
     [ObservableProperty]
     private string _currentEmotion = "😊";
 
+    // 新增：关键词唤醒状态相关属性
+    [ObservableProperty]
+    private string _keywordWakeStatusText = "待机中";
+
+    [ObservableProperty]
+    private string _keywordWakePromptText = "请说 '小电' 来唤醒助手";
+
+    // 新增：情感状态描述文本
+    [ObservableProperty]
+    private string _emotionStatusText = "平静待机";
+
     // Manual按钮可用状态 - 基于连接状态、推送说话状态和等待响应状态
     public bool IsManualButtonEnabled => IsConnected && !IsPushToTalkActive && !IsWaitingForResponse;
 
@@ -180,6 +191,12 @@ public partial class HomePageViewModel : ViewModelBase
         ModeToggleText = "手动";
         ManualButtonText = "按住说话";
         AutoButtonText = "开始对话";
+        
+        // 初始化新增的状态属性
+        KeywordWakeStatusText = "待机中";
+        KeywordWakePromptText = "请说 '小点' 来唤醒助手";
+        EmotionStatusText = "平静待机";
+        
         //SetEmotion("neutral");
 
         // 确保按钮状态正确初始化
@@ -280,6 +297,9 @@ public partial class HomePageViewModel : ViewModelBase
                     if (IsConnected) // 确保只在连接状态下更新
                     {
                         StatusText = "正在聆听";
+                        KeywordWakeStatusText = "聆听中";
+                        KeywordWakePromptText = "正在聆听您的指令...";
+                        EmotionStatusText = "专注聆听";
                         SetEmotion("listening");
                         ShowMicrophoneVisualizer = true;
 
@@ -301,6 +321,9 @@ public partial class HomePageViewModel : ViewModelBase
                     if (IsConnected)
                     {
                         StatusText = "正在播放";
+                        KeywordWakeStatusText = "播放中";
+                        KeywordWakePromptText = "正在播放回复内容...";
+                        EmotionStatusText = "活跃交流";
                         SetEmotion("speaking");
                         ShowMicrophoneVisualizer = false;
 
@@ -313,6 +336,9 @@ public partial class HomePageViewModel : ViewModelBase
                     break;
                 case DeviceState.Connecting:
                     StatusText = "连接中";
+                    KeywordWakeStatusText = "连接中";
+                    KeywordWakePromptText = "正在连接到服务器...";
+                    EmotionStatusText = "连接中";
                     SetEmotion("thinking");
                     ShowMicrophoneVisualizer = false;
                     IsListening = false;
@@ -323,6 +349,9 @@ public partial class HomePageViewModel : ViewModelBase
                     if (IsConnected)
                     {
                         StatusText = "待命";
+                        KeywordWakeStatusText = "待机中";
+                        KeywordWakePromptText = "请说 '小点' 来唤醒助手";
+                        EmotionStatusText = "平静待机";
                         SetEmotion("neutral");
                         ShowMicrophoneVisualizer = false;
 
@@ -352,6 +381,9 @@ public partial class HomePageViewModel : ViewModelBase
                     else
                     {
                         StatusText = "未连接";
+                        KeywordWakeStatusText = "离线";
+                        KeywordWakePromptText = "请先连接到服务器";
+                        EmotionStatusText = "离线状态";
                         SetEmotion("neutral");
                         ShowMicrophoneVisualizer = false;
 
