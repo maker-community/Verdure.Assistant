@@ -128,6 +128,13 @@ public partial class HomePageViewModel : ViewModelBase
     [ObservableProperty]
     private string _emotionStatusText = "平静待机";
 
+    // MAUI 特定属性
+    [ObservableProperty]
+    private string _messageText = string.Empty;
+
+    [ObservableProperty]
+    private bool _isManualRecording = false;
+
     // Manual按钮可用状态 - 基于连接状态、推送说话状态和等待响应状态
     public bool IsManualButtonEnabled => IsConnected && !IsPushToTalkActive && !IsWaitingForResponse;
 
@@ -136,6 +143,9 @@ public partial class HomePageViewModel : ViewModelBase
 
     // 断开按钮可用状态 - 已连接且未在连接/断开过程中
     public bool IsDisconnectButtonEnabled => IsConnected && !_isConnecting && !_isDisconnecting;
+
+    // 连接状态属性 - 用于XAML绑定
+    public bool IsConnecting => _isConnecting;
 
     #endregion
 
@@ -654,6 +664,7 @@ public partial class HomePageViewModel : ViewModelBase
         _isConnecting = true;
 
         // 立即更新按钮状态，禁用连接按钮
+        OnPropertyChanged(nameof(IsConnecting));
         OnPropertyChanged(nameof(IsConnectButtonEnabled));
         OnPropertyChanged(nameof(IsDisconnectButtonEnabled));
 
@@ -725,6 +736,7 @@ public partial class HomePageViewModel : ViewModelBase
             _isConnecting = false;
 
             // 更新按钮状态
+            OnPropertyChanged(nameof(IsConnecting));
             OnPropertyChanged(nameof(IsConnectButtonEnabled));
             OnPropertyChanged(nameof(IsDisconnectButtonEnabled));
         }
@@ -1234,6 +1246,71 @@ public partial class HomePageViewModel : ViewModelBase
         {
             _logger?.LogError(ex, "设置音量失败");
             AddMessage($"❌ 音量设置失败: {ex.Message}", true);
+        }
+    }
+
+    [RelayCommand]
+    private async Task PreviousMusicAsync()
+    {
+        if (_musicPlayerService == null)
+        {
+            AddMessage("❌ 音乐播放服务未可用", true);
+            return;
+        }
+
+        try
+        {
+            // 使用跳转到开头来模拟上一首功能
+            await _musicPlayerService.SeekAsync(0);
+            AddMessage("⏮️ 返回到歌曲开头");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "返回歌曲开头失败");
+            AddMessage($"❌ 操作失败: {ex.Message}", true);
+        }
+    }
+
+    [RelayCommand]
+    private async Task NextMusicAsync()
+    {
+        if (_musicPlayerService == null)
+        {
+            AddMessage("❌ 音乐播放服务未可用", true);
+            return;
+        }
+
+        try
+        {
+            // 停止当前播放，用户可以重新搜索下一首
+            await _musicPlayerService.StopAsync();
+            AddMessage("⏭️ 已停止播放，请搜索下一首歌曲");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "停止播放失败");
+            AddMessage($"❌ 操作失败: {ex.Message}", true);
+        }
+    }
+
+    [RelayCommand]
+    private void ClearMessages()
+    {
+        Messages.Clear();
+        AddMessage("🗑️ 消息已清空", false);
+        _logger?.LogInformation("用户清空了消息列表");
+    }
+
+    [RelayCommand]
+    private async Task ToggleConnectionAsync()
+    {
+        if (IsConnected)
+        {
+            await DisconnectCommand.ExecuteAsync(null);
+        }
+        else
+        {
+            await ConnectCommand.ExecuteAsync(null);
         }
     }
 
