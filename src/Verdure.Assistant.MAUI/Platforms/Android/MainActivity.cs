@@ -22,7 +22,8 @@ public class MainActivity : MauiAppCompatActivity
     {
         Manifest.Permission.RecordAudio,
         Manifest.Permission.ModifyAudioSettings,
-        Manifest.Permission.ForegroundService
+        Manifest.Permission.ForegroundService,
+        Manifest.Permission.Internet
     };
 
     protected override void OnCreate(Bundle? savedInstanceState)
