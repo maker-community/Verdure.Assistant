@@ -225,9 +225,9 @@ public class VoiceChatService : IVoiceChatService
             _interruptService.RegisterInterruptSource(_manualSource);
 
             // Hotkey interrupt source
-            _hotkeySource = new Interrupt.Sources.HotkeyInterruptSource(
-                Microsoft.Extensions.Logging.LoggerFactory.Create(builder => { }).CreateLogger<Interrupt.Sources.HotkeyInterruptSource>());
-            _interruptService.RegisterInterruptSource(_hotkeySource);
+            //_hotkeySource = new Interrupt.Sources.HotkeyInterruptSource(
+            //    Microsoft.Extensions.Logging.LoggerFactory.Create(builder => { }).CreateLogger<Interrupt.Sources.HotkeyInterruptSource>());
+            //_interruptService.RegisterInterruptSource(_hotkeySource);
 
             // API interrupt source
             _apiSource = new Interrupt.Sources.ApiInterruptSource(
