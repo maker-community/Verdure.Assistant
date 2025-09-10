@@ -24,8 +24,17 @@ public static class MauiProgram
             .UseMauiCommunityToolkit()
             .ConfigureFonts(fonts =>
             {
-                fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
-                fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+                try
+                {
+                    fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
+                    fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+                }
+                catch (Exception ex)
+                {
+                    // 如果字体加载失败，记录错误但不中断应用启动
+                    System.Diagnostics.Debug.WriteLine($"Font loading error: {ex.Message}");
+                    // MAUI会自动使用系统默认字体作为回退
+                }
             });
 
         // 注册音频服务（参考ForegroundService项目配置）
@@ -64,6 +73,10 @@ public static class MauiProgram
 
         // 注册UI调度器 - MAUI平台特定实现
         builder.Services.AddSingleton<IUIDispatcher, MauiUIDispatcher>();
+
+        // 注册MAUI平台服务
+        builder.Services.AddSingleton<MauiResourceService>();
+        builder.Services.AddSingleton<IPlatformResourceService>(provider => provider.GetRequiredService<MauiResourceService>());
 
         // 注册音乐播放服务
         builder.Services.AddSingleton<IMusicPlayerService, KuwoMusicService>();
