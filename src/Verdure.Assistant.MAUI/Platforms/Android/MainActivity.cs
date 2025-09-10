@@ -17,33 +17,41 @@ public class MainActivity : MauiAppCompatActivity
 {
     private const int PERMISSIONS_REQUEST_CODE = 1001;
     
+    // 简化权限配置，参考ForegroundService项目
     private readonly string[] _requiredPermissions = new[]
     {
         Manifest.Permission.RecordAudio,
         Manifest.Permission.ModifyAudioSettings,
-        Manifest.Permission.ForegroundService,
-        Manifest.Permission.PostNotifications,
-        Manifest.Permission.WriteExternalStorage,
-        Manifest.Permission.ReadExternalStorage
+        Manifest.Permission.ForegroundService
     };
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
         
-        // 请求必要权限
-        RequestRequiredPermissions();
+        // 检查并请求基础权限（简化权限验证流程）
+        CheckAndRequestBasicPermissions();
     }
 
-    private void RequestRequiredPermissions()
+    private void CheckAndRequestBasicPermissions()
     {
         var permissionsToRequest = new List<string>();
 
+        // 检查基础权限
         foreach (var permission in _requiredPermissions)
         {
             if (ContextCompat.CheckSelfPermission(this, permission) != Permission.Granted)
             {
                 permissionsToRequest.Add(permission);
+            }
+        }
+
+        // Android 13+ 需要额外的通知权限（参考ForegroundService项目）
+        if (Build.VERSION.SdkInt >= BuildVersionCodes.Tiramisu)
+        {
+            if (ContextCompat.CheckSelfPermission(this, Manifest.Permission.PostNotifications) != Permission.Granted)
+            {
+                permissionsToRequest.Add(Manifest.Permission.PostNotifications);
             }
         }
 
@@ -89,12 +97,11 @@ public class MainActivity : MauiAppCompatActivity
     {
         var dialog = new AndroidX.AppCompat.App.AlertDialog.Builder(this)
             .SetTitle("权限说明")
-            .SetMessage("绿荫助手需要以下权限才能正常工作：\n\n" +
-                       "• 录音权限：用于语音输入\n" +
-                       "• 前台服务权限：用于后台运行\n" +
-                       "• 通知权限：用于显示服务状态\n" +
-                       "• 存储权限：用于保存录音文件\n\n" +
-                       "请在设置中手动授予这些权限。")
+            .SetMessage("绿荫助手需要以下基础权限：\n\n" +
+                       "• 录音权限：语音输入功能\n" +
+                       "• 前台服务权限：后台语音处理\n" +
+                       "• 通知权限：服务状态提醒\n\n" +
+                       "请授予这些权限以正常使用应用。")
             .SetPositiveButton("去设置", (sender, args) =>
             {
                 // 打开应用设置页面
@@ -105,7 +112,7 @@ public class MainActivity : MauiAppCompatActivity
             })
             .SetNegativeButton("稍后", (sender, args) =>
             {
-                // 用户选择稍后，记录日志
+                // 用户选择稍后
                 System.Diagnostics.Debug.WriteLine("用户选择稍后授予权限");
             })
             .SetCancelable(false);

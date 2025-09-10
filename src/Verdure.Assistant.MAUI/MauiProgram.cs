@@ -3,6 +3,7 @@ using Plugin.Maui.Audio;
 using CommunityToolkit.Maui;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Services;
+using Verdure.Assistant.Core.Services.MCP;
 using Verdure.Assistant.ViewModels;
 using Verdure.Assistant.MAUI.Services;
 using Verdure.Assistant.MAUI.Views;
@@ -27,9 +28,33 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
-        // 注册音频服务
+        // 注册音频服务（参考ForegroundService项目配置）
         builder.Services.AddSingleton(AudioManager.Current);
         builder.Services.AddSingleton<IAudioManager>(AudioManager.Current);
+
+        // 注册核心服务（参考WinUI项目配置）
+        builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
+        
+        // 音频流管理器 - 使用工厂模式注册为单例
+        builder.Services.AddSingleton<SoundFlowAudioRecorder>(provider =>
+        {
+            var logger = provider.GetService<ILogger<SoundFlowAudioRecorder>>();
+            return SoundFlowAudioRecorder.GetInstance(logger);
+        });
+        builder.Services.AddSingleton<ISharedAudioRecorder>(provider => provider.GetRequiredService<SoundFlowAudioRecorder>());
+
+        builder.Services.AddSingleton<Core.Interfaces.IAudioPlayer, SoundFlowAudioPlayer>();
+        builder.Services.AddSingleton<IAudioCodec, OpusSharpAudioCodec>();
+
+        // 语音聊天服务（核心功能）
+        builder.Services.AddSingleton<IVoiceChatService, VoiceChatService>();
+
+        // 关键词识别服务
+        builder.Services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
+
+        // MCP服务（参考WinUI项目）
+        builder.Services.AddSingleton<McpServer>();
+        builder.Services.AddSingleton<McpDeviceManager>();
 
         // 注册服务接口
 #if ANDROID

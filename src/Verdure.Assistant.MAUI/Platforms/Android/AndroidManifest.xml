@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 音频相关权限 -->
+    <!-- 基础音频权限（参考ForegroundService项目配置） -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     
@@ -11,10 +11,6 @@
     
     <!-- 通知权限 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    
-    <!-- 存储权限 -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     
     <!-- 网络权限 -->
     <uses-permission android:name="android.permission.INTERNET" />
