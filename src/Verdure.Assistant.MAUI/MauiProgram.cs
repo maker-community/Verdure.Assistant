@@ -78,6 +78,11 @@ public static class MauiProgram
         builder.Services.AddSingleton<MauiResourceService>();
         builder.Services.AddSingleton<IPlatformResourceService>(provider => provider.GetRequiredService<MauiResourceService>());
 
+        // 注册表情系统服务
+        builder.Services.AddSingleton<IEmotionAssetResolver, MauiEmotionAssetResolver>();
+        builder.Services.AddSingleton<IEmotionRenderer, MauiGifEmotionRenderer>();
+        builder.Services.AddSingleton<IEmotionPlaybackCoordinator, EmotionPlaybackCoordinator>();
+
         // 注册音乐播放服务
         builder.Services.AddSingleton<IMusicPlayerService, KuwoMusicService>();
 
