@@ -31,7 +31,67 @@
 
 		<!-- Images -->
 		<MauiImage Include="Resources\Images\*" Exclude="Resources\Images\appicon.svg;Resources\Images\appiconfg.svg" />
+		<MauiImage Update="Resources\Images\angry.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
+		<MauiImage Update="Resources\Images\confident.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
+		<MauiImage Update="Resources\Images\confused.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
+		<MauiImage Update="Resources\Images\cool.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
+		<MauiImage Update="Resources\Images\crying.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
+		<MauiImage Update="Resources\Images\delicious.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
 		<MauiImage Update="Resources\Images\dotnet_bot.svg" BaseSize="168,208" />
+		<MauiImage Update="Resources\Images\embarrassed.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
+		<MauiImage Update="Resources\Images\funny.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
+		<MauiImage Update="Resources\Images\happy.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
+		<MauiImage Update="Resources\Images\laughing.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
+		<MauiImage Update="Resources\Images\loving.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
+		<MauiImage Update="Resources\Images\neutral.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
+		<MauiImage Update="Resources\Images\relaxed.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
+		<MauiImage Update="Resources\Images\sad.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
+		<MauiImage Update="Resources\Images\shocked.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
+		<MauiImage Update="Resources\Images\silly.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
+		<MauiImage Update="Resources\Images\sleepy.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
+		<MauiImage Update="Resources\Images\surprised.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
+		<MauiImage Update="Resources\Images\thinking.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
+		<MauiImage Update="Resources\Images\winking.gif">
+		  <LogicalName>%(Filename)%(Extension)</LogicalName>
+		</MauiImage>
 		
 		<!-- Emotion GIFs as raw assets to preserve animation -->
 		<MauiAsset Include="Resources\Images\Emotions\*.gif" LogicalName="%(Filename)%(Extension)" />
@@ -41,6 +101,16 @@
 
 		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <MauiImage Remove="Resources\Images\kissy.gif" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <MauiAsset Include="Resources\Images\kissy.gif">
+	    <LogicalName>%(Filename)%(Extension)</LogicalName>
+	  </MauiAsset>
 	</ItemGroup>
 
 	<ItemGroup>

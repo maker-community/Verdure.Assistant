@@ -133,6 +133,7 @@
                             <Image x:Name="EmotionGifImage"
                                    HorizontalOptions="Center"
                                    VerticalOptions="Center"
+                                   IsAnimationPlaying="True"
                                    Aspect="AspectFit"
                                    IsVisible="False" />
                             
