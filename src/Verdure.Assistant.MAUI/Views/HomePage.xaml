@@ -5,263 +5,233 @@
              xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              xmlns:vm="clr-namespace:Verdure.Assistant.ViewModels;assembly=Verdure.Assistant.ViewModels"
              x:DataType="vm:HomePageViewModel"
-             Title="语音对话"
+             Title="语音助手"
              BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray900}}">
 
     <ScrollView>
-        <Grid Padding="16" RowSpacing="20">
+        <Grid Padding="12" RowSpacing="12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <!-- 状态显示区域 -->
+            <!-- 关键词唤醒状态区域 -->
             <Frame Grid.Row="0" 
                    BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
-                   CornerRadius="15"
+                   CornerRadius="12"
+                   HasShadow="True"
+                   Padding="12">
+                <StackLayout Spacing="8">
+                    <Label Text="💫 智能唤醒" 
+                           FontSize="16" 
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center"
+                           TextColor="{StaticResource Primary}" />
+                    
+                    <!-- 唤醒状态显示 -->
+                    <Frame BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                           CornerRadius="8"
+                           Padding="12,8"
+                           HasShadow="False">
+                        <StackLayout Spacing="4">
+                            <Label Text="{Binding KeywordWakeStatusText}"
+                                   FontSize="14"
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="Center"
+                                   TextColor="White" />
+                            <Label Text="{Binding KeywordWakePromptText}"
+                                   FontSize="12"
+                                   HorizontalOptions="Center"
+                                   TextColor="White"
+                                   MaxLines="2"
+                                   LineBreakMode="WordWrap" />
+                        </StackLayout>
+                    </Frame>
+                    
+                    <!-- 唤醒词显示 -->
+                    <Frame BackgroundColor="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                           CornerRadius="6"
+                           Padding="8,4"
+                           HasShadow="False">
+                        <StackLayout Spacing="2">
+                            <Label Text="唤醒词" 
+                                   FontSize="10"
+                                   HorizontalOptions="Center"
+                                   TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
+                            <Label Text="小电" 
+                                   FontSize="16"
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="Center"
+                                   TextColor="{StaticResource Primary}" />
+                        </StackLayout>
+                    </Frame>
+                </StackLayout>
+            </Frame>
+
+            <!-- 授权验证区域 -->
+            <Frame Grid.Row="1" 
+                   BackgroundColor="{AppThemeBinding Light={StaticResource Warning}, Dark={StaticResource WarningDark}}"
+                   CornerRadius="12"
+                   HasShadow="True"
+                   Padding="12"
+                   IsVisible="{Binding IsVerificationCodeVisible}">
+                <StackLayout Spacing="10">
+                    <Label Text="🔐 身份验证" 
+                           FontSize="16" 
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center"
+                           TextColor="White" />
+                    
+                    <Label Text="{Binding VerificationCodeMessage}"
+                           FontSize="12"
+                           HorizontalOptions="Center"
+                           TextColor="White"
+                           MaxLines="2"
+                           LineBreakMode="WordWrap" />
+                    
+                    <Entry Text="{Binding VerificationCode}"
+                           Placeholder="请输入授权码"
+                           FontSize="14"
+                           HorizontalOptions="FillAndExpand"
+                           BackgroundColor="White"
+                           TextColor="Black" />
+                    
+                    <Button Text="验证"
+                            BackgroundColor="White"
+                            TextColor="{StaticResource Primary}"
+                            CornerRadius="6"
+                            HeightRequest="36"
+                            FontSize="14" />
+                </StackLayout>
+            </Frame>
+
+            <!-- 表情显示区域 -->
+            <Frame Grid.Row="2" 
+                   BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
+                   CornerRadius="12"
                    HasShadow="True"
                    Padding="16">
                 <StackLayout Spacing="12">
-                    <!-- 连接状态 -->
-                    <Grid ColumnDefinitions="Auto,*,Auto">
-                        <Label Grid.Column="0" 
-                               Text="🔗 连接状态:" 
+                    <Label Text="✨ 情感中心" 
+                           FontSize="16" 
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center"
+                           TextColor="{StaticResource Primary}" />
+                    
+                    <!-- 表情显示容器 -->
+                    <Frame BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                           CornerRadius="20"
+                           Padding="20"
+                           HasShadow="False"
+                           HeightRequest="120"
+                           WidthRequest="120"
+                           HorizontalOptions="Center">
+                        <Grid>
+                            <!-- GIF表情显示 -->
+                            <Image x:Name="EmotionGifImage"
+                                   HorizontalOptions="Center"
+                                   VerticalOptions="Center"
+                                   Aspect="AspectFit"
+                                   IsVisible="False" />
+                            
+                            <!-- 文字表情显示 -->
+                            <Label x:Name="EmotionTextLabel"
+                                   Text="{Binding CurrentEmotion}"
+                                   FontSize="60"
+                                   HorizontalOptions="Center"
+                                   VerticalOptions="Center" />
+                        </Grid>
+                    </Frame>
+                    
+                    <!-- 状态文本 -->
+                    <Frame BackgroundColor="{StaticResource Primary}"
+                           CornerRadius="8"
+                           Padding="12,6"
+                           HasShadow="False"
+                           HorizontalOptions="Center">
+                        <Label Text="{Binding EmotionStatusText}"
+                               FontSize="12"
                                FontAttributes="Bold"
-                               VerticalOptions="Center" />
-                        <Label Grid.Column="1" 
-                               Text="{Binding IsConnected, Converter={StaticResource BoolToStringConverter}, ConverterParameter='已连接|未连接'}"
+                               TextColor="White"
+                               HorizontalOptions="Center" />
+                    </Frame>
+                    
+                    <!-- TTS状态显示 -->
+                    <Frame BackgroundColor="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                           CornerRadius="8"
+                           Padding="10,6"
+                           HasShadow="False">
+                        <StackLayout Spacing="4">
+                            <Label Text="🔊 语音状态" 
+                                   FontSize="11"
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="Center"
+                                   TextColor="{StaticResource Primary}" />
+                            <Label Text="{Binding TtsText}"
+                                   FontSize="11"
+                                   HorizontalOptions="Center"
+                                   TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
+                                   MaxLines="3"
+                                   LineBreakMode="TailTruncation" />
+                        </StackLayout>
+                    </Frame>
+                </StackLayout>
+            </Frame>
+
+            <!-- 系统状态信息 -->
+            <Frame Grid.Row="3" 
+                   BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
+                   CornerRadius="12"
+                   HasShadow="True"
+                   Padding="12">
+                <StackLayout Spacing="8">
+                    <Label Text="📊 系统状态" 
+                           FontSize="14" 
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center"
+                           TextColor="{StaticResource Primary}" />
+                    
+                    <!-- 系统状态 -->
+                    <Frame BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                           CornerRadius="6"
+                           Padding="8,6"
+                           HasShadow="False">
+                        <Label Text="{Binding SystemStatusText}"
+                               FontSize="11"
+                               HorizontalOptions="Center"
+                               TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
+                               MaxLines="2"
+                               LineBreakMode="TailTruncation" />
+                    </Frame>
+                    
+                    <!-- 连接状态 -->
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                        <Frame Grid.Column="0"
+                               BackgroundColor="{AppThemeBinding Light=Green, Dark=DarkGreen}"
+                               CornerRadius="6"
+                               Padding="6,4"
+                               HasShadow="False">
+                            <Label Text="🟢"
+                                   FontSize="10" />
+                        </Frame>
+                        
+                        <Label Grid.Column="1"
+                               Text="连接状态"
+                               FontSize="12"
                                VerticalOptions="Center"
-                               Margin="8,0,0,0" />
+                               TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
+                        
                         <ActivityIndicator Grid.Column="2" 
                                          IsRunning="{Binding IsConnecting}"
                                          IsVisible="{Binding IsConnecting}"
                                          Color="{StaticResource Primary}"
-                                         WidthRequest="20"
-                                         HeightRequest="20" />
-                    </Grid>
-
-                    <!-- 系统状态 -->
-                    <Label Text="{Binding SystemStatusText, StringFormat='📊 {0}'}"
-                           FontSize="14"
-                           TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
-
-                    <!-- TTS状态 -->
-                    <Label Text="{Binding TtsText, StringFormat='🔊 {0}'}"
-                           FontSize="14"
-                           IsVisible="{Binding TtsText, Converter={StaticResource StringToBoolConverter}}"
-                           TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
-                           MaxLines="2"
-                           LineBreakMode="TailTruncation" />
-                </StackLayout>
-            </Frame>
-
-            <!-- 音乐播放器控制区域 -->
-            <Frame Grid.Row="1" 
-                   BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
-                   CornerRadius="15"
-                   HasShadow="True"
-                   Padding="16">
-                <StackLayout Spacing="12">
-                    <Label Text="🎵 音乐播放" 
-                           FontSize="18" 
-                           FontAttributes="Bold"
-                           HorizontalOptions="Center" />
-
-                    <!-- 歌曲信息 -->
-                    <StackLayout Spacing="4" IsVisible="{Binding CurrentSongName, Converter={StaticResource StringToBoolConverter}}">
-                        <Label Text="{Binding CurrentSongName}" 
-                               FontSize="16" 
-                               FontAttributes="Bold"
-                               HorizontalOptions="Center"
-                               MaxLines="1"
-                               LineBreakMode="TailTruncation" />
-                        <Label Text="{Binding CurrentArtist}" 
-                               FontSize="14" 
-                               HorizontalOptions="Center"
-                               TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
-                               MaxLines="1"
-                               LineBreakMode="TailTruncation" />
-                    </StackLayout>
-
-                    <!-- 播放进度 -->
-                    <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding CurrentSongName, Converter={StaticResource StringToBoolConverter}}">
-                        <Label Grid.Column="0" 
-                               Text="{Binding MusicPosition, Converter={StaticResource TimeSpanToStringConverter}}"
-                               FontSize="12"
-                               VerticalOptions="Center" />
-                        <Slider Grid.Column="1" 
-                                Minimum="0"
-                                Maximum="{Binding MusicDuration}"
-                                Value="{Binding MusicPosition}"
-                                Margin="8,0"
-                                ThumbColor="{StaticResource Primary}"
-                                MinimumTrackColor="{StaticResource Primary}"
-                                MaximumTrackColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" />
-                        <Label Grid.Column="2" 
-                               Text="{Binding MusicDuration, Converter={StaticResource TimeSpanToStringConverter}}"
-                               FontSize="12"
-                               VerticalOptions="Center" />
-                    </Grid>
-
-                    <!-- 播放控制按钮 -->
-                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
-                        <Button Grid.Column="0" 
-                                Text="⏮️" 
-                                FontSize="20"
-                                Command="{Binding PreviousMusicCommand}"
-                                BackgroundColor="{StaticResource Primary}"
-                                TextColor="White"
-                                CornerRadius="25"
-                                HeightRequest="50" />
-                        <Button Grid.Column="1" 
-                                Text="{Binding MusicStatus, Converter={StaticResource MusicStatusToPlayPauseConverter}}" 
-                                FontSize="24"
-                                Command="{Binding PauseMusicCommand}"
-                                BackgroundColor="{StaticResource Primary}"
-                                TextColor="White"
-                                CornerRadius="25"
-                                HeightRequest="50" />
-                        <Button Grid.Column="2" 
-                                Text="⏭️" 
-                                FontSize="20"
-                                Command="{Binding NextMusicCommand}"
-                                BackgroundColor="{StaticResource Primary}"
-                                TextColor="White"
-                                CornerRadius="25"
-                                HeightRequest="50" />
+                                         WidthRequest="16"
+                                         HeightRequest="16" />
                     </Grid>
                 </StackLayout>
             </Frame>
-
-            <!-- 对话消息列表 -->
-            <Frame Grid.Row="2" 
-                   BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
-                   CornerRadius="15"
-                   HasShadow="True"
-                   Padding="0"
-                   MinimumHeightRequest="300">
-                <Grid>
-                    <CollectionView ItemsSource="{Binding Messages}"
-                                  BackgroundColor="Transparent">
-                        <CollectionView.Header>
-                            <StackLayout Padding="16,16,16,8">
-                                <Label Text="💬 对话记录" 
-                                       FontSize="18" 
-                                       FontAttributes="Bold"
-                                       HorizontalOptions="Center" />
-                            </StackLayout>
-                        </CollectionView.Header>
-                        <CollectionView.ItemTemplate>
-                            <DataTemplate>
-                                <Grid Padding="16,4">
-                                    <Frame BackgroundColor="{Binding IsError, Converter={StaticResource BoolToMessageBackgroundConverter}}"
-                                           CornerRadius="12"
-                                           Padding="12,8"
-                                           HasShadow="False">
-                                        <StackLayout Spacing="4">
-                                            <Label Text="{Binding Content}" 
-                                                   FontSize="14"
-                                                   TextColor="{Binding IsError, Converter={StaticResource BoolToMessageTextColorConverter}}" />
-                                            <Label Text="{Binding Timestamp, StringFormat='{0:HH:mm:ss}'}" 
-                                                   FontSize="12"
-                                                   TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"
-                                                   HorizontalOptions="End" />
-                                        </StackLayout>
-                                    </Frame>
-                                </Grid>
-                            </DataTemplate>
-                        </CollectionView.ItemTemplate>
-                    </CollectionView>
-
-                    <!-- 空状态显示 -->
-                    <StackLayout IsVisible="{Binding Messages.Count, Converter={StaticResource IntToBoolInverseConverter}}"
-                               VerticalOptions="Center"
-                               Padding="20">
-                        <Label Text="🤖" 
-                               FontSize="48"
-                               HorizontalOptions="Center"
-                               Opacity="0.3" />
-                        <Label Text="还没有对话消息"
-                               FontSize="16"
-                               HorizontalOptions="Center"
-                               TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"
-                               Margin="0,8,0,0" />
-                        <Label Text="点击下方麦克风开始对话"
-                               FontSize="14"
-                               HorizontalOptions="Center"
-                               TextColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}" />
-                    </StackLayout>
-                </Grid>
-            </Frame>
-
-            <!-- 文本输入区域 -->
-            <Frame Grid.Row="3" 
-                   BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
-                   CornerRadius="15"
-                   HasShadow="True"
-                   Padding="12">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                    <Entry Grid.Column="0" 
-                           Text="{Binding MessageText}"
-                           Placeholder="输入消息..."
-                           BackgroundColor="Transparent"
-                           VerticalOptions="Center" />
-                    <Button Grid.Column="1" 
-                            Text="📤"
-                            FontSize="20"
-                            Command="{Binding SendMessageCommand}"
-                            BackgroundColor="{StaticResource Primary}"
-                            TextColor="White"
-                            CornerRadius="20"
-                            WidthRequest="40"
-                            HeightRequest="40" />
-                </Grid>
-            </Frame>
-
-            <!-- 语音控制区域 -->
-            <Grid Grid.Row="4" ColumnDefinitions="*,Auto,*" ColumnSpacing="16">
-                <!-- 清空按钮 -->
-                <Button Grid.Column="0" 
-                        Text="🗑️ 清空"
-                        Command="{Binding ClearMessagesCommand}"
-                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
-                        TextColor="{AppThemeBinding Light=Black, Dark=White}"
-                        CornerRadius="25"
-                        HeightRequest="50" />
-
-                <!-- 主要录音按钮 -->
-                <Border Grid.Column="1" 
-                        StrokeThickness="3"
-                        Stroke="{Binding IsManualRecording, Converter={StaticResource BoolToRecordingBorderConverter}}"
-                        BackgroundColor="{Binding IsManualRecording, Converter={StaticResource BoolToRecordingBackgroundConverter}}"
-                        WidthRequest="80"
-                        HeightRequest="80">
-                    <Border.StrokeShape>
-                        <RoundRectangle CornerRadius="40" />
-                    </Border.StrokeShape>
-                    <Border.GestureRecognizers>
-                        <PointerGestureRecognizer PointerPressed="OnRecordingPressed" 
-                                                PointerReleased="OnRecordingReleased" />
-                    </Border.GestureRecognizers>
-                    <Label Text="{Binding IsManualRecording, Converter={StaticResource BoolToRecordingTextConverter}}"
-                           FontSize="32"
-                           HorizontalOptions="Center"
-                           VerticalOptions="Center"
-                           TextColor="White" />
-                </Border>
-
-                <!-- 服务状态按钮 -->
-                <Button Grid.Column="2" 
-                        Text="{Binding IsConnected, Converter={StaticResource BoolToServiceStatusConverter}}"
-                        Command="{Binding ToggleConnectionCommand}"
-                        BackgroundColor="{Binding IsConnected, Converter={StaticResource BoolToServiceBackgroundConverter}}"
-                        TextColor="White"
-                        CornerRadius="25"
-                        HeightRequest="50" />
-            </Grid>
         </Grid>
     </ScrollView>
 

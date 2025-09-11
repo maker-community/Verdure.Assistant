@@ -14,6 +14,9 @@ public partial class HomePage : ContentPage
         _viewModel = viewModel;
         _logger = logger;
         BindingContext = _viewModel;
+        
+        // 订阅表情变化事件
+        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
     }
 
     protected override async void OnAppearing()
@@ -26,30 +29,87 @@ public partial class HomePage : ContentPage
         _logger?.LogInformation("HomePage appeared and ViewModel initialized");
     }
 
-    #region 录音手势处理
-
-    private async void OnRecordingPressed(object? sender, PointerEventArgs e)
+    protected override void OnDisappearing()
     {
-        try
+        base.OnDisappearing();
+        _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+    }
+
+    #region 表情显示处理
+
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(HomePageViewModel.CurrentEmotion))
         {
-            await _viewModel.StartManualRecordingCommand.ExecuteAsync(null);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Error starting manual recording");
+            UpdateEmotionDisplay();
         }
     }
 
-    private async void OnRecordingReleased(object? sender, PointerEventArgs e)
+    private void UpdateEmotionDisplay()
     {
         try
         {
-            await _viewModel.StopManualRecordingCommand.ExecuteAsync(null);
+            var emotion = _viewModel.CurrentEmotion;
+            
+            // 检查是否为GIF路径或文件名
+            if (!string.IsNullOrEmpty(emotion) && (emotion.EndsWith(".gif", StringComparison.OrdinalIgnoreCase) || 
+                emotion.Contains("/") || IsEmotionGifFile(emotion)))
+            {
+                try
+                {
+                    // 显示GIF
+                    string gifPath = emotion;
+                    
+                    // 如果只是表情名称，构建完整路径
+                    if (!emotion.Contains("/") && !emotion.EndsWith(".gif", StringComparison.OrdinalIgnoreCase))
+                    {
+                        gifPath = $"{emotion.ToLower()}.gif";
+                    }
+                    
+                    if (emotion.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                    {
+                        EmotionGifImage.Source = ImageSource.FromUri(new Uri(emotion));
+                    }
+                    else
+                    {
+                        // 对于本地GIF文件，使用FromFile方法
+                        EmotionGifImage.Source = ImageSource.FromFile(gifPath);
+                    }
+                    EmotionGifImage.IsVisible = true;
+                    EmotionTextLabel.IsVisible = false;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Failed to load GIF emotion: {Emotion}", emotion);
+                    // 如果加载GIF失败，回退到文字表情
+                    EmotionGifImage.IsVisible = false;
+                    EmotionTextLabel.IsVisible = true;
+                }
+            }
+            else
+            {
+                // 显示文字表情
+                EmotionGifImage.IsVisible = false;
+                EmotionTextLabel.IsVisible = true;
+            }
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Error stopping manual recording");
+            _logger?.LogError(ex, "Error updating emotion display");
+            // 出错时显示默认表情
+            EmotionGifImage.IsVisible = false;
+            EmotionTextLabel.IsVisible = true;
         }
+    }
+
+    private bool IsEmotionGifFile(string emotion)
+    {
+        // 检查是否为已知的表情名称
+        var knownEmotions = new[] { "happy", "sad", "angry", "neutral", "thinking", "loving", "laughing", 
+            "cool", "confused", "confident", "crying", "delicious", "embarrassed", "funny", "kissy", 
+            "relaxed", "shocked", "silly", "sleepy", "winking" };
+        
+        return knownEmotions.Contains(emotion.ToLower());
     }
 
     #endregion

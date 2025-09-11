@@ -32,6 +32,9 @@
 		<!-- Images -->
 		<MauiImage Include="Resources\Images\*" Exclude="Resources\Images\appicon.svg;Resources\Images\appiconfg.svg" />
 		<MauiImage Update="Resources\Images\dotnet_bot.svg" BaseSize="168,208" />
+		
+		<!-- Emotion GIFs as raw assets to preserve animation -->
+		<MauiAsset Include="Resources\Images\Emotions\*.gif" LogicalName="%(Filename)%(Extension)" />
 
 		<!-- Custom Fonts -->
 		<MauiFont Include="Resources\Fonts\*" />
