@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Verdure.Assistant.Core.Interfaces;
@@ -10,24 +9,22 @@ namespace Verdure.Assistant.MAUI.Services
 {
     /// <summary>
     /// MAUI 表情资源解析器
-    /// 专门处理MAUI应用包中的表情资源
+    /// 提供固定的表情资源映射，无需文件系统访问
     /// </summary>
     public class MauiEmotionAssetResolver : IEmotionAssetResolver
     {
         private readonly ILogger<MauiEmotionAssetResolver> _logger;
-        private readonly MauiResourceService _resourceService;
         private readonly Dictionary<string, string> _emotionMappings;
+        private readonly HashSet<string> _availableEmotions;
 
-        public MauiEmotionAssetResolver(
-            ILogger<MauiEmotionAssetResolver> logger,
-            MauiResourceService resourceService)
+        public MauiEmotionAssetResolver(ILogger<MauiEmotionAssetResolver> logger)
         {
             _logger = logger;
-            _resourceService = resourceService;
             _emotionMappings = InitializeEmotionMappings();
+            _availableEmotions = InitializeAvailableEmotions();
         }
 
-        public async Task<IEnumerable<EmotionAsset>> ResolveAssetsAsync(string emotionType)
+        public Task<IEnumerable<EmotionAsset>> ResolveAssetsAsync(string emotionType)
         {
             var assets = new List<EmotionAsset>();
             var normalizedEmotion = NormalizeEmotionName(emotionType);
@@ -35,8 +32,23 @@ namespace Verdure.Assistant.MAUI.Services
             _logger.LogDebug("Resolving assets for emotion: {EmotionType} (normalized: {NormalizedEmotion})", 
                 emotionType, normalizedEmotion);
 
-            // 在MAUI中查找GIF资源
-            await FindMauiGifAssets(normalizedEmotion, assets);
+            // 如果是可用的表情，添加GIF资源
+            if (_availableEmotions.Contains(normalizedEmotion))
+            {
+                assets.Add(new EmotionAsset
+                {
+                    Path = $"Emotions/{normalizedEmotion}.gif",
+                    Type = "gif",
+                    Priority = 100, // GIF优先级最高
+                    IsAvailable = true,
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["Source"] = "MAUI AppPackage",
+                        ["Platform"] = "MAUI",
+                        ["EmotionType"] = normalizedEmotion
+                    }
+                });
+            }
 
             // 总是添加Emoji作为后备
             assets.Add(new EmotionAsset
@@ -57,119 +69,77 @@ namespace Verdure.Assistant.MAUI.Services
             _logger.LogDebug("Found {Count} available assets for emotion {EmotionType}", 
                 availableAssets.Count, emotionType);
 
-            return availableAssets;
+            return Task.FromResult<IEnumerable<EmotionAsset>>(availableAssets);
         }
 
-        public async Task<EmotionAsset?> GetPreferredAssetAsync(string emotionType, string rendererType)
+        public Task<EmotionAsset?> GetPreferredAssetAsync(string emotionType, string rendererType)
         {
-            var assets = await ResolveAssetsAsync(emotionType);
-            var preferredAsset = assets.FirstOrDefault(a => a.Type.Equals(rendererType, StringComparison.OrdinalIgnoreCase));
+            var normalizedEmotion = NormalizeEmotionName(emotionType);
             
-            _logger.LogDebug("Preferred asset for {EmotionType} with renderer {RendererType}: {AssetPath}", 
-                emotionType, rendererType, preferredAsset?.Path ?? "Not found");
-                
-            return preferredAsset;
-        }
-
-        public async Task<bool> HasAssetAsync(string emotionType)
-        {
-            var assets = await ResolveAssetsAsync(emotionType);
-            return assets.Any(a => a.IsAvailable);
-        }
-
-        public async Task<IEnumerable<string>> GetAvailableEmotionsAsync()
-        {
-            var availableEmotions = new List<string>();
-
-            // 检查所有已知表情的GIF资源
-            var knownEmotions = new[]
+            // 如果请求GIF渲染器且表情可用，返回GIF资源
+            if (rendererType.Equals("gif", StringComparison.OrdinalIgnoreCase) && 
+                _availableEmotions.Contains(normalizedEmotion))
             {
-                "angry", "confident", "confused", "cool", "crying", "delicious", 
-                "embarrassed", "funny", "happy", "kissy", "laughing", "loving", 
-                "neutral", "relaxed", "sad", "shocked", "silly", "sleepy", 
-                "surprised", "thinking", "winking", "listening", "speaking"
-            };
-
-            foreach (var emotion in knownEmotions)
-            {
-                if (await CheckMauiGifExists(emotion))
+                var asset = new EmotionAsset
                 {
-                    availableEmotions.Add(emotion);
-                }
-            }
-
-            _logger.LogDebug("Found {Count} available emotions in MAUI resources", availableEmotions.Count);
-            return availableEmotions;
-        }
-
-        private async Task FindMauiGifAssets(string emotionName, List<EmotionAsset> assets)
-        {
-            // MAUI中的可能路径
-            var possiblePaths = new[]
-            {
-                $"{emotionName}.gif",
-                $"Emotions/{emotionName}.gif",
-                $"emotions/{emotionName}.gif",
-                $"Images/Emotions/{emotionName}.gif",
-                $"images/emotions/{emotionName}.gif"
-            };
-
-            foreach (var path in possiblePaths)
-            {
-                if (await CheckMauiResourceExists(path))
-                {
-                    assets.Add(new EmotionAsset
+                    Path = $"Emotions/{normalizedEmotion}.gif",
+                    Type = "gif",
+                    Priority = 100,
+                    IsAvailable = true,
+                    Metadata = new Dictionary<string, object>
                     {
-                        Path = path,
-                        Type = "gif",
-                        Priority = 100, // GIF优先级最高
-                        IsAvailable = true,
-                        Metadata = new Dictionary<string, object>
-                        {
-                            ["Source"] = "MAUI AppPackage",
-                            ["Platform"] = "MAUI",
-                            ["OriginalPath"] = path
-                        }
-                    });
-
-                    _logger.LogDebug("Found MAUI GIF asset: {Path}", path);
-                    break; // 找到第一个就停止
-                }
+                        ["Source"] = "MAUI AppPackage",
+                        ["Platform"] = "MAUI",
+                        ["EmotionType"] = normalizedEmotion
+                    }
+                };
+                
+                _logger.LogDebug("Preferred asset for {EmotionType} with renderer {RendererType}: {AssetPath}", 
+                    emotionType, rendererType, asset.Path);
+                    
+                return Task.FromResult<EmotionAsset?>(asset);
             }
-        }
-
-        private async Task<bool> CheckMauiGifExists(string emotionName)
-        {
-            var possiblePaths = new[]
+            
+            // 返回Emoji后备
+            var emojiAsset = new EmotionAsset
             {
-                $"{emotionName}.gif",
-                $"Emotions/{emotionName}.gif",
-                $"Images/Emotions/{emotionName}.gif"
-            };
-
-            foreach (var path in possiblePaths)
-            {
-                if (await CheckMauiResourceExists(path))
+                Path = GetEmotionEmoji(normalizedEmotion),
+                Type = "emoji",
+                Priority = 1,
+                IsAvailable = true,
+                Metadata = new Dictionary<string, object>
                 {
-                    return true;
+                    ["Source"] = "Emoji",
+                    ["Platform"] = "MAUI"
                 }
-            }
-
-            return false;
+            };
+            
+            return Task.FromResult<EmotionAsset?>(emojiAsset);
         }
 
-        private async Task<bool> CheckMauiResourceExists(string resourcePath)
+        public Task<bool> HasAssetAsync(string emotionType)
         {
-            try
+            var normalizedEmotion = NormalizeEmotionName(emotionType);
+            // 总是返回true，因为至少有Emoji后备
+            return Task.FromResult(true);
+        }
+
+        public Task<IEnumerable<string>> GetAvailableEmotionsAsync()
+        {
+            _logger.LogDebug("Found {Count} available emotions", _availableEmotions.Count);
+            return Task.FromResult<IEnumerable<string>>(_availableEmotions);
+        }
+
+        private HashSet<string> InitializeAvailableEmotions()
+        {
+            // 定义所有可用的表情（与Emotions目录中的GIF文件对应）
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                using var stream = await Microsoft.Maui.Storage.FileSystem.Current.OpenAppPackageFileAsync(resourcePath);
-                return stream != null;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogTrace("Resource not found: {ResourcePath} - {Error}", resourcePath, ex.Message);
-                return false;
-            }
+                "angry", "confident", "confused", "cool", "crying", "delicious",
+                "embarrassed", "funny", "happy", "kissy", "laughing", "loving",
+                "neutral", "relaxed", "sad", "shocked", "silly", "sleepy",
+                "surprised", "thinking", "winking"
+            };
         }
 
         private string NormalizeEmotionName(string emotionType)

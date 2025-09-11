@@ -4,21 +4,48 @@ using Verdure.Assistant.MAUI.Services;
 
 namespace Verdure.Assistant.MAUI.Views;
 
-public partial class HomePage : ContentPage
-{
-    private readonly HomePageViewModel _viewModel;
-    private readonly ILogger<HomePage>? _logger;
+    public partial class HomePage : ContentPage
+    {
+        private readonly HomePageViewModel _viewModel;
+        private readonly ILogger<HomePage>? _logger;
 
+        // 表情映射字典
+        private readonly Dictionary<string, string> _emotionGifMapping = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["neutral"] = "Emotions/neutral.gif",
+            ["happy"] = "Emotions/happy.gif",
+            ["sad"] = "Emotions/sad.gif",
+            ["angry"] = "Emotions/angry.gif",
+            ["surprised"] = "Emotions/surprised.gif",
+            ["confused"] = "Emotions/confused.gif",
+            ["thinking"] = "Emotions/thinking.gif",
+            ["speaking"] = "Emotions/happy.gif", // 映射到happy
+            ["listening"] = "Emotions/thinking.gif", // 映射到thinking
+            ["laughing"] = "Emotions/laughing.gif",
+            ["loving"] = "Emotions/loving.gif",
+            ["embarrassed"] = "Emotions/embarrassed.gif",
+            ["shocked"] = "Emotions/shocked.gif",
+            ["winking"] = "Emotions/winking.gif",
+            ["cool"] = "Emotions/cool.gif",
+            ["relaxed"] = "Emotions/relaxed.gif",
+            ["sleepy"] = "Emotions/sleepy.gif",
+            ["silly"] = "Emotions/silly.gif",
+            ["confident"] = "Emotions/confident.gif",
+            ["crying"] = "Emotions/crying.gif",
+            ["delicious"] = "Emotions/delicious.gif",
+            ["funny"] = "Emotions/funny.gif",
+            ["kissy"] = "Emotions/kissy.gif"
+        };
     public HomePage(HomePageViewModel viewModel, ILogger<HomePage>? logger = null)
     {
         InitializeComponent();
         _viewModel = viewModel;
         _logger = logger;
         BindingContext = _viewModel;
-        
+
         // 订阅表情变化事件
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
-        
+
         // 订阅GIF渲染事件
         MauiGifEmotionRenderer.GifRenderRequested += OnGifRenderRequested;
         MauiGifEmotionRenderer.GifRenderStopped += OnGifRenderStopped;
@@ -65,7 +92,7 @@ public partial class HomePage : ContentPage
                 {
                     _logger?.LogDebug("Displaying GIF emotion: {EmotionType} -> {GifPath}", e.EmotionType, e.GifPath);
                     
-                    // 设置GIF图片源
+                    // 直接使用GIF路径
                     EmotionGifImage.Source = ImageSource.FromFile(e.GifPath);
                     EmotionGifImage.IsVisible = true;
                     EmotionTextLabel.IsVisible = false;
@@ -108,35 +135,22 @@ public partial class HomePage : ContentPage
         {
             var emotion = _viewModel.CurrentEmotion;
             
-            // 检查是否为GIF路径或文件名
-            if (!string.IsNullOrEmpty(emotion) && (emotion.EndsWith(".gif", StringComparison.OrdinalIgnoreCase) || 
-                emotion.Contains("/") || IsEmotionGifFile(emotion)))
+            if (string.IsNullOrEmpty(emotion))
+            {
+                emotion = "neutral";
+            }
+
+            // 查找表情对应的GIF路径
+            if (_emotionGifMapping.TryGetValue(emotion, out var gifPath))
             {
                 try
                 {
-                    // 显示GIF - 优先使用新的渲染系统通过事件处理
-                    // 如果没有通过事件系统处理，则使用旧的直接设置方法
-                    string gifPath = emotion;
-                    
-                    // 如果只是表情名称，构建完整路径
-                    if (!emotion.Contains("/") && !emotion.EndsWith(".gif", StringComparison.OrdinalIgnoreCase))
-                    {
-                        gifPath = $"{emotion.ToLower()}.gif";
-                    }
-                    
-                    if (emotion.StartsWith("http", StringComparison.OrdinalIgnoreCase))
-                    {
-                        EmotionGifImage.Source = ImageSource.FromUri(new Uri(emotion));
-                    }
-                    else
-                    {
-                        // 对于本地GIF文件，使用FromFile方法
-                        EmotionGifImage.Source = ImageSource.FromFile(gifPath);
-                    }
+                    // 显示GIF
+                    EmotionGifImage.Source = ImageSource.FromFile(gifPath);
                     EmotionGifImage.IsVisible = true;
                     EmotionTextLabel.IsVisible = false;
                     
-                    _logger?.LogDebug("Updated emotion display with GIF: {GifPath}", gifPath);
+                    _logger?.LogDebug("Updated emotion display with GIF: {Emotion} -> {GifPath}", emotion, gifPath);
                 }
                 catch (Exception ex)
                 {
@@ -147,17 +161,15 @@ public partial class HomePage : ContentPage
             }
             else
             {
-                // 显示文字表情
-                EmotionGifImage.IsVisible = false;
-                EmotionTextLabel.IsVisible = true;
-                _logger?.LogDebug("Updated emotion display with text: {Emotion}", emotion);
+                // 没有找到对应的GIF，显示文字表情
+                ShowEmotionFallback(emotion);
             }
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error updating emotion display");
             // 出错时显示默认表情
-            ShowEmotionFallback("😊");
+            ShowEmotionFallback("neutral");
         }
     }
 
@@ -166,17 +178,11 @@ public partial class HomePage : ContentPage
         EmotionGifImage.IsVisible = false;
         EmotionTextLabel.IsVisible = true;
         
-        // 如果是表情名称，转换为emoji
-        if (IsEmotionGifFile(emotion))
-        {
-            var emoji = GetEmotionEmoji(emotion);
-            if (!string.IsNullOrEmpty(emoji))
-            {
-                EmotionTextLabel.Text = emoji;
-            }
-        }
+        // 转换为emoji
+        var emoji = GetEmotionEmoji(emotion);
+        EmotionTextLabel.Text = emoji;
         
-        _logger?.LogDebug("Showing emotion fallback: {Emotion}", emotion);
+        _logger?.LogDebug("Showing emotion fallback: {Emotion} -> {Emoji}", emotion, emoji);
     }
 
     private string GetEmotionEmoji(string emotionType)
@@ -208,16 +214,6 @@ public partial class HomePage : ContentPage
             "kissy" => "😘",
             _ => "😊"
         };
-    }
-
-    private bool IsEmotionGifFile(string emotion)
-    {
-        // 检查是否为已知的表情名称
-        var knownEmotions = new[] { "happy", "sad", "angry", "neutral", "thinking", "loving", "laughing", 
-            "cool", "confused", "confident", "crying", "delicious", "embarrassed", "funny", "kissy", 
-            "relaxed", "shocked", "silly", "sleepy", "winking" };
-        
-        return knownEmotions.Contains(emotion.ToLower());
     }
 
     #endregion

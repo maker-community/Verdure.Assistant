@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 using System;
-using System.IO;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Verdure.Assistant.Core.Interfaces;
@@ -9,12 +9,13 @@ namespace Verdure.Assistant.MAUI.Services
 {
     /// <summary>
     /// MAUI GIF 表情渲染器
-    /// 专门处理Android平台的GIF资源路径和显示
+    /// 提供固定的表情路径映射，无需文件系统访问
     /// </summary>
     public class MauiGifEmotionRenderer : IEmotionRenderer
     {
         private readonly ILogger<MauiGifEmotionRenderer> _logger;
-        private readonly MauiResourceService _resourceService;
+        private readonly HashSet<string> _availableEmotions;
+        private readonly Dictionary<string, string> _emotionMappings;
         private CancellationTokenSource? _currentCancellationTokenSource;
 
         public string RendererType => "gif";
@@ -22,43 +23,30 @@ namespace Verdure.Assistant.MAUI.Services
 
         public event EventHandler<EmotionRenderEventArgs>? RenderCompleted;
 
-        public MauiGifEmotionRenderer(
-            ILogger<MauiGifEmotionRenderer> logger,
-            MauiResourceService resourceService)
+        // 静态事件，供HomePage订阅
+        public static event EventHandler<MauiGifRenderEventArgs>? GifRenderRequested;
+        public static event EventHandler? GifRenderStopped;
+
+        public MauiGifEmotionRenderer(ILogger<MauiGifEmotionRenderer> logger)
         {
             _logger = logger;
-            _resourceService = resourceService;
+            _availableEmotions = InitializeAvailableEmotions();
+            _emotionMappings = InitializeEmotionMappings();
         }
 
-        public async Task<bool> CanRenderAsync(EmotionRenderRequest request)
+        public Task<bool> CanRenderAsync(EmotionRenderRequest request)
         {
             if (string.IsNullOrEmpty(request.AssetPath))
-                return false;
-
-            // 检查是否是GIF文件（通过扩展名或表情名称）
-            if (request.AssetPath.EndsWith(".gif", StringComparison.OrdinalIgnoreCase))
-            {
-                // 如果是完整路径，检查文件是否存在
-                if (Path.IsPathRooted(request.AssetPath))
-                {
-                    return File.Exists(request.AssetPath);
-                }
-                // 如果是相对路径，检查是否在Resources中
-                return await CheckMauiResourceExists(request.AssetPath);
-            }
+                return Task.FromResult(false);
 
             // 检查是否是已知的表情名称
-            if (IsKnownEmotion(request.AssetPath))
-            {
-                var gifFileName = $"{request.AssetPath.ToLower()}.gif";
-                return await CheckMauiResourceExists($"Emotions/{gifFileName}") || 
-                       await CheckMauiResourceExists(gifFileName);
-            }
-
-            return false;
+            var emotionName = GetEmotionName(request.AssetPath, request.EmotionType);
+            var normalizedEmotion = NormalizeEmotionName(emotionName);
+            
+            return Task.FromResult(_availableEmotions.Contains(normalizedEmotion));
         }
 
-        public async Task RenderAsync(EmotionRenderRequest request, CancellationToken cancellationToken = default)
+        public Task RenderAsync(EmotionRenderRequest request, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -67,14 +55,18 @@ namespace Verdure.Assistant.MAUI.Services
                 _logger.LogDebug("Starting MAUI GIF emotion render: {EmotionType} -> {AssetPath}", 
                     request.EmotionType, request.AssetPath);
 
-                string gifPath = await ResolveGifPath(request.AssetPath, request.EmotionType);
+                var emotionName = GetEmotionName(request.AssetPath, request.EmotionType);
+                var normalizedEmotion = NormalizeEmotionName(emotionName);
                 
-                if (string.IsNullOrEmpty(gifPath))
+                if (!_availableEmotions.Contains(normalizedEmotion))
                 {
-                    throw new FileNotFoundException($"GIF file not found for: {request.AssetPath}");
+                    _logger.LogWarning("Emotion not available: {EmotionName}", emotionName);
+                    normalizedEmotion = "neutral"; // 回退到默认表情
                 }
 
-                // 通过事件通知UI更新 - 使用标准的MAUI路径格式
+                var gifPath = $"Emotions/{normalizedEmotion}.gif";
+
+                // 通过事件通知UI更新
                 OnGifRenderRequested(new MauiGifRenderEventArgs
                 {
                     EmotionType = request.EmotionType,
@@ -83,106 +75,110 @@ namespace Verdure.Assistant.MAUI.Services
                     Duration = request.Duration
                 });
 
-                // 等待播放完成
-                var playbackDuration = request.Duration;
-                if (request.Loops > 1)
-                {
-                    playbackDuration = TimeSpan.FromMilliseconds(playbackDuration.TotalMilliseconds * request.Loops);
-                }
+                // 模拟渲染完成
+                var renderEventArgs = new EmotionRenderEventArgs(request.EmotionType, RendererType, true);
 
-                await Task.Delay(playbackDuration, _currentCancellationTokenSource.Token);
+                RenderCompleted?.Invoke(this, renderEventArgs);
 
-                // 播放完成
-                RenderCompleted?.Invoke(this, new EmotionRenderEventArgs(request.EmotionType, RendererType, true));
-                
-                _logger.LogDebug("MAUI GIF emotion render completed: {EmotionType}", request.EmotionType);
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.LogDebug("MAUI GIF emotion render cancelled: {EmotionType}", request.EmotionType);
-                // 取消不算错误
+                _logger.LogDebug("MAUI GIF emotion render completed: {EmotionType} -> {GifPath}", 
+                    request.EmotionType, gifPath);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "MAUI GIF emotion render failed: {EmotionType}", request.EmotionType);
-                RenderCompleted?.Invoke(this, new EmotionRenderEventArgs(request.EmotionType, RendererType, false, ex.Message));
-            }
-        }
+                _logger.LogError(ex, "Error during MAUI GIF emotion render");
+                
+                var renderEventArgs = new EmotionRenderEventArgs(request.EmotionType, RendererType, false, ex.Message);
 
-        public async Task StopAsync()
-        {
-            _currentCancellationTokenSource?.Cancel();
-            _currentCancellationTokenSource?.Dispose();
-            _currentCancellationTokenSource = null;
-
-            // 通知UI停止显示
-            OnGifRenderStopped();
-
-            await Task.CompletedTask;
-        }
-
-        private async Task<string> ResolveGifPath(string assetPath, string emotionType)
-        {
-            // 如果已经是有效的资源路径（不包含文件系统分隔符），直接返回
-            if (!string.IsNullOrEmpty(assetPath) && !assetPath.Contains(Path.DirectorySeparatorChar) && !assetPath.Contains(Path.AltDirectorySeparatorChar))
-            {
-                if (assetPath.EndsWith(".gif", StringComparison.OrdinalIgnoreCase))
-                {
-                    return assetPath;
-                }
+                RenderCompleted?.Invoke(this, renderEventArgs);
             }
 
-            // 尝试构建标准的表情GIF路径
-            string emotionName = !string.IsNullOrEmpty(emotionType) ? emotionType.ToLower() : 
-                                 Path.GetFileNameWithoutExtension(assetPath)?.ToLower() ?? "neutral";
-
-            // MAUI中的GIF资源路径格式
-            var possiblePaths = new[]
-            {
-                $"{emotionName}.gif",  // 直接使用文件名
-                $"Emotions/{emotionName}.gif",  // 在Emotions文件夹中
-                $"emotions/{emotionName}.gif",  // 小写文件夹名
-                assetPath  // 原始路径
-            };
-
-            foreach (var path in possiblePaths)
-            {
-                if (await CheckMauiResourceExists(path))
-                {
-                    _logger.LogDebug("Resolved GIF path: {Path}", path);
-                    return path;
-                }
-            }
-
-            _logger.LogWarning("Could not resolve GIF path for: {AssetPath}, EmotionType: {EmotionType}", assetPath, emotionType);
-            return string.Empty;
+            return Task.CompletedTask;
         }
 
-        private async Task<bool> CheckMauiResourceExists(string resourcePath)
+        public Task StopAsync()
         {
             try
             {
-                // 在MAUI中，检查应用包资源是否存在
-                using var stream = await Microsoft.Maui.Storage.FileSystem.Current.OpenAppPackageFileAsync(resourcePath);
-                return stream != null;
+                _currentCancellationTokenSource?.Cancel();
+                _currentCancellationTokenSource?.Dispose();
+                _currentCancellationTokenSource = null;
+
+                OnGifRenderStopped();
+
+                _logger.LogDebug("MAUI GIF emotion render stopped");
             }
-            catch
+            catch (Exception ex)
             {
-                return false;
+                _logger.LogError(ex, "Error stopping MAUI GIF emotion render");
             }
+
+            return Task.CompletedTask;
         }
 
-        private bool IsKnownEmotion(string emotion)
+        private string GetEmotionName(string? assetPath, string emotionType)
         {
-            // 检查是否为已知的表情名称
-            var knownEmotions = new[] { 
-                "happy", "sad", "angry", "neutral", "thinking", "loving", "laughing", 
-                "cool", "confused", "confident", "crying", "delicious", "embarrassed", 
-                "funny", "kissy", "relaxed", "shocked", "silly", "sleepy", "winking",
-                "surprised", "listening", "speaking"
+            // 优先使用emotionType
+            if (!string.IsNullOrEmpty(emotionType))
+                return emotionType;
+
+            // 如果assetPath是表情名称，使用它
+            if (!string.IsNullOrEmpty(assetPath) && !assetPath.Contains("/") && !assetPath.Contains("\\"))
+            {
+                return assetPath.Replace(".gif", "", StringComparison.OrdinalIgnoreCase);
+            }
+
+            return "neutral";
+        }
+
+        private string NormalizeEmotionName(string emotionType)
+        {
+            if (string.IsNullOrEmpty(emotionType))
+                return "neutral";
+
+            var normalized = emotionType.ToLowerInvariant().Trim();
+
+            // 应用映射表
+            if (_emotionMappings.TryGetValue(normalized, out var mapped))
+            {
+                return mapped;
+            }
+
+            return normalized;
+        }
+
+        private HashSet<string> InitializeAvailableEmotions()
+        {
+            // 定义所有可用的表情（与Emotions目录中的GIF文件对应）
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "angry", "confident", "confused", "cool", "crying", "delicious",
+                "embarrassed", "funny", "happy", "kissy", "laughing", "loving",
+                "neutral", "relaxed", "sad", "shocked", "silly", "sleepy",
+                "surprised", "thinking", "winking"
             };
-            
-            return Array.Exists(knownEmotions, e => e.Equals(emotion, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private Dictionary<string, string> InitializeEmotionMappings()
+        {
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                // 状态映射
+                ["listening"] = "thinking",
+                ["speaking"] = "happy",
+                ["talking"] = "happy",
+                ["processing"] = "thinking",
+                ["idle"] = "neutral",
+                ["waiting"] = "neutral",
+                
+                // 情感映射
+                ["joy"] = "happy",
+                ["excited"] = "happy",
+                ["upset"] = "sad",
+                ["furious"] = "angry",
+                ["amazed"] = "surprised",
+                ["puzzled"] = "confused",
+                ["playful"] = "silly"
+            };
         }
 
         private void OnGifRenderRequested(MauiGifRenderEventArgs args)
@@ -194,10 +190,6 @@ namespace Verdure.Assistant.MAUI.Services
         {
             GifRenderStopped?.Invoke(this, EventArgs.Empty);
         }
-
-        // UI事件
-        public static event EventHandler<MauiGifRenderEventArgs>? GifRenderRequested;
-        public static event EventHandler? GifRenderStopped;
     }
 
     /// <summary>
