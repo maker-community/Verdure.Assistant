@@ -32,13 +32,16 @@
     <!-- Success Colors -->
     <Color x:Key="Success">#28A745</Color>
     <Color x:Key="SuccessLight">#D4EDDA</Color>
+    <Color x:Key="SuccessDark">#155724</Color>
     
     <!-- Warning Colors -->
     <Color x:Key="Warning">#FFC107</Color>
     <Color x:Key="WarningLight">#FFF3CD</Color>
+    <Color x:Key="WarningDark">#FF8F00</Color>
     
     <!-- Error Colors -->
     <Color x:Key="Error">#DC3545</Color>
     <Color x:Key="ErrorLight">#F8D7DA</Color>
+    <Color x:Key="ErrorDark">#721C24</Color>
 
 </ResourceDictionary>

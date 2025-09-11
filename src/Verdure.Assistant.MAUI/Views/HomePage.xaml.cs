@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Verdure.Assistant.ViewModels;
 using Verdure.Assistant.MAUI.Services;
 
