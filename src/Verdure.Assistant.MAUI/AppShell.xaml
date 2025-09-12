@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="Verdure.Assistant.MAUI.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:Verdure.Assistant.MAUI.Views"
+    Title="绿荫助手"
+    Shell.FlyoutBehavior="Flyout">
+
+    <Shell.FlyoutHeader>
+        <Grid BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource Primary}}" 
+              HeightRequest="120">
+            <StackLayout Orientation="Horizontal" 
+                       VerticalOptions="Center" 
+                       HorizontalOptions="Center"
+                       Spacing="15">
+                <Image Source="dotnet_bot" 
+                       WidthRequest="50" 
+                       HeightRequest="50" />
+                <StackLayout Orientation="Vertical" 
+                           VerticalOptions="Center">
+                    <Label Text="绿荫助手" 
+                           FontSize="24" 
+                           FontAttributes="Bold"
+                           TextColor="White" />
+                    <Label Text="您的AI语音助手" 
+                           FontSize="14" 
+                           TextColor="White" 
+                           Opacity="0.8" />
+                </StackLayout>
+            </StackLayout>
+        </Grid>
+    </Shell.FlyoutHeader>
+
+    <FlyoutItem Title="主页" Icon="home.png">
+        <ShellContent Route="homepage" ContentTemplate="{DataTemplate local:HomePage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="设置" Icon="settings.png">
+        <ShellContent Route="settings" ContentTemplate="{DataTemplate local:SettingsPage}" />
+    </FlyoutItem>
+
+</Shell>

@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="Verdure.Assistant.MAUI.Views.SettingsPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:Verdure.Assistant.ViewModels;assembly=Verdure.Assistant.ViewModels"
+             x:DataType="vm:SettingsPageViewModel"
+             Title="设置"
+             BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray900}}">
+
+    <ScrollView>
+        <StackLayout Padding="16" Spacing="20">
+
+            <!-- 服务器设置 -->
+            <Frame BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
+                   CornerRadius="15"
+                   HasShadow="True"
+                   Padding="16">
+                <StackLayout Spacing="12">
+                    <Label Text="🌐 服务器设置" 
+                           FontSize="18" 
+                           FontAttributes="Bold" />
+                    
+                    <StackLayout Spacing="8">
+                        <Label Text="服务器地址:" FontAttributes="Bold" />
+                        <Entry Text="{Binding ServerUrl}" 
+                               Placeholder="ws://localhost:8080/ws"
+                               BackgroundColor="{AppThemeBinding Light={StaticResource Gray50}, Dark={StaticResource Gray700}}" />
+                    </StackLayout>
+
+                    <Button Text="测试连接" 
+                            Command="{Binding TestConnectionCommand}"
+                            BackgroundColor="{StaticResource Primary}"
+                            TextColor="White"
+                            CornerRadius="8" />
+                </StackLayout>
+            </Frame>
+
+            <!-- 语音设置 -->
+            <Frame BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
+                   CornerRadius="15"
+                   HasShadow="True"
+                   Padding="16">
+                <StackLayout Spacing="12">
+                    <Label Text="🎤 语音设置" 
+                           FontSize="18" 
+                           FontAttributes="Bold" />
+                    
+                    <StackLayout Spacing="8">
+                        <Label Text="录音质量:" FontAttributes="Bold" />
+                        <Picker Title="选择录音质量"
+                                ItemsSource="{Binding AudioQualityOptions}"
+                                SelectedItem="{Binding SelectedAudioQuality}"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource Gray50}, Dark={StaticResource Gray700}}" />
+                    </StackLayout>
+
+                    <StackLayout Spacing="8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" 
+                                   Text="自动语音检测" 
+                                   FontAttributes="Bold"
+                                   VerticalOptions="Center" />
+                            <Switch Grid.Column="1" 
+                                    IsToggled="{Binding IsVoiceActivationEnabled}"
+                                    OnColor="{StaticResource Primary}" />
+                        </Grid>
+                        <Label Text="启用后将自动检测语音输入"
+                               FontSize="12"
+                               TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
+                    </StackLayout>
+                </StackLayout>
+            </Frame>
+
+            <!-- 音乐设置 -->
+            <Frame BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
+                   CornerRadius="15"
+                   HasShadow="True"
+                   Padding="16">
+                <StackLayout Spacing="12">
+                    <Label Text="🎵 音乐设置" 
+                           FontSize="18" 
+                           FontAttributes="Bold" />
+                    
+                    <StackLayout Spacing="8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" 
+                                   Text="{Binding MusicVolume, StringFormat='音乐音量: {0:F0}%'}" 
+                                   FontAttributes="Bold"
+                                   VerticalOptions="Center" />
+                            <Label Grid.Column="1" 
+                                   Text="{Binding MusicVolume, StringFormat='{0:F0}%'}"
+                                   FontAttributes="Bold"
+                                   TextColor="{StaticResource Primary}"
+                                   VerticalOptions="Center" />
+                        </Grid>
+                        <Slider Value="{Binding MusicVolume}"
+                                Minimum="0"
+                                Maximum="100"
+                                ThumbColor="{StaticResource Primary}"
+                                MinimumTrackColor="{StaticResource Primary}"
+                                MaximumTrackColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" />
+                    </StackLayout>
+
+                    <StackLayout Spacing="8">
+                        <Label Text="音乐服务:" FontAttributes="Bold" />
+                        <Picker Title="选择音乐服务"
+                                ItemsSource="{Binding MusicServiceOptions}"
+                                SelectedItem="{Binding SelectedMusicService}"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource Gray50}, Dark={StaticResource Gray700}}" />
+                    </StackLayout>
+                </StackLayout>
+            </Frame>
+
+            <!-- 界面设置 -->
+            <Frame BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
+                   CornerRadius="15"
+                   HasShadow="True"
+                   Padding="16">
+                <StackLayout Spacing="12">
+                    <Label Text="🎨 界面设置" 
+                           FontSize="18" 
+                           FontAttributes="Bold" />
+                    
+                    <StackLayout Spacing="8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" 
+                                   Text="深色模式" 
+                                   FontAttributes="Bold"
+                                   VerticalOptions="Center" />
+                            <Switch Grid.Column="1" 
+                                    IsToggled="{Binding IsDarkMode}"
+                                    OnColor="{StaticResource Primary}" />
+                        </Grid>
+                    </StackLayout>
+
+                    <StackLayout Spacing="8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" 
+                                   Text="显示麦克风可视化" 
+                                   FontAttributes="Bold"
+                                   VerticalOptions="Center" />
+                            <Switch Grid.Column="1" 
+                                    IsToggled="{Binding ShowMicrophoneVisualizer}"
+                                    OnColor="{StaticResource Primary}" />
+                        </Grid>
+                    </StackLayout>
+                </StackLayout>
+            </Frame>
+
+            <!-- 关于信息 -->
+            <Frame BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
+                   CornerRadius="15"
+                   HasShadow="True"
+                   Padding="16">
+                <StackLayout Spacing="12">
+                    <Label Text="ℹ️ 关于" 
+                           FontSize="18" 
+                           FontAttributes="Bold" />
+                    
+                    <StackLayout Spacing="4">
+                        <Label Text="绿荫助手 MAUI版"
+                               FontSize="16"
+                               FontAttributes="Bold" />
+                        <Label Text="版本 1.0.0"
+                               FontSize="14"
+                               TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
+                        <Label Text="基于.NET MAUI的智能语音助手"
+                               FontSize="14"
+                               TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
+                    </StackLayout>
+
+                    <Button Text="检查更新" 
+                            Command="{Binding CheckUpdateCommand}"
+                            BackgroundColor="{StaticResource Secondary}"
+                            TextColor="White"
+                            CornerRadius="8" />
+                </StackLayout>
+            </Frame>
+
+            <!-- 操作按钮 -->
+            <StackLayout Spacing="12">
+                <Button Text="💾 保存设置" 
+                        Command="{Binding SaveSettingsCommand}"
+                        BackgroundColor="{StaticResource Primary}"
+                        TextColor="White"
+                        CornerRadius="8"
+                        HeightRequest="50" />
+                        
+                <Button Text="↩️ 重置为默认" 
+                        Command="{Binding ResetSettingsCommand}"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                        TextColor="{AppThemeBinding Light=Black, Dark=White}"
+                        CornerRadius="8" />
+            </StackLayout>
+
+        </StackLayout>
+    </ScrollView>
+
+</ContentPage>

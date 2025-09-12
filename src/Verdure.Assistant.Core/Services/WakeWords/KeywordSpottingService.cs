@@ -3,6 +3,7 @@ using Microsoft.CognitiveServices.Speech.Audio;
 using Microsoft.Extensions.Logging;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
+using System.Reflection;
 
 namespace Verdure.Assistant.Core.Services;
 
@@ -15,6 +16,7 @@ public class KeywordSpottingService : IKeywordSpottingService
 {
     private readonly ILogger<KeywordSpottingService>? _logger;
     private readonly ISharedAudioRecorder _audioStreamManager;
+    private readonly IPlatformResourceService? _platformResourceService;
 
     // Microsoft认知服务相关
     private SpeechConfig? _speechConfig;
@@ -46,10 +48,11 @@ public class KeywordSpottingService : IKeywordSpottingService
     public bool IsRunning => _isRunning && !_isPaused;
     public bool IsPaused => _isPaused;
     public bool IsEnabled => _isEnabled;
-    public KeywordSpottingService(ISharedAudioRecorder audioStreamManager, ILogger<KeywordSpottingService>? logger = null)
+    public KeywordSpottingService(ISharedAudioRecorder audioStreamManager, ILogger<KeywordSpottingService>? logger = null, IPlatformResourceService? platformResourceService = null)
     {
         _audioStreamManager = audioStreamManager;
         _logger = logger;
+        _platformResourceService = platformResourceService;
 
         InitializeSpeechConfig();
     }
@@ -123,7 +126,7 @@ public class KeywordSpottingService : IKeywordSpottingService
             }
 
             // 加载关键词模型
-            if (!LoadKeywordModels())
+            if (!await LoadKeywordModelsAsync())
             {
                 _logger?.LogError("加载关键词模型失败");
                 return false;
@@ -168,7 +171,7 @@ public class KeywordSpottingService : IKeywordSpottingService
     /// 加载关键词模型（使用配置中的模型路径和文件）
     /// 每次调用都创建新的模型实例以避免句柄错误
     /// </summary>
-    private bool LoadKeywordModels()
+    private async Task<bool> LoadKeywordModelsAsync()
     {
         try
         {
@@ -191,16 +194,23 @@ public class KeywordSpottingService : IKeywordSpottingService
 
             // 获取模型文件路径
             var modelPath = GetKeywordModelPath();
-            if (string.IsNullOrEmpty(modelPath) || !File.Exists(modelPath))
+            if (string.IsNullOrEmpty(modelPath))
             {
-                _logger?.LogError($"关键词模型文件不存在: {modelPath}");
+                _logger?.LogError("无法获取关键词模型文件路径");
+                return false;
+            }
+
+            // 验证文件存在性（支持平台特定的验证方式）
+            if (!await ValidateModelFileExistsAsync(modelPath))
+            {
+                _logger?.LogError("关键词模型文件不存在或无法访问: {Path}", modelPath);
                 return false;
             }
 
             // 从.table文件创建关键词模型 - 每次都创建新实例
             _keywordModel = KeywordRecognitionModel.FromFile(modelPath);
 
-            _logger?.LogInformation($"成功加载关键词模型: {modelPath}");
+            _logger?.LogInformation("成功加载关键词模型: {Path}", modelPath);
             return true;
         }
         catch (Exception ex)
@@ -211,13 +221,80 @@ public class KeywordSpottingService : IKeywordSpottingService
     }
 
     /// <summary>
+    /// 验证模型文件是否存在（支持平台特定的验证方式）
+    /// </summary>
+    /// <param name="modelPath">模型文件路径</param>
+    /// <returns>文件是否存在且可访问</returns>
+    private async Task<bool> ValidateModelFileExistsAsync(string modelPath)
+    {
+        try
+        {
+            // 优先使用平台资源服务进行验证（适用于MAUI等平台）
+            if (_platformResourceService != null)
+            {
+                var currentModel = _config?.KeywordModels.CurrentModel ?? "keyword_xiaodian.table";
+                var resourcePath = $"keywords/{currentModel}";
+                
+                try
+                {
+                    var platformPath = await _platformResourceService.GetResourceFilePathAsync(resourcePath);
+                    if (!string.IsNullOrEmpty(platformPath))
+                    {
+                        // 平台资源服务已经确保文件存在并可访问
+                        _logger?.LogDebug("通过平台资源服务验证模型文件: {Path}", platformPath);
+                        return true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogDebug("平台资源服务验证失败，回退到文件系统验证: {Error}", ex.Message);
+                }
+            }
+
+            // 回退到标准文件系统验证
+            if (File.Exists(modelPath))
+            {
+                _logger?.LogDebug("通过文件系统验证模型文件: {Path}", modelPath);
+                return true;
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "验证模型文件存在性时发生错误: {Path}", modelPath);
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 获取关键词模型文件的完整路径
     /// </summary>
     private string GetKeywordModelPath()
     {
-        var modelsPath = GetModelsDirectoryPath();
         var currentModel = _config?.KeywordModels.CurrentModel ?? "keyword_xiaodian.table";
         
+        // 优先使用平台资源服务获取具体文件路径
+        if (_platformResourceService != null)
+        {
+            try
+            {
+                var resourcePath = $"keywords/{currentModel}";
+                var platformFilePath = _platformResourceService.GetResourceFilePathAsync(resourcePath).Result;
+                if (!string.IsNullOrEmpty(platformFilePath))
+                {
+                    _logger?.LogDebug("使用平台资源服务获取模型文件: {Path}", platformFilePath);
+                    return platformFilePath;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug("平台资源服务获取模型文件失败: {Error}", ex.Message);
+            }
+        }
+
+        // 回退到传统方式
+        var modelsPath = GetModelsDirectoryPath();
         return Path.Combine(modelsPath, currentModel);
     }
 
@@ -241,6 +318,24 @@ public class KeywordSpottingService : IKeywordSpottingService
             }
         }
 
+        // 优先使用平台资源服务（MAUI等平台）
+        if (_platformResourceService != null)
+        {
+            try
+            {
+                var platformPath = _platformResourceService.GetKeywordModelsDirectoryAsync().Result;
+                if (!string.IsNullOrEmpty(platformPath) && Directory.Exists(platformPath))
+                {
+                    _logger?.LogDebug("使用平台资源服务模型路径: {Path}", platformPath);
+                    return platformPath;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug("平台资源服务获取模型路径失败: {Error}", ex.Message);
+            }
+        }
+
         // 使用默认逻辑：根据当前项目类型自动检测
         return GetDefaultModelsPath();
     }
@@ -260,6 +355,37 @@ public class KeywordSpottingService : IKeywordSpottingService
             return consoleModelsPath;
         }
 
+        // 检测是否运行在MAUI环境中
+        if (IsMauiEnvironment())
+        {
+            // MAUI项目：检查应用数据目录中的keywords文件夹
+            try
+            {
+                var appDataDir = GetMauiAppDataDirectory();
+                if (!string.IsNullOrEmpty(appDataDir))
+                {
+                    var mauiKeywordsPath = Path.Combine(appDataDir, "keywords");
+                    if (Directory.Exists(mauiKeywordsPath))
+                    {
+                        _logger?.LogDebug("使用MAUI应用数据目录模型路径: {Path}", mauiKeywordsPath);
+                        return mauiKeywordsPath;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug("MAUI应用数据目录访问失败: {Error}", ex.Message);
+            }
+            
+            // MAUI项目：尝试直接从程序目录访问
+            var mauiAssemblyPath = Path.Combine(assemblyPath, "keywords");
+            if (Directory.Exists(mauiAssemblyPath))
+            {
+                _logger?.LogDebug("使用MAUI程序目录模型路径: {Path}", mauiAssemblyPath);
+                return mauiAssemblyPath;
+            }
+        }
+
         // 然后尝试从解决方案根目录查找WinUI项目的Assets/keywords
         var currentDir = new DirectoryInfo(assemblyPath);
         while (currentDir != null && !File.Exists(Path.Combine(currentDir.FullName, "Verdure.Assistant.sln")))
@@ -275,12 +401,133 @@ public class KeywordSpottingService : IKeywordSpottingService
                 _logger?.LogDebug("使用WinUI项目模型路径: {Path}", winuiModelsPath);
                 return winuiModelsPath;
             }
+            
+            // 也尝试MAUI项目的Raw资源路径
+            var mauiRawModelsPath = Path.Combine(currentDir.FullName, "src", "Verdure.Assistant.MAUI", "Resources", "Raw", "keywords");
+            if (Directory.Exists(mauiRawModelsPath))
+            {
+                _logger?.LogDebug("使用MAUI Raw资源模型路径: {Path}", mauiRawModelsPath);
+                return mauiRawModelsPath;
+            }
         }
 
         // 回退到相对路径
         var fallbackPath = Path.Combine(assemblyPath, "..", "..", "..", "..", "Verdure.Assistant.WinUI", "Assets", "keywords");
         _logger?.LogDebug("使用回退模型路径: {Path}", fallbackPath);
         return fallbackPath;
+    }
+
+    /// <summary>
+    /// 检测是否运行在MAUI环境中
+    /// </summary>
+    private bool IsMauiEnvironment()
+    {
+        try
+        {
+            // 检查是否存在Microsoft.Maui程序集
+            var mauiAssembly = AppDomain.CurrentDomain.GetAssemblies()
+                .FirstOrDefault(a => a.GetName().Name?.StartsWith("Microsoft.Maui") == true);
+            
+            if (mauiAssembly != null)
+            {
+                _logger?.LogDebug("检测到MAUI环境");
+                return true;
+            }
+
+            // 检查是否在移动平台上运行
+            var entryAssembly = Assembly.GetEntryAssembly();
+            var assemblyName = entryAssembly?.GetName().Name;
+            if (assemblyName?.Contains("MAUI") == true)
+            {
+                _logger?.LogDebug("检测到MAUI应用程序集");
+                return true;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogDebug("MAUI环境检测失败: {Error}", ex.Message);
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 获取MAUI应用数据目录
+    /// </summary>
+    private string? GetMauiAppDataDirectory()
+    {
+        try
+        {
+            // 尝试通过反射访问Microsoft.Maui.Storage.FileSystem
+            var fileSystemType = Type.GetType("Microsoft.Maui.Storage.FileSystem, Microsoft.Maui.Essentials");
+            if (fileSystemType != null)
+            {
+                var currentProperty = fileSystemType.GetProperty("Current", BindingFlags.Static | BindingFlags.Public);
+                var fileSystemInstance = currentProperty?.GetValue(null);
+                
+                if (fileSystemInstance != null)
+                {
+                    var appDataProperty = fileSystemInstance.GetType().GetProperty("AppDataDirectory");
+                    var appDataDir = appDataProperty?.GetValue(fileSystemInstance) as string;
+                    
+                    if (!string.IsNullOrEmpty(appDataDir))
+                    {
+                        _logger?.LogDebug("获取MAUI应用数据目录: {Directory}", appDataDir);
+                        return appDataDir;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogDebug("无法获取MAUI应用数据目录: {Error}", ex.Message);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 获取可用的关键词模型列表
+    /// </summary>
+    /// <returns>可用模型文件名数组</returns>
+    public async Task<string[]> GetAvailableKeywordModelsAsync()
+    {
+        // 优先使用平台资源服务
+        if (_platformResourceService != null)
+        {
+            try
+            {
+                var platformModels = await _platformResourceService.GetAvailableKeywordModelsAsync();
+                if (platformModels.Length > 0)
+                {
+                    _logger?.LogDebug("通过平台资源服务找到 {Count} 个关键词模型", platformModels.Length);
+                    return platformModels;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug("平台资源服务获取模型列表失败: {Error}", ex.Message);
+            }
+        }
+
+        // 回退到传统方式
+        try
+        {
+            var modelsPath = GetModelsDirectoryPath();
+            if (Directory.Exists(modelsPath))
+            {
+                var tableFiles = Directory.GetFiles(modelsPath, "*.table");
+                var modelNames = tableFiles.Select(Path.GetFileName).Where(name => !string.IsNullOrEmpty(name)).Cast<string>().ToArray();
+                _logger?.LogDebug("通过文件系统找到 {Count} 个关键词模型", modelNames.Length);
+                return modelNames;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "获取关键词模型列表失败");
+        }
+
+        return Array.Empty<string>();
     }
 
     /// <summary>
@@ -295,13 +542,42 @@ public class KeywordSpottingService : IKeywordSpottingService
         }
 
         // 验证模型文件是否存在
-        var modelsPath = GetModelsDirectoryPath();
-        var modelPath = Path.Combine(modelsPath, modelFileName);
+        string? modelPath = null;
         
-        if (!File.Exists(modelPath))
+        // 优先使用平台资源服务验证文件存在性
+        if (_platformResourceService != null)
         {
-            _logger?.LogError($"关键词模型文件不存在: {modelPath}");
-            return false;
+            try
+            {
+                var resourcePath = $"keywords/{modelFileName}";
+                modelPath = await _platformResourceService.GetResourceFilePathAsync(resourcePath);
+                if (!string.IsNullOrEmpty(modelPath))
+                {
+                    _logger?.LogDebug("平台资源服务验证模型文件成功: {Path}", modelPath);
+                }
+                else
+                {
+                    _logger?.LogError("平台资源服务找不到关键词模型文件: {FileName}", modelFileName);
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug("平台资源服务验证模型文件失败: {Error}", ex.Message);
+            }
+        }
+        
+        // 回退到传统方式验证
+        if (string.IsNullOrEmpty(modelPath))
+        {
+            var modelsPath = GetModelsDirectoryPath();
+            modelPath = Path.Combine(modelsPath, modelFileName);
+            
+            if (!File.Exists(modelPath))
+            {
+                _logger?.LogError("关键词模型文件不存在: {Path}", modelPath);
+                return false;
+            }
         }
 
         // 更新配置
@@ -834,7 +1110,7 @@ public class KeywordSpottingService : IKeywordSpottingService
             await CleanupKeywordRecognizer();
 
             // 2. 重新加载关键词模型
-            if (!LoadKeywordModels())
+            if (!await LoadKeywordModelsAsync())
             {
                 throw new InvalidOperationException("重新加载关键词模型失败");
             }

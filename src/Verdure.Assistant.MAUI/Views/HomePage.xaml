@@ -1,0 +1,239 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="Verdure.Assistant.MAUI.Views.HomePage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:vm="clr-namespace:Verdure.Assistant.ViewModels;assembly=Verdure.Assistant.ViewModels"
+             x:DataType="vm:HomePageViewModel"
+             Title="语音助手"
+             BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray900}}">
+
+    <ScrollView>
+        <Grid Padding="12" RowSpacing="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- 关键词唤醒状态区域 -->
+            <Frame Grid.Row="0" 
+                   BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
+                   CornerRadius="12"
+                   HasShadow="True"
+                   Padding="12">
+                <StackLayout Spacing="8">
+                    <Label Text="💫 智能唤醒" 
+                           FontSize="16" 
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center"
+                           TextColor="{StaticResource Primary}" />
+                    
+                    <!-- 唤醒状态显示 -->
+                    <Frame BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                           CornerRadius="8"
+                           Padding="12,8"
+                           HasShadow="False">
+                        <StackLayout Spacing="4">
+                            <Label Text="{Binding KeywordWakeStatusText}"
+                                   FontSize="14"
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="Center"
+                                   TextColor="White" />
+                            <Label Text="{Binding KeywordWakePromptText}"
+                                   FontSize="12"
+                                   HorizontalOptions="Center"
+                                   TextColor="White"
+                                   MaxLines="2"
+                                   LineBreakMode="WordWrap" />
+                        </StackLayout>
+                    </Frame>
+                    
+                    <!-- 唤醒词显示 -->
+                    <Frame BackgroundColor="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                           CornerRadius="6"
+                           Padding="8,4"
+                           HasShadow="False">
+                        <StackLayout Spacing="2">
+                            <Label Text="唤醒词" 
+                                   FontSize="10"
+                                   HorizontalOptions="Center"
+                                   TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
+                            <Label Text="小电" 
+                                   FontSize="16"
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="Center"
+                                   TextColor="{StaticResource Primary}" />
+                        </StackLayout>
+                    </Frame>
+                </StackLayout>
+            </Frame>
+
+            <!-- 授权验证区域 -->
+            <Frame Grid.Row="1" 
+                   BackgroundColor="{AppThemeBinding Light={StaticResource Warning}, Dark={StaticResource WarningDark}}"
+                   CornerRadius="12"
+                   HasShadow="True"
+                   Padding="12"
+                   IsVisible="{Binding IsVerificationCodeVisible}">
+                <StackLayout Spacing="10">
+                    <Label Text="🔐 身份验证" 
+                           FontSize="16" 
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center"
+                           TextColor="White" />
+                    
+                    <Label Text="{Binding VerificationCodeMessage}"
+                           FontSize="12"
+                           HorizontalOptions="Center"
+                           TextColor="White"
+                           MaxLines="2"
+                           LineBreakMode="WordWrap" />
+                    
+                    <Entry Text="{Binding VerificationCode}"
+                           Placeholder="请输入授权码"
+                           FontSize="14"
+                           HorizontalOptions="FillAndExpand"
+                           BackgroundColor="White"
+                           TextColor="Black" />
+                    
+                    <Button Text="验证"
+                            BackgroundColor="White"
+                            TextColor="{StaticResource Primary}"
+                            CornerRadius="6"
+                            HeightRequest="36"
+                            FontSize="14" />
+                </StackLayout>
+            </Frame>
+
+            <!-- 表情显示区域 -->
+            <Frame Grid.Row="2" 
+                   BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
+                   CornerRadius="12"
+                   HasShadow="True"
+                   Padding="16">
+                <StackLayout Spacing="12">
+                    <Label Text="✨ 情感中心" 
+                           FontSize="16" 
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center"
+                           TextColor="{StaticResource Primary}" />
+                    
+                    <!-- 表情显示容器 -->
+                    <Frame BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                           CornerRadius="20"
+                           Padding="20"
+                           HasShadow="False"
+                           HeightRequest="120"
+                           WidthRequest="120"
+                           HorizontalOptions="Center">
+                        <Grid>
+                            <!-- GIF表情显示 -->
+                            <Image x:Name="EmotionGifImage"
+                                   HorizontalOptions="Center"
+                                   VerticalOptions="Center"
+                                   IsAnimationPlaying="True"
+                                   Aspect="AspectFit"
+                                   IsVisible="False" />
+                            
+                            <!-- 文字表情显示 -->
+                            <Label x:Name="EmotionTextLabel"
+                                   Text="{Binding CurrentEmotion}"
+                                   FontSize="60"
+                                   HorizontalOptions="Center"
+                                   VerticalOptions="Center" />
+                        </Grid>
+                    </Frame>
+                    
+                    <!-- 状态文本 -->
+                    <Frame BackgroundColor="{StaticResource Primary}"
+                           CornerRadius="8"
+                           Padding="12,6"
+                           HasShadow="False"
+                           HorizontalOptions="Center">
+                        <Label Text="{Binding EmotionStatusText}"
+                               FontSize="12"
+                               FontAttributes="Bold"
+                               TextColor="White"
+                               HorizontalOptions="Center" />
+                    </Frame>
+                    
+                    <!-- TTS状态显示 -->
+                    <Frame BackgroundColor="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                           CornerRadius="8"
+                           Padding="10,6"
+                           HasShadow="False">
+                        <StackLayout Spacing="4">
+                            <Label Text="🔊 语音状态" 
+                                   FontSize="11"
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="Center"
+                                   TextColor="{StaticResource Primary}" />
+                            <Label Text="{Binding TtsText}"
+                                   FontSize="11"
+                                   HorizontalOptions="Center"
+                                   TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
+                                   MaxLines="3"
+                                   LineBreakMode="TailTruncation" />
+                        </StackLayout>
+                    </Frame>
+                </StackLayout>
+            </Frame>
+
+            <!-- 系统状态信息 -->
+            <Frame Grid.Row="3" 
+                   BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
+                   CornerRadius="12"
+                   HasShadow="True"
+                   Padding="12">
+                <StackLayout Spacing="8">
+                    <Label Text="📊 系统状态" 
+                           FontSize="14" 
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center"
+                           TextColor="{StaticResource Primary}" />
+                    
+                    <!-- 系统状态 -->
+                    <Frame BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                           CornerRadius="6"
+                           Padding="8,6"
+                           HasShadow="False">
+                        <Label Text="{Binding SystemStatusText}"
+                               FontSize="11"
+                               HorizontalOptions="Center"
+                               TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
+                               MaxLines="2"
+                               LineBreakMode="TailTruncation" />
+                    </Frame>
+                    
+                    <!-- 连接状态 -->
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                        <Frame Grid.Column="0"
+                               BackgroundColor="{AppThemeBinding Light=Green, Dark=DarkGreen}"
+                               CornerRadius="6"
+                               Padding="6,4"
+                               HasShadow="False">
+                            <Label Text="🟢"
+                                   FontSize="10" />
+                        </Frame>
+                        
+                        <Label Grid.Column="1"
+                               Text="连接状态"
+                               FontSize="12"
+                               VerticalOptions="Center"
+                               TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
+                        
+                        <ActivityIndicator Grid.Column="2" 
+                                         IsRunning="{Binding IsConnecting}"
+                                         IsVisible="{Binding IsConnecting}"
+                                         Color="{StaticResource Primary}"
+                                         WidthRequest="16"
+                                         HeightRequest="16" />
+                    </Grid>
+                </StackLayout>
+            </Frame>
+        </Grid>
+    </ScrollView>
+
+</ContentPage>
