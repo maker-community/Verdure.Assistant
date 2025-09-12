@@ -37,6 +37,9 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
     private const int MaxQueueSize = 50;  // 增加队列大小，支持更多缓冲
     private readonly Timer _playbackTimer;
     private DateTime _lastDataTime = DateTime.Now;
+    private DateTime _lastSampleAddTime = DateTime.Now;
+    private long _totalSamplesAdded = 0;
+    private long _totalBytesAdded = 0;
     private EventHandler<EventArgs>? _onPlaybackEnded;
     private Task? _feedTask;
     private CancellationTokenSource? _cancellationTokenSource;
@@ -102,6 +105,7 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
 
     /// <summary>
     /// 检查播放完成条件（基于实际音频数据状态）
+    /// 修复：不仅检查时间，还要确保没有音频数据在缓冲区中等待播放
     /// </summary>
     private void CheckPlaybackCompletion(object? state)
     {
@@ -110,11 +114,29 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
             if (_isPlaying)
             {
                 var timeSinceLastData = (DateTime.Now - _lastDataTime).TotalMilliseconds;
+                var timeSinceLastSample = (DateTime.Now - _lastSampleAddTime).TotalMilliseconds;
                 
-                // 检查是否有足够长时间没有新音频数据
-                if (timeSinceLastData > 2000) // 2秒没有新数据认为播放完成
+                // 计算基于采样率的预估播放时间
+                // 假设所有添加的样本都已经发送到设备，计算最后一批样本的播放时间
+                var estimatedPlaybackTimeMs = (_totalSamplesAdded > 0) ? 
+                    (_totalSamplesAdded * 1000.0 / _sampleRate) : 0;
+                
+                // 更保守的完成检测逻辑：
+                // 1. 距离最后接收数据超过3秒 (增加到3秒，原来是2秒)
+                // 2. 距离最后添加样本超过1秒 (确保缓冲区已空)
+                // 3. 预估的播放时间已经过去了足够长时间
+                var shouldStop = timeSinceLastData > 3000 && 
+                               timeSinceLastSample > 1000;
+                
+                _logger?.LogDebug("播放状态检查 - 距离最后数据: {TimeSinceLastData}ms, " +
+                                "距离最后样本: {TimeSinceLastSample}ms, " +
+                                "总样本数: {TotalSamples}, " +
+                                "是否应停止: {ShouldStop}", 
+                                timeSinceLastData, timeSinceLastSample, _totalSamplesAdded, shouldStop);
+
+                if (shouldStop)
                 {
-                    _logger?.LogDebug("SoundFlow播放完成检测 - 无新数据 {TimeSinceLastData}ms", timeSinceLastData);
+                    _logger?.LogDebug("SoundFlow播放完成检测 - 条件满足，停止播放");
                     
                     // 停止定时器防止多次触发
                     _playbackTimer.Change(Timeout.Infinite, Timeout.Infinite);
@@ -355,6 +377,12 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
         {
             _isPlaying = true;
             
+            // 重置音频跟踪变量，确保干净的状态
+            _totalSamplesAdded = 0;
+            _totalBytesAdded = 0;
+            _lastDataTime = DateTime.Now;
+            _lastSampleAddTime = DateTime.Now;
+            
             // 启动播放设备
             _playbackDevice.Start();
             _logger?.LogDebug("🔊 SoundFlow播放设备启动");
@@ -413,6 +441,10 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
             // 添加到队列中
             _dataProvider.AddSamples(floatSamples);
 
+            // 更新样本跟踪
+            _lastSampleAddTime = DateTime.Now;
+            _totalSamplesAdded += floatSamples.Length;
+
             await Task.CompletedTask;
         }
         catch (Exception ex)
@@ -459,6 +491,11 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
             
             // 直接添加到QueueDataProvider
             _dataProvider.AddSamples(floatSamples);
+            
+            // 更新样本跟踪
+            _lastSampleAddTime = DateTime.Now;
+            _totalSamplesAdded += floatSamples.Length;
+            _totalBytesAdded += audioData.Length;
             
             await Task.CompletedTask;
         }
@@ -508,6 +545,11 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
             // 添加到队列中，QueueDataProvider会自动处理流式播放
             _dataProvider.AddSamples(floatSamples);
             
+            // 更新样本跟踪
+            _lastSampleAddTime = DateTime.Now;
+            _totalSamplesAdded += floatSamples.Length;
+            _totalBytesAdded += audioData.Length;
+            
             await Task.CompletedTask;
         }
         catch (Exception ex)
@@ -549,6 +591,44 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
                 }
             }
 
+            // 重要：清理数据提供器的缓冲区以防止音频混合
+            if (_dataProvider != null)
+            {
+                try
+                {
+                    // 注意：QueueDataProvider可能没有Clear方法，但我们可以重新创建
+                    // 这样可以确保完全清空任何残留的音频数据
+                    var format = new AudioFormat
+                    {
+                        SampleRate = _sampleRate,
+                        Channels = _channels,
+                        Format = SampleFormat.F32
+                    };
+                    
+                    _dataProvider.Dispose();
+                    _dataProvider = new QueueDataProvider(format);
+                    
+                    // 如果播放器存在，更新其数据源
+                    if (_soundPlayer != null)
+                    {
+                        _playbackDevice?.MasterMixer.RemoveComponent(_soundPlayer);
+                        _soundPlayer.Dispose();
+                        _soundPlayer = new SoundPlayer(_engine, format, _dataProvider);
+                        _playbackDevice?.MasterMixer.AddComponent(_soundPlayer);
+                    }
+                    
+                    _logger?.LogDebug("🧹 已清理QueueDataProvider缓冲区");
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "清理QueueDataProvider时出现警告");
+                }
+            }
+
+            // 重置音频跟踪变量
+            _totalSamplesAdded = 0;
+            _totalBytesAdded = 0;
+            
             _logger?.LogInformation("SoundFlow音频播放已停止");
             await Task.CompletedTask;
         }

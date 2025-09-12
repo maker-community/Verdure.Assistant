@@ -88,11 +88,11 @@ public class NAudioPlayer : IAudioPlayer, IDisposable
 
             lock (_lock)
             {
-                // 清理可能存在的旧音频数据以避免杂音
-                if (_bufferedProvider.BufferedDuration.TotalMilliseconds > 2000) // 如果缓冲区超过2秒
+                // 更保守的缓冲区清理：只有在缓冲区过大时才清理，避免中断正常播放
+                if (_bufferedProvider.BufferedDuration.TotalMilliseconds > 5000) // 增加到5秒阈值
                 {
                     _bufferedProvider.ClearBuffer();
-                    _logger?.LogDebug("清理音频缓冲区以避免杂音");
+                    _logger?.LogDebug("清理音频缓冲区以避免过度积累 - 缓冲区超过5秒");
                 }
 
                 // 将音频数据添加到缓冲区
@@ -175,13 +175,18 @@ public class NAudioPlayer : IAudioPlayer, IDisposable
                 var bufferedDuration = _bufferedProvider.BufferedDuration;
                 var timeSinceLastData = (DateTime.Now - _lastDataTime).TotalMilliseconds;
 
-                // 如果缓冲区基本为空且距离最后接收数据超过1.5秒，认为播放完成
-                var shouldStop = bufferedDuration.TotalMilliseconds < 100 && timeSinceLastData > 1500;
+                // 更保守的完成检测：缓冲区基本为空且距离最后接收数据超过2秒
+                // 增加时间阈值从1.5秒到2秒，确保音频播放完整
+                var shouldStop = bufferedDuration.TotalMilliseconds < 50 && timeSinceLastData > 2000;
+
+                _logger?.LogDebug("播放状态检查 - 缓冲区时长: {BufferedDuration}ms, " +
+                                "距离最后数据: {TimeSinceLastData}ms, " +
+                                "是否应停止: {ShouldStop}",
+                        bufferedDuration.TotalMilliseconds, timeSinceLastData, shouldStop);
 
                 if (shouldStop)
                 {
-                    _logger?.LogDebug("播放完成检测 - 缓冲区时长: {BufferedDuration}ms, 距离最后数据: {TimeSinceLastData}ms",
-                        bufferedDuration.TotalMilliseconds, timeSinceLastData);
+                    _logger?.LogDebug("NAudio播放完成检测 - 条件满足，停止播放");
 
                     // 停止定时器以防止多次触发
                     _playbackTimer.Change(Timeout.Infinite, Timeout.Infinite);
