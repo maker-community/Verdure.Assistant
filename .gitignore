@@ -362,4 +362,6 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 
-.vitepress/
+# VitePress build and cache directories
+docs-website/.vitepress/dist/
+docs-website/.vitepress/cache/
