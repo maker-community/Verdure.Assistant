@@ -1,0 +1,75 @@
+name: Deploy Documentation to GitHub Pages
+
+on:
+  # 在main分支推送时触发
+  push:
+    branches: [main]
+    paths:
+      - 'docs-website/**'
+      - '.github/workflows/deploy-docs.yml'
+
+  # 允许手动触发
+  workflow_dispatch:
+
+# 设置GITHUB_TOKEN权限以允许部署到GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 只允许一个并发部署，跳过正在运行的部署之间的运行队列
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 需要完整历史记录以获取最后修改时间
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+          cache-dependency-path: docs-website/package-lock.json
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: docs-website
+
+      - name: Build with VitePress
+        run: npm run build
+        working-directory: docs-website
+        env:
+          # 如果使用自定义域名，取消注释下一行
+          # CUSTOM_DOMAIN: true
+
+      - name: Add CNAME file (if using custom domain)
+        run: |
+          # 如果使用自定义域名，取消注释并修改下一行的域名
+          # echo "your-custom-domain.com" > docs-website-dist/CNAME
+        if: false  # 将此改为 true 如果使用自定义域名
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-website-dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

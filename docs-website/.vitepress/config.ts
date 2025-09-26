@@ -104,6 +104,10 @@ export default defineConfig({
   title: 'Verdure Assistant',
   description: '绿荫助手 - 基于 .NET 9 的智能语音助手',
   
+  // GitHub Pages 配置
+  // 如果有自定义域名，设置环境变量 CUSTOM_DOMAIN=true
+  base: process.env.CUSTOM_DOMAIN ? '/' : '/Verdure.Assistant/',
+  
   // 多语言配置
   locales: {
     root: {
