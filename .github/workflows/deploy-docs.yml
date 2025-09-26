@@ -50,13 +50,13 @@ jobs:
         working-directory: docs-website
         env:
           # 如果使用自定义域名，取消注释下一行
-          # CUSTOM_DOMAIN: true
+          CUSTOM_DOMAIN: true
 
       - name: Add CNAME file (if using custom domain)
         run: |
           # 如果使用自定义域名，取消注释并修改下一行的域名
-          # echo "your-custom-domain.com" > docs-website-dist/CNAME
-        if: false  # 将此改为 true 如果使用自定义域名
+          echo "verdure-assistant.verdure-hiro.cn" > docs-website-dist/CNAME
+        if: true  # 将此改为 true 如果使用自定义域名
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
