@@ -65,6 +65,18 @@ npm run preview
 
 构建结果在 `docs-website-dist/` 目录中
 
+## 🚀 部署
+
+### GitHub Pages 自动部署
+
+项目已配置 GitHub Actions 自动部署到 GitHub Pages：
+
+1. **自动触发**：向 `main` 分支推送 `docs-website/` 目录的更改
+2. **手动运行**：在 GitHub Actions 页面手动触发
+3. **部署地址**：https://maker-community.github.io/Verdure.Assistant/
+
+详细部署配置请参考 [DEPLOYMENT.md](./DEPLOYMENT.md)
+
 ## 📝 内容概览
 
 ### 入门指南 (Guide)
