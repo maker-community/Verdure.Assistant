@@ -1,0 +1,16 @@
+{
+  "name": "verdure-assistant-docs",
+  "version": "1.0.0",
+  "description": "Verdure Assistant Documentation Website",
+  "author": "maker-community",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "vitepress": "^1.5.0"
+  }
+}
