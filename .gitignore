@@ -365,3 +365,4 @@ FodyWeavers.xsd
 # VitePress build and cache directories
 docs-website/.vitepress/dist/
 docs-website/.vitepress/cache/
+docs-website-dist/
