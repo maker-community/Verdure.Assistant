@@ -1,12 +1,15 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Services;
 using Verdure.Assistant.Core.Services.MCP;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Api.Services;
 using Verdure.Assistant.Api.Audio;
+using Verdure.Assistant.Api.Models;
+using Verdure.Assistant.Api.Services.WiFi;
 using System.Runtime.ExceptionServices;
 using System.Runtime;
 
@@ -137,9 +140,20 @@ builder.Services.AddSingleton<Verdure.Assistant.Api.Services.Robot.DisplayServic
 builder.Services.AddSingleton<Verdure.Assistant.Api.Services.Robot.RobotActionService>();
 builder.Services.AddSingleton<Verdure.Assistant.Api.Services.Robot.EmotionActionService>();
 
+// Register WiFi Setup Services
+builder.Services.Configure<WiFiSetupConfig>(builder.Configuration.GetSection("WiFiSetup"));
+builder.Services.AddSingleton<DeviceConfig>(provider =>
+{
+    var config = provider.GetService<IOptions<WiFiSetupConfig>>()?.Value?.DeviceConfig ?? new DeviceConfig();
+    return config;
+});
+builder.Services.AddScoped<WiFiNetworkManager>();
+builder.Services.AddSingleton<LocalizationService>();
+
 // Register Background Services
 builder.Services.AddHostedService<Verdure.Assistant.Api.Services.Robot.TimeDisplayService>();
 builder.Services.AddHostedService<Verdure.Assistant.Api.Services.AudioMonitoringService>();
+builder.Services.AddHostedService<WiFiSetupService>();
 
 // Register Emotion Integration Service
 builder.Services.AddSingleton<Verdure.Assistant.Api.Services.EmotionIntegrationService>();
@@ -313,7 +327,14 @@ catch (Exception ex)
 
 
 
-app.Run();
+// 设置优雅关闭处理
+using var cts = new CancellationTokenSource();
+Console.CancelKeyPress += (sender, e) =>
+{
+    Console.WriteLine("\n[关闭] 收到Ctrl+C信号，正在优雅关闭...");
+    e.Cancel = true; // 防止立即退出
+    cts.Cancel(); // 触发优雅关闭
+};
 
 // 应用程序关闭时的清理
 AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
@@ -329,6 +350,25 @@ AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
         Console.WriteLine($"[关闭] 清理资源时出错: {ex.Message}");
     }
 };
+
+try
+{
+    Console.WriteLine("[启动] 应用程序启动完成，按 Ctrl+C 优雅关闭");
+    await app.RunAsync(cts.Token);
+}
+catch (OperationCanceledException)
+{
+    Console.WriteLine("[关闭] 应用程序已优雅关闭");
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[错误] 应用程序运行时出现错误: {ex.Message}");
+    Environment.ExitCode = 1;
+}
+finally
+{
+    Console.WriteLine("[关闭] 应用程序完全退出");
+}
 
 // 创建默认配置的辅助方法
 static VerdureConfig CreateDefaultVerdureConfig(IConfiguration configuration)
