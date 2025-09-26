@@ -121,7 +121,7 @@ export default defineConfig({
         },
         footer: {
           message: '基于 MIT 许可证发布',
-          copyright: 'Copyright © 2024 Maker Community'
+          copyright: 'Copyright © 2025 Maker Community'
         },
         outline: {
           label: '页面导航'
@@ -150,7 +150,7 @@ export default defineConfig({
         },
         footer: {
           message: 'Released under the MIT License',
-          copyright: 'Copyright © 2024 Maker Community'
+          copyright: 'Copyright © 2025 Maker Community'
         }
       }
     }
