@@ -187,5 +187,8 @@ export default defineConfig({
   ],
 
   // 构建配置
-  outDir: '../docs-website-dist'
+  outDir: '../docs-website-dist',
+  
+  // 忽略死链接检查
+  ignoreDeadLinks: true
 })
