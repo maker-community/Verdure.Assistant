@@ -656,4 +656,14 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
             _isDisposed = true;
         }
     }
+
+    public void CompleteAdding()
+    {
+        throw new NotImplementedException();
+    }
+
+    public void Reset()
+    {
+        throw new NotImplementedException();
+    }
 }

@@ -23,6 +23,10 @@ public interface IAudioPlayer
     /// </summary>
     Task StopAsync();
 
+    void CompleteAdding();
+
+    void Reset();
+
     /// <summary>
     /// 是否正在播放
     /// </summary>

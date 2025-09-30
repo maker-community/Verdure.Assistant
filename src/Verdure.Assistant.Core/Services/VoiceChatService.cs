@@ -1233,9 +1233,10 @@ public class VoiceChatService : IVoiceChatService
 
     private void HandleTtsStarted(TtsEventArgs e)
     {
+        _audioPlayer?.Reset(); // 重置播放器，准备播放新语音    
         // 只记录日志和触发事件，不切换状态
         // 状态切换由实际的音频数据接收 (HandleAudioDataReceived) 控制
-        _logger?.LogInformation("TTS started: {Text}, 当前状态: {State}, 监听模式: {Mode}", 
+        _logger?.LogInformation("TTS started: {Text}, 当前状态: {State}, 监听模式: {Mode}",
             e.Text, CurrentState, _listeningMode);
         TtsStateChanged?.Invoke(this, e.TtsMessage!);
     }
@@ -1244,9 +1245,10 @@ public class VoiceChatService : IVoiceChatService
     {
         // 只记录日志和触发事件，不切换状态
         // 状态切换由音频播放完成事件 (OnAudioPlaybackStopped) 控制
-        _logger?.LogInformation("TTS stopped, 当前状态: {State}, 监听模式: {Mode}", 
+        _logger?.LogInformation("TTS stopped, 当前状态: {State}, 监听模式: {Mode}",
             CurrentState, _listeningMode);
         TtsStateChanged?.Invoke(this, e.TtsMessage!);
+        _audioPlayer?.CompleteAdding(); // 标记音频数据添加完成
     }
 
     private void HandleTtsSentenceStarted(TtsEventArgs e)
@@ -1275,9 +1277,6 @@ public class VoiceChatService : IVoiceChatService
             // 解码并播放音频数据 - 使用输出采样率
             var pcmData = _audioCodec.Decode(e.AudioData, _config.AudioOutputSampleRate, _config.AudioChannels);
             await _audioPlayer.PlayAsync(pcmData, _config.AudioOutputSampleRate, _config.AudioChannels);
-
-            // 注意：不要在这里立即停止播放，因为可能还有更多音频数据要来
-            // 播放完成应该由播放器的PlaybackStopped事件或者明确的停止指令来触发
         }
     }
 

@@ -274,4 +274,14 @@ public class NAudioPlayer : IAudioPlayer, IDisposable
             _logger?.LogError(ex, "释放NAudioPlayer资源时出错");
         }
     }
+
+    public void CompleteAdding()
+    {
+        throw new NotImplementedException();
+    }
+
+    public void Reset()
+    {
+        throw new NotImplementedException();
+    }
 }
