@@ -366,3 +366,5 @@ FodyWeavers.xsd
 docs-website/.vitepress/dist/
 docs-website/.vitepress/cache/
 docs-website-dist/
+src/Verdure.Assistant.Api/config_page.png
+src/Verdure.Assistant.Api/qrcode.png

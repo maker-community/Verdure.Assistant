@@ -161,7 +161,7 @@ public class ConversationStateMachine
 
             // From Speaking state
             (DeviceState.Speaking, ConversationTrigger.TtsCompleted) => DeviceState.Listening,
-            (DeviceState.Speaking, ConversationTrigger.AudioPlaybackCompleted) => DeviceState.Idle,
+            (DeviceState.Speaking, ConversationTrigger.AudioPlaybackCompleted) => DeviceState.Listening,
             (DeviceState.Speaking, ConversationTrigger.UserInterrupt) => DeviceState.Idle,
             (DeviceState.Speaking, ConversationTrigger.KeywordDetected) => DeviceState.Idle, // Interrupt speaking
             (DeviceState.Speaking, ConversationTrigger.StopVoiceChat) => DeviceState.Idle,

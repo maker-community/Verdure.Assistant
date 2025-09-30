@@ -1233,15 +1233,19 @@ public class VoiceChatService : IVoiceChatService
 
     private void HandleTtsStarted(TtsEventArgs e)
     {
-        // TTS开始播放时，从监听状态切换到说话状态
-        _stateMachine?.RequestTransition(ConversationTrigger.TtsStarted, $"TTS started: {e.Text}");
+        // 只记录日志和触发事件，不切换状态
+        // 状态切换由实际的音频数据接收 (HandleAudioDataReceived) 控制
+        _logger?.LogInformation("TTS started: {Text}, 当前状态: {State}, 监听模式: {Mode}", 
+            e.Text, CurrentState, _listeningMode);
         TtsStateChanged?.Invoke(this, e.TtsMessage!);
     }
 
     private void HandleTtsStopped(TtsEventArgs e)
     {
-        // TTS停止播放时，从说话状态切换回空闲或监听状态
-        _stateMachine?.RequestTransition(ConversationTrigger.TtsCompleted, "TTS completed");
+        // 只记录日志和触发事件，不切换状态
+        // 状态切换由音频播放完成事件 (OnAudioPlaybackStopped) 控制
+        _logger?.LogInformation("TTS stopped, 当前状态: {State}, 监听模式: {Mode}", 
+            CurrentState, _listeningMode);
         TtsStateChanged?.Invoke(this, e.TtsMessage!);
     }
 

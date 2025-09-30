@@ -30,6 +30,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
 
     private ClientWebSocket? _webSocket;
     private CancellationTokenSource? _cancellationTokenSource;
+    private Task? _receiveTask;
     private readonly IConfigurationService _configurationService;
     private readonly ILogger? _logger;
     private bool _isConnected;
@@ -95,8 +96,16 @@ public class WebSocketClient : ICommunicationClient, IDisposable
 
             _logger?.LogInformation("WebSocket连接已建立，正在发送Hello消息");
 
-            // 开始接收消息
-            _ = Task.Run(ReceiveMessagesAsync);
+            // 开始接收消息 - 使用 LongRunning 任务避免占用线程池
+            _receiveTask = Task.Factory.StartNew(
+                ReceiveMessagesAsync,
+                _cancellationTokenSource.Token,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default
+            ).Unwrap();
+
+            // 监控接收任务异常
+            _ = MonitorReceiveTaskAsync(_receiveTask);
 
             // 发送客户端Hello消息
             var helloMessage = WebSocketProtocol.CreateHelloMessage(
@@ -138,8 +147,33 @@ public class WebSocketClient : ICommunicationClient, IDisposable
                 _logger?.LogDebug("已发送Goodbye消息");
             }
 
+            // 取消接收任务
             _cancellationTokenSource?.Cancel();
 
+            // 等待接收任务完成（设置超时避免无限等待）
+            if (_receiveTask != null && !_receiveTask.IsCompleted)
+            {
+                try
+                {
+                    _logger?.LogDebug("等待消息接收任务完成...");
+                    var completedTask = await Task.WhenAny(_receiveTask, Task.Delay(5000));
+                    
+                    if (completedTask == _receiveTask)
+                    {
+                        _logger?.LogDebug("消息接收任务已正常结束");
+                    }
+                    else
+                    {
+                        _logger?.LogWarning("消息接收任务在超时时间内未完成");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "等待消息接收任务结束时出错");
+                }
+            }
+
+            // 关闭 WebSocket 连接
             if (_webSocket?.State == WebSocketState.Open)
             {
                 await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Client disconnect", CancellationToken.None);
@@ -153,6 +187,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
         {
             _isConnected = false;
             _sessionId = null;
+            _receiveTask = null;
             //ConnectionStateChanged?.Invoke(this, false);
             _webSocket?.Dispose();
             _cancellationTokenSource?.Dispose();
@@ -326,6 +361,34 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     #endregion
 
     #region MCP Methods
+
+    /// <summary>
+    /// 监控接收任务的异常情况
+    /// </summary>
+    private async Task MonitorReceiveTaskAsync(Task receiveTask)
+    {
+        try
+        {
+            await receiveTask;
+        }
+        catch (OperationCanceledException)
+        {
+            // 正常取消，不需要记录
+            _logger?.LogDebug("消息接收任务已取消");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "消息接收任务发生未处理的异常");
+            
+            // 触发连接错误事件
+            if (_isConnected)
+            {
+                _isConnected = false;
+                _eventManager.TriggerConnectionEvent(WebSocketEventTrigger.ConnectionError, false,
+                    errorMessage: ex.Message, context: "Message receive task failed");
+            }
+        }
+    }
 
     /// <summary>
     /// 初始化MCP客户端
