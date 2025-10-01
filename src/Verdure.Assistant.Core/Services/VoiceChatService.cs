@@ -596,12 +596,10 @@ public class VoiceChatService : IVoiceChatService
     /// <summary>
     /// 关键词检测事件处理（对应py-xiaozhi的_on_wake_word_detected回调）
     /// </summary>
-    private void OnKeywordDetected(object? sender, KeywordDetectedEventArgs e)
+    private async void OnKeywordDetected(object? sender, KeywordDetectedEventArgs e)
     {
         _logger?.LogInformation($"检测到关键词: {e.Keyword} (完整文本: {e.FullText})");
-
-        // 在后台线程处理关键词检测事件（对应py-xiaozhi的_handle_wake_word_detected）
-        Task.Run(async () => await HandleKeywordDetectedAsync(e.Keyword));
+        await HandleKeywordDetectedAsync(e.Keyword);
     }
 
     /// <summary>
