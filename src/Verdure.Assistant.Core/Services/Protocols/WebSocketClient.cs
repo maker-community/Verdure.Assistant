@@ -135,7 +135,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
 
     public async Task DisconnectAsync()
     {
-        if (!_isConnected) return;
+        //if (!_isConnected) return;
 
         try
         {

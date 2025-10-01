@@ -1130,14 +1130,12 @@ public class VoiceChatService : IVoiceChatService
         }
         else
         {
-            _stateMachine?.RequestTransition(ConversationTrigger.ServerDisconnected, "Connection lost");
-
-
             if (_communicationClient != null)
             {
                 _logger?.LogInformation("连接断开，尝试断开WebSocket连接");
                 await _communicationClient.DisconnectAsync();
             }
+            _stateMachine?.RequestTransition(ConversationTrigger.ServerDisconnected, "Connection lost");
         }
     }
 

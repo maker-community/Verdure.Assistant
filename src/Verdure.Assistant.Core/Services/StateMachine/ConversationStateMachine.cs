@@ -165,7 +165,7 @@ public class ConversationStateMachine
             (DeviceState.Speaking, ConversationTrigger.UserInterrupt) => DeviceState.Idle,
             (DeviceState.Speaking, ConversationTrigger.KeywordDetected) => DeviceState.Idle, // Interrupt speaking
             (DeviceState.Speaking, ConversationTrigger.StopVoiceChat) => DeviceState.Idle,
-            (DeviceState.Speaking, ConversationTrigger.ServerDisconnected) => DeviceState.Connecting,
+            (DeviceState.Speaking, ConversationTrigger.ServerDisconnected) => DeviceState.Idle,
 
             // Interrupt handling from Speaking state - 播放语音中打断进入聆听状态
             (DeviceState.Speaking, ConversationTrigger.ManualInterrupt) => DeviceState.Listening,

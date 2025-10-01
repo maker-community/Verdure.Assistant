@@ -146,9 +146,23 @@ public class KeywordSpottingService : IKeywordSpottingService
             // 订阅事件
             SubscribeToRecognizerEvents();
 
-            // 开始关键词识别
-            await _keywordRecognizer.RecognizeOnceAsync(_keywordModel);
-            _logger?.LogInformation("关键词识别已启动");
+            // 在后台任务中启动关键词识别，避免阻塞主流程
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    if (_keywordModel != null && _keywordRecognizer != null)
+                    {
+                        await _keywordRecognizer.RecognizeOnceAsync(_keywordModel);
+                        _logger?.LogInformation("关键词识别已启动（后台任务）");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "关键词识别后台任务异常");
+                    OnErrorOccurred($"关键词识别异常: {ex.Message}");
+                }
+            });
 
             _isRunning = true;
             _isPaused = false;
@@ -710,13 +724,6 @@ public class KeywordSpottingService : IKeywordSpottingService
                 };
 
                 KeywordDetected?.Invoke(this, eventArgs);
-
-                // 实现py-xiaozhi的状态协调逻辑
-                //HandleKeywordDetection(keyword);
-
-                // 关键：重新启动关键词识别以实现连续检测
-                // KeywordRecognizer的RecognizeOnceAsync检测到关键词后会停止，需要手动重启
-                //RestartContinuousRecognition();
             }
         }
         catch (Exception ex)
