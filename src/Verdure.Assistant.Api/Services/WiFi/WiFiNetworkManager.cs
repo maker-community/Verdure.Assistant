@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using Verdure.Assistant.Api.Models;
 
@@ -22,19 +23,20 @@ public class WiFiNetworkManager
 
     /// <summary>
     /// 异步执行nmcli命令
-    /// </summary>
+    /// </summary>        
     private async Task<CommandResult> RunNmcliCommandAsync(string arguments, int timeoutSeconds = 30)
     {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        if (!OperatingSystem.IsLinux())
         {
-            _logger.LogWarning("非Linux系统，跳过nmcli命令执行: {Arguments}", arguments);
-            return new CommandResult { Success = false, Output = "非Linux系统", Error = "仅支持Linux系统" };
+            _logger.LogWarning("非Linux系统，跳过nmcli命令执行");
+            return new CommandResult { Success = false, Output = "非Linux系统" };
         }
 
         try
         {
+            // 构建完整的命令，包含sudo
             var fullCommand = $"sudo nmcli {arguments}";
-            
+
             var psi = new ProcessStartInfo
             {
                 FileName = "/bin/bash",
@@ -50,6 +52,8 @@ public class WiFiNetworkManager
 
             var outputTask = process.StandardOutput.ReadToEndAsync();
             var errorTask = process.StandardError.ReadToEndAsync();
+
+            // 修复：将任务存储在变量中，避免重复创建Task对象
             var allTask = Task.WhenAll(outputTask, errorTask);
             var timeoutTask = Task.Delay(TimeSpan.FromSeconds(timeoutSeconds));
 
@@ -67,9 +71,7 @@ public class WiFiNetworkManager
                     Output = output,
                     Error = error,
                     ExitCode = process.ExitCode
-                };
-
-                if (!result.Success && !string.IsNullOrEmpty(error))
+                }; if (!result.Success && !string.IsNullOrEmpty(error))
                 {
                     _logger.LogError("nmcli命令执行失败: {Error}", error);
                 }
@@ -299,30 +301,75 @@ public class WiFiNetworkManager
     }
 
     /// <summary>
-    /// 检查网络连接状态
+    /// 异步重启系统
+    /// </summary>
+    public async Task RebootAsync()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            Console.WriteLine("非Linux系统，跳过重启");
+            return;
+        }
+
+        Console.WriteLine("执行系统重启...");
+        await RunCommandAsync("sudo reboot");
+    }
+
+    /// <summary>
+    /// 异步检查网络连接
     /// </summary>
     public async Task<bool> IsNetworkAvailableAsync()
     {
+        try
+        {
+            var result = await RunCommandAsync("sudo ping -c 1 -W 1 8.8.8.8");
+            if (!result.Success)
+            {
+                Console.WriteLine("网络连接检查失败: " + result.Error);
+                return false;
+            }
+            Console.WriteLine("网络连接检查成功");
+            return result.Success;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"检查网络连接时出错: {ex.Message}");
+            return false;
+        }
+    }
+
+
+
+
+    /// <summary>
+    /// 检查WiFi接口是否已连接到网络
+    /// </summary>
+    public async Task<bool> IsWiFiConnectedAsync()
+    {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
-            _logger.LogInformation("非Linux系统，模拟网络检查结果: 未连接");
-            return false; // 非Linux系统默认启动配网模式用于测试
+            return false;
         }
 
         try
         {
-            // 检查网络连接状态
-            using var httpClient = new HttpClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(5);
-            var response = await httpClient.GetAsync("http://www.google.com");
-            var isConnected = response.IsSuccessStatusCode;
-
-            _logger.LogInformation("网络连接状态: {Status}", isConnected ? "已连接" : "未连接");
-            return isConnected;
+            var result = await RunNmcliCommandAsync($"device status");
+            if (result.Success)
+            {
+                var lines = result.Output.Split('\n');
+                foreach (var line in lines)
+                {
+                    if (line.Contains(_interface) && line.Contains("connected") && !line.Contains("disconnected"))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "网络连接检查失败，假定网络不可用");
+            _logger.LogError(ex, "检查WiFi连接状态失败");
             return false;
         }
     }
@@ -330,60 +377,132 @@ public class WiFiNetworkManager
     /// <summary>
     /// 获取当前WiFi连接的IP地址
     /// </summary>
-    public async Task<string?> GetWiFiConnectedIpAddressAsync()
+    public Task<string?> GetWiFiConnectedIpAddressAsync()
     {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            _logger.LogInformation("非Linux系统，模拟IP地址: 192.168.1.100");
-            return "192.168.1.100";
-        }
-
         try
         {
-            var result = await RunNmcliCommandAsync($"device show {_interface}");
-            if (result.Success)
+            NetworkInterface[] networkInterfaces = NetworkInterface.GetAllNetworkInterfaces();
+            foreach (NetworkInterface netInterface in networkInterfaces)
             {
-                var lines = result.Output.Split('\n');
-                foreach (var line in lines)
+                if (netInterface.OperationalStatus != OperationalStatus.Up)
+                    continue;
+                if (netInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+                    continue;
+
+                // 查找无线网络接口
+                bool isWireless = netInterface.Description.ToLower().Contains("wireless") ||
+                                  netInterface.Name.ToLower().Contains("wlan") ||
+                                  netInterface.Name.ToLower().Contains("wi-fi");
+
+                if (isWireless)
                 {
-                    if (line.Contains("IP4.ADDRESS[1]"))
+                    IPInterfaceProperties ipProps = netInterface.GetIPProperties();
+                    foreach (UnicastIPAddressInformation addr in ipProps.UnicastAddresses)
                     {
-                        var parts = line.Split(':');
-                        if (parts.Length > 1)
+                        if (addr.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
                         {
-                            var ipWithMask = parts[1].Trim();
-                            var ip = ipWithMask.Split('/')[0];
-                            return ip;
+                            var ip = addr.Address.ToString();
+                            // 排除热点IP段，只返回正常WiFi连接的IP
+                            if (!ip.StartsWith("192.168.4.") &&
+                                !ip.StartsWith("10.42.0.") &&
+                                !ip.StartsWith("169.254.")) // 排除APIPA地址
+                            {
+                                return Task.FromResult<string?>(ip);
+                            }
                         }
                     }
                 }
             }
+            return Task.FromResult<string?>(null);
         }
-        catch (Exception ex)
+        catch
         {
-            _logger.LogError(ex, "获取WiFi IP地址失败");
+            return Task.FromResult<string?>(null);
         }
-
-        return null;
     }
 
     /// <summary>
-    /// 重启系统
+    /// 异步执行shell命令
     /// </summary>
-    public async Task RebootAsync()
+    public static async Task<CommandResult> RunCommandAsync(string command, int timeoutSeconds = 30)
     {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        try
         {
-            _logger.LogInformation("非Linux系统，模拟系统重启");
-            return;
-        }
+            var psi = new ProcessStartInfo
+            {
+                FileName = "/bin/bash",
+                Arguments = $"-c \"{command.Replace("\"", "\\\"")}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
 
-        _logger.LogInformation("执行系统重启...");
-        var result = await RunNmcliCommandAsync("reboot", 5);
-        
-        if (!result.Success)
+            using var process = new Process { StartInfo = psi };
+            process.Start();
+
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+
+            // 修复：将任务存储在变量中，避免重复创建Task对象
+            var allTask = Task.WhenAll(outputTask, errorTask);
+            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(timeoutSeconds));
+
+            var completed = await Task.WhenAny(allTask, timeoutTask);
+
+            if (completed == allTask)
+            {
+                await process.WaitForExitAsync();
+                var output = await outputTask;
+                var error = await errorTask;
+
+                Console.WriteLine($"命令 '{command}' 执行完成，输出: {output}, 错误: {error}");
+                var result = new CommandResult
+                {
+                    Success = process.ExitCode == 0,
+                    Output = output,
+                    Error = error,
+                    ExitCode = process.ExitCode
+                };
+
+                if (!result.Success && !string.IsNullOrEmpty(error))
+                {
+                    Console.WriteLine($"命令 '{command}' 执行错误: {error}");
+                }
+
+                return result;
+            }
+            else
+            {
+                // 超时处理
+                try
+                {
+                    if (!process.HasExited)
+                    {
+                        process.Kill();
+                    }
+                }
+                catch { }
+
+                return new CommandResult
+                {
+                    Success = false,
+                    Output = "",
+                    Error = $"命令执行超时({timeoutSeconds}秒)",
+                    ExitCode = -1
+                };
+            }
+        }
+        catch (Exception ex)
         {
-            _logger.LogError("重启命令执行失败: {Error}", result.Error);
+            Console.WriteLine($"执行命令 '{command}' 时出错: {ex.Message}");
+            return new CommandResult
+            {
+                Success = false,
+                Output = "",
+                Error = ex.Message,
+                ExitCode = -1
+            };
         }
     }
 }

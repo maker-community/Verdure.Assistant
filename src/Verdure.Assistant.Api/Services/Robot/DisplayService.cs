@@ -1,7 +1,7 @@
+using SkiaSharp;
 using System.Device.Gpio;
 using System.Device.Spi;
 using System.Runtime.InteropServices;
-using SkiaSharp;
 using Verdure.Assistant.Api.IoTDevice;
 using Verdure.Assistant.Api.Models;
 
@@ -65,7 +65,7 @@ public class DisplayService : IDisposable
 
             // 创建2.4寸显示器 (表情显示)
             _display24Inch = new ST7789Display(settings1, _gpio, true, dcPin: 25, resetPin: 27, displayType: DisplayType.Display24Inch);
-            
+
             // 创建1.47寸显示器 (时间显示，横屏模式)
             _display147Inch = new ST7789Display(settings2, _gpio, false, dcPin: 25, resetPin: 27, displayType: DisplayType.Display147Inch, isLandscape: true);
 
@@ -164,7 +164,7 @@ public class DisplayService : IDisposable
             _logger.LogWarning($"无效的表情类型: {emotionType}");
             return;
         }
-        
+
         if (!_lottieRenderers.ContainsKey(emotionType))
         {
             _logger.LogWarning($"未找到表情类型 {emotionType} 的渲染器");
@@ -247,13 +247,51 @@ public class DisplayService : IDisposable
 
             // 创建时间显示的位图
             var timeImage = CreateTimeImage(timeText, dateText, Display147Width, Display147Height);
-            
+
             // 发送到1.47寸屏幕
             await Task.Run(() => _display147Inch.SendData(timeImage), cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "时间显示发生错误");
+        }
+    }
+
+    /// <summary>
+    /// 在1.47寸屏幕上显示时间和网络信息（IP+端口）
+    /// </summary>
+    public async Task DisplayTimeWithNetworkInfoAsync(string? ipAddress, CancellationToken cancellationToken = default)
+    {
+        if (_display147Inch == null)
+        {
+            _logger.LogDebug("1.47寸显示器未初始化，跳过时间显示");
+            return;
+        }
+
+        try
+        {
+            var timeText = DateTime.Now.ToString("HH:mm:ss");
+            var dateText = DateTime.Now.ToString("yyyy-MM-dd");
+
+            // 如果有IP地址，显示时间+网络信息；否则只显示时间
+            _logger.LogInformation("显示时间和网络信息: IP={IpAddress}", ipAddress ?? "无");
+
+            byte[] timeImage;
+            if (!string.IsNullOrEmpty(ipAddress))
+            {
+                timeImage = CreateTimeWithNetworkImage(timeText, dateText, ipAddress, Display147Width, Display147Height);
+            }
+            else
+            {
+                timeImage = CreateTimeImage(timeText, dateText, Display147Width, Display147Height);
+            }
+
+            // 发送到1.47寸屏幕
+            await Task.Run(() => _display147Inch.SendData(timeImage), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "时间网络信息显示发生错误");
         }
     }
 
@@ -269,39 +307,108 @@ public class DisplayService : IDisposable
         canvas.Clear(new SKColor(0, 50, 100));
 
         // 设置时间字体
+        using var timeFont = new SKFont(SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold), 48);
         using var timePaint = new SKPaint
         {
             Color = SKColors.White,
-            TextSize = 48,
-            IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
+            IsAntialias = true
         };
 
         // 设置日期字体
+        using var dateFont = new SKFont(SKTypeface.FromFamilyName("Arial", SKFontStyle.Normal), 24);
         using var datePaint = new SKPaint
         {
             Color = SKColors.LightGray,
-            TextSize = 24,
-            IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Normal)
+            IsAntialias = true
         };
 
         // 计算文本位置
-        var timeTextBounds = new SKRect();
-        timePaint.MeasureText(timeText, ref timeTextBounds);
-        
-        var dateTextBounds = new SKRect();
-        datePaint.MeasureText(dateText, ref dateTextBounds);
+        var timeTextWidth = timeFont.MeasureText(timeText);
+        var dateTextWidth = dateFont.MeasureText(dateText);
 
         // 绘制时间 (居中显示)
-        float timeX = (width - timeTextBounds.Width) / 2;
-        float timeY = (height - timeTextBounds.Height) / 2 + timeTextBounds.Height;
-        canvas.DrawText(timeText, timeX, timeY, timePaint);
+        float timeX = (width - timeTextWidth) / 2;
+        float timeY = (height / 2) - 10;
+        canvas.DrawText(timeText, timeX, timeY, SKTextAlign.Left, timeFont, timePaint);
 
         // 绘制日期 (在时间下方)
-        float dateX = (width - dateTextBounds.Width) / 2;
+        float dateX = (width - dateTextWidth) / 2;
         float dateY = timeY + 40;
-        canvas.DrawText(dateText, dateX, dateY, datePaint);
+        canvas.DrawText(dateText, dateX, dateY, SKTextAlign.Left, dateFont, datePaint);
+
+        // 获取图像并转换为RGB565
+        using var image = surface.Snapshot();
+        using var pixmap = image.PeekPixels();
+
+        return ConvertToRgb565(pixmap, width, height);
+    }
+
+    /// <summary>
+    /// 创建时间和网络信息显示图像（显示IP和端口）
+    /// </summary>
+    private byte[] CreateTimeWithNetworkImage(string timeText, string dateText, string ipAddress, int width, int height)
+    {
+        using var surface = SKSurface.Create(new SKImageInfo(width, height));
+        using var canvas = surface.Canvas;
+
+        // 清除背景为深蓝色（表示有网络）
+        canvas.Clear(new SKColor(0, 50, 100));
+
+        // 设置时间字体（稍小一些，为IP信息腾出空间）
+        using var timeFont = new SKFont(SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold), 36);
+        using var timePaint = new SKPaint
+        {
+            Color = SKColors.White,
+            IsAntialias = true
+        };
+
+        // 设置日期字体
+        using var dateFont = new SKFont(SKTypeface.FromFamilyName("Arial", SKFontStyle.Normal), 18);
+        using var datePaint = new SKPaint
+        {
+            Color = SKColors.LightGray,
+            IsAntialias = true
+        };
+
+        // 设置IP信息字体
+        using var ipFont = new SKFont(SKTypeface.FromFamilyName("Arial", SKFontStyle.Normal), 16);
+        using var ipPaint = new SKPaint
+        {
+            Color = new SKColor(144, 238, 144), // 浅绿色表示网络已连接
+            IsAntialias = true
+        };
+
+        // 获取API端口（假设从配置读取，这里硬编码为5241）
+        var serverInfo = $"{ipAddress}:5241";
+
+        // 计算文本位置
+        var timeTextWidth = timeFont.MeasureText(timeText);
+        var dateTextWidth = dateFont.MeasureText(dateText);
+        var serverTextWidth = ipFont.MeasureText(serverInfo);
+
+        // 绘制时间 (靠上居中)
+        float timeX = (width - timeTextWidth) / 2;
+        float timeY = height / 3;
+        canvas.DrawText(timeText, timeX, timeY, SKTextAlign.Left, timeFont, timePaint);
+
+        // 绘制日期 (在时间下方)
+        float dateX = (width - dateTextWidth) / 2;
+        float dateY = timeY + 30;
+        canvas.DrawText(dateText, dateX, dateY, SKTextAlign.Left, dateFont, datePaint);
+
+        // 绘制服务器地址 (在底部)
+        float serverX = (width - serverTextWidth) / 2;
+        float serverY = height * 2 / 3 + 20;
+        canvas.DrawText(serverInfo, serverX, serverY, SKTextAlign.Left, ipFont, ipPaint);
+
+        // 绘制网络状态指示器（小圆点）
+        using var statusPaint = new SKPaint
+        {
+            Color = new SKColor(0, 255, 0), // 绿色表示在线
+            IsAntialias = true,
+            Style = SKPaintStyle.Fill
+        };
+        canvas.DrawCircle(width - 15, 15, 8, statusPaint);
 
         // 获取图像并转换为RGB565
         using var image = surface.Snapshot();
@@ -376,7 +483,7 @@ public class DisplayService : IDisposable
         {
             const int steps = 10;
             int delayPerStep = durationMs / steps;
-            
+
             // 从当前显示内容逐渐变暗到黑色
             for (int i = steps; i >= 0; i--)
             {

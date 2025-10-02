@@ -1,8 +1,7 @@
-using System.Runtime.InteropServices;
 using Microsoft.Extensions.Options;
+using System.Runtime.InteropServices;
 using Verdure.Assistant.Api.Models;
 using Verdure.Assistant.Api.Services.Robot;
-using Verdure.Assistant.Api.Services.WiFi;
 
 namespace Verdure.Assistant.Api.Services.WiFi;
 
@@ -48,29 +47,53 @@ public class WiFiSetupService : BackgroundService
             _localizationService = new LocalizationService();
 
             // 启动延时，确保系统服务和网络接口准备就绪
-            _logger.LogInformation("启动延时 {DelaySeconds} 秒", _config.StartupDelaySeconds);
+            _logger.LogInformation("启动延时 {DelaySeconds} 秒，等待系统网络接口初始化", _config.StartupDelaySeconds);
             await Task.Delay(_config.StartupDelaySeconds * 1000, stoppingToken);
 
             if (stoppingToken.IsCancellationRequested)
                 return;
 
-            // 检查网络连接状态
-            _logger.LogInformation("开始检查网络连接状态");
-            var isNetworkAvailable = await _networkManager.IsNetworkAvailableAsync();
-
-            if (!isNetworkAvailable)
+            // 主循环 - 持续监控网络状态
+            bool isInApMode = false;
+            while (!stoppingToken.IsCancellationRequested)
             {
-                _logger.LogInformation("网络未连接，启动AP热点模式");
-                await StartAccessPointModeAsync(stoppingToken);
-            }
-            else
-            {
-                _logger.LogInformation("已连接到网络，显示连接状态");
-                await ShowConnectedStatusAsync();
-            }
+                try
+                {
+                    // 检查网络连接状态
+                    _logger.LogDebug("检查网络连接状态...");
+                    var isNetworkAvailable = await _networkManager.IsNetworkAvailableAsync();
 
-            // 保持服务运行
-            await Task.Delay(Timeout.Infinite, stoppingToken);
+                    if (!isNetworkAvailable && !isInApMode)
+                    {
+                        // 网络断开且未处于AP模式，启动AP热点
+                        _logger.LogInformation("检测到网络断开，启动AP热点模式进行配网");
+                        await StartAccessPointModeAsync(stoppingToken);
+                        isInApMode = true;
+                    }
+                    else if (isNetworkAvailable && isInApMode)
+                    {
+                        // 网络已连接但仍在AP模式，关闭AP热点
+                        _logger.LogInformation("检测到网络已连接，关闭AP热点模式");
+                        await StopAccessPointModeAsync();
+                        await ShowConnectedStatusAsync();
+                        isInApMode = false;
+                    }
+                    else if (isNetworkAvailable && !isInApMode)
+                    {
+                        // 网络已连接，定期更新显示
+                        _logger.LogDebug("网络正常，保持连接状态");
+                        await ShowConnectedStatusAsync();
+                    }
+
+                    // 每30秒检查一次网络状态
+                    await Task.Delay(30000, stoppingToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "网络状态检查循环发生错误");
+                    await Task.Delay(10000, stoppingToken); // 错误后等待10秒再重试
+                }
+            }
         }
         catch (OperationCanceledException)
         {
@@ -91,7 +114,7 @@ public class WiFiSetupService : BackgroundService
         {
             var apConfig = _deviceConfig.ApConfig;
             var apIp = !string.IsNullOrWhiteSpace(apConfig.Ip) ? apConfig.Ip : "192.168.4.1";
-            
+
             _logger.LogInformation("预设热点IP地址: {ApIp}", apIp);
 
             // 启动AP热点
@@ -114,6 +137,37 @@ public class WiFiSetupService : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "启动AP热点模式失败");
+        }
+    }
+
+    /// <summary>
+    /// 停止AP热点模式
+    /// </summary>
+    private async Task StopAccessPointModeAsync()
+    {
+        try
+        {
+            if (_networkManager == null)
+            {
+                _logger.LogWarning("NetworkManager未初始化，无法停止AP热点");
+                return;
+            }
+
+            _logger.LogInformation("正在停止AP热点模式...");
+            var success = await _networkManager.StopHotspotAsync();
+
+            if (success)
+            {
+                _logger.LogInformation("AP热点已成功停止");
+            }
+            else
+            {
+                _logger.LogWarning("停止AP热点可能未完全成功");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "停止AP热点模式失败");
         }
     }
 
@@ -157,21 +211,21 @@ public class WiFiSetupService : BackgroundService
     /// <summary>
     /// 在屏幕上显示QR码
     /// </summary>
-    private async Task ShowQrCodeOnDisplayAsync(string url, string gatewayIp)
+    private Task ShowQrCodeOnDisplayAsync(string url, string gatewayIp)
     {
         try
         {
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
                 _logger.LogInformation("非Linux系统，生成测试图片");
-                
+
                 // 生成QR码图片用于测试
                 WiFiSetupUtils.GenerateQrCodeImage(url);
                 WiFiSetupUtils.GenerateTestConfigPageImage(url, gatewayIp);
-                
+
                 _logger.LogInformation("配网地址: {Url}", url);
                 _logger.LogInformation("网关IP: {GatewayIp}", gatewayIp);
-                return;
+                return Task.CompletedTask;
             }
 
             // 获取显示服务
@@ -179,10 +233,10 @@ public class WiFiSetupService : BackgroundService
             if (displayService != null)
             {
                 _logger.LogInformation("使用现有DisplayService显示QR码");
-                
+
                 // 为2.4寸屏幕生成QR码图像数据
                 var qrImage24Data = WiFiSetupUtils.CreateQrCodeWithTextImageData(url, $"IP: {gatewayIp}", 320, 240);
-                
+
                 // 为1.47寸屏幕生成QR码图像数据
                 var qrImage47Data = WiFiSetupUtils.CreateQrCodeWithTextImageData(url, $"IP: {gatewayIp}", 320, 172);
 
@@ -191,7 +245,7 @@ public class WiFiSetupService : BackgroundService
                     // 这里可以扩展DisplayService来支持直接发送RGB565数据
                     // 或者集成到现有的显示逻辑中
                     _logger.LogInformation("QR码图像数据已生成，准备显示");
-                    
+
                     // 目前先输出日志，后续可以集成到DisplayService
                     _logger.LogInformation("2.4寸屏幕数据大小: {Size24} bytes", qrImage24Data.Length);
                     _logger.LogInformation("1.47寸屏幕数据大小: {Size47} bytes", qrImage47Data.Length);
@@ -211,6 +265,8 @@ public class WiFiSetupService : BackgroundService
             // 生成备用图片
             WiFiSetupUtils.GenerateQrCodeImage(url);
         }
+
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -266,7 +322,7 @@ public class WiFiSetupService : BackgroundService
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("WiFi配网服务正在停止...");
-        
+
         try
         {
             // 清理资源
