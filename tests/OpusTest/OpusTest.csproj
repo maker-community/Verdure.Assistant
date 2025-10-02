@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="OpusSharp" Version="1.5.6" />
+    <PackageReference Include="OpusSharp"  />
   </ItemGroup>
 
 </Project>

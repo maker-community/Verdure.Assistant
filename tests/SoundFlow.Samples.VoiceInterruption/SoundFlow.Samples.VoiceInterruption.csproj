@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 	<ItemGroup>
-		<PackageReference Include="SoundFlow" Version="1.2.1" />
-		<PackageReference Include="SoundFlow.Extensions.WebRtc.Apm" Version="1.0.4" />
+		<PackageReference Include="SoundFlow"  />
+		<PackageReference Include="SoundFlow.Extensions.WebRtc.Apm"  />
 	</ItemGroup>
 </Project>

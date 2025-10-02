@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using SkiaSharp;
-using QRCoder;
+using ZXing;
+using ZXing.QrCode;
 
 namespace Verdure.Assistant.Api.Services.WiFi;
 
@@ -18,12 +19,12 @@ public static class WiFiSetupUtils
     {
         try
         {
-            using var qrGenerator = new QRCodeGenerator();
-            using var qrCodeData = qrGenerator.CreateQrCode(url, QRCodeGenerator.ECCLevel.Q);
-            using var qrCode = new PngByteQRCode(qrCodeData);
-            var qrCodeBytes = qrCode.GetGraphic(20);
+            var qrCodeData = GenerateQrCodeData(url, 400);
 
-            File.WriteAllBytes(outputPath, qrCodeBytes);
+            // 保存PNG文件
+            using var stream = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
+            qrCodeData.SaveTo(stream);
+
             _logger.LogInformation("QR码图片已保存到: {OutputPath}", outputPath);
             _logger.LogInformation("QR码内容: {Url}", url);
         }
@@ -31,6 +32,43 @@ public static class WiFiSetupUtils
         {
             _logger.LogError(ex, "生成QR码图片失败");
         }
+    }
+
+    /// <summary>
+    /// 生成二维码数据（PNG格式）- 使用ZXing.Net
+    /// </summary>
+    private static SKData GenerateQrCodeData(string text, int size)
+    {
+        var qrWriter = new BarcodeWriterPixelData
+        {
+            Format = BarcodeFormat.QR_CODE,
+            Options = new QrCodeEncodingOptions
+            {
+                Height = size,
+                Width = size,
+                Margin = 1
+            }
+        };
+        var pixelData = qrWriter.Write(text);
+
+        // 创建SkiaSharp位图
+        using var bitmap = new SKBitmap(pixelData.Width, pixelData.Height);
+        var pixels = pixelData.Pixels;
+
+        // ZXing的pixelData.Pixels是BGRA格式，每个像素4个字节
+        for (int y = 0; y < pixelData.Height; y++)
+        {
+            for (int x = 0; x < pixelData.Width; x++)
+            {
+                int offset = (y * pixelData.Width + x) * 4; // 4 bytes per pixel (BGRA)
+                // 根据像素值设置为黑色或白色
+                byte pixelValue = pixels[offset]; // 取B通道值判断
+                bitmap.SetPixel(x, y, pixelValue == 0 ? SKColors.Black : SKColors.White);
+            }
+        }
+
+        using var image = SKImage.FromBitmap(bitmap);
+        return image.Encode(SKEncodedImageFormat.Png, 100);
     }
 
     /// <summary>
@@ -46,42 +84,68 @@ public static class WiFiSetupUtils
             // 清除背景为黑色
             canvas.Clear(SKColors.Black);
 
-            // 生成QR码
-            using var qrGenerator = new QRCodeGenerator();
-            using var qrCodeData = qrGenerator.CreateQrCode(url, QRCodeGenerator.ECCLevel.Q);
-            using var qrCode = new PngByteQRCode(qrCodeData);
-            var qrCodeBytes = qrCode.GetGraphic(8);
+            // 计算二维码大小 - 留出空间给文本
+            int textAreaHeight = string.IsNullOrEmpty(text) ? 0 : Math.Min(30, height / 10);
+            int qrSize = Math.Min(width - 20, height - textAreaHeight - 20);
 
-            // 加载QR码到SkiaSharp
-            using var qrBitmap = SKBitmap.Decode(qrCodeBytes);
-            if (qrBitmap == null)
+            // 生成二维码 - 使用ZXing.Net
+            var qrWriter = new BarcodeWriterPixelData
             {
-                _logger.LogError("无法解码QR码图像");
-                return null;
+                Format = BarcodeFormat.QR_CODE,
+                Options = new QrCodeEncodingOptions
+                {
+                    Height = qrSize,
+                    Width = qrSize,
+                    Margin = 1
+                }
+            };
+            var pixelData = qrWriter.Write(url);
+
+            // 计算二维码位置（居中上部）
+            int qrX = (width - qrSize) / 2;
+            int qrY = 10; // 顶部边距
+
+            // 绘制二维码
+            var pixels = pixelData.Pixels;
+            for (int y = 0; y < pixelData.Height; y++)
+            {
+                for (int x = 0; x < pixelData.Width; x++)
+                {
+                    int offset = (y * pixelData.Width + x) * 4; // BGRA格式
+                    byte pixelValue = pixels[offset]; // 取B通道值
+                    var color = pixelValue == 0 ? SKColors.White : SKColors.Black; // 反转颜色以适应黑色背景
+
+                    int drawX = qrX + x;
+                    int drawY = qrY + y;
+
+                    if (drawX >= 0 && drawX < width && drawY >= 0 && drawY < height)
+                    {
+                        using var paint = new SKPaint { Color = color };
+                        canvas.DrawPoint(drawX, drawY, paint);
+                    }
+                }
             }
 
-            // 计算QR码位置（居中显示）
-            var qrSize = Math.Min(width * 3 / 4, height * 3 / 4);
-            var qrX = (width - qrSize) / 2;
-            var qrY = (height - qrSize) / 4;
-
-            // 绘制QR码
-            var destRect = new SKRect(qrX, qrY, qrX + qrSize, qrY + qrSize);
-            canvas.DrawBitmap(qrBitmap, destRect);
-
-            // 绘制文本
-            using var paint = new SKPaint
+            // 绘制文本（如果提供）
+            if (!string.IsNullOrEmpty(text))
             {
-                Color = SKColors.White,
-                IsAntialias = true
-            };
+                int fontSize = Math.Min(18, textAreaHeight - 4);
+                using var font = new SKFont(SKTypeface.Default, fontSize);
+                using var paint = new SKPaint
+                {
+                    Color = SKColors.White,
+                    IsAntialias = true
+                };
 
-            // 使用SKFont替代已废弃的属性
-            using var font = new SKFont(SKTypeface.Default, 18);
-            
-            // 在QR码下方绘制文本
-            var textY = qrY + qrSize + 30;
-            canvas.DrawText(text, width / 2, textY, SKTextAlign.Center, font, paint);
+                var textBounds = font.MeasureText(text);
+                float textX = (width - textBounds) / 2;
+                float textY = qrY + qrSize + textAreaHeight / 2 + fontSize / 2;
+
+                if (textY < height - 5) // 确保文本在屏幕内
+                {
+                    canvas.DrawText(text, textX, textY, SKTextAlign.Left, font, paint);
+                }
+            }
 
             // 转换为RGB565格式
             using var image = surface.Snapshot();
@@ -270,20 +334,39 @@ public static class WiFiSetupUtils
             using var titleFont = new SKFont(SKTypeface.Default, 32);
             canvas.DrawText("绿荫助手 WiFi 配置", width / 2, 80, SKTextAlign.Center, titleFont, titlePaint);
 
-            // 绘制QR码
-            using var qrGenerator = new QRCodeGenerator();
-            using var qrCodeData = qrGenerator.CreateQrCode(url, QRCodeGenerator.ECCLevel.Q);
-            using var qrCode = new PngByteQRCode(qrCodeData);
-            var qrCodeBytes = qrCode.GetGraphic(8);
-            using var qrBitmap = SKBitmap.Decode(qrCodeBytes);
+            // 绘制QR码 - 使用ZXing.Net
+            var qrSize = 200;
+            var qrX = (width - qrSize) / 2;
+            var qrY = 120;
             
-            if (qrBitmap != null)
+            var qrWriter = new BarcodeWriterPixelData
             {
-                var qrSize = 200;
-                var qrX = (width - qrSize) / 2;
-                var qrY = 120;
-                var destRect = new SKRect(qrX, qrY, qrX + qrSize, qrY + qrSize);
-                canvas.DrawBitmap(qrBitmap, destRect);
+                Format = BarcodeFormat.QR_CODE,
+                Options = new QrCodeEncodingOptions
+                {
+                    Height = qrSize,
+                    Width = qrSize,
+                    Margin = 1
+                }
+            };
+            var pixelData = qrWriter.Write(url);
+            var pixels = pixelData.Pixels;
+
+            // 绘制二维码
+            for (int y = 0; y < pixelData.Height; y++)
+            {
+                for (int x = 0; x < pixelData.Width; x++)
+                {
+                    int offset = (y * pixelData.Width + x) * 4; // BGRA格式
+                    byte pixelValue = pixels[offset]; // 取B通道值
+                    var color = pixelValue == 0 ? SKColors.Black : SKColors.White;
+
+                    int drawX = qrX + x;
+                    int drawY = qrY + y;
+
+                    using var paint = new SKPaint { Color = color };
+                    canvas.DrawPoint(drawX, drawY, paint);
+                }
             }
 
             // 绘制说明文本

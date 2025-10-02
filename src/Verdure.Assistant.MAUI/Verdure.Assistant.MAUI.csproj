@@ -46,13 +46,13 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.100" />
-		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.100" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.9" />
-		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
-		<PackageReference Include="CommunityToolkit.Maui" Version="12.2.0" />
-		<PackageReference Include="Plugin.Maui.Audio" Version="4.0.0" />
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.9" />
+		<PackageReference Include="Microsoft.Maui.Controls"  />
+		<PackageReference Include="Microsoft.Maui.Controls.Compatibility"  />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug"  />
+		<PackageReference Include="CommunityToolkit.Mvvm"  />
+		<PackageReference Include="CommunityToolkit.Maui"  />
+		<PackageReference Include="Plugin.Maui.Audio"  />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection"  />
 	</ItemGroup>
 
 	<ItemGroup>
