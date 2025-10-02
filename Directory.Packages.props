@@ -16,19 +16,19 @@
     <PackageVersion Include="MQTTnet" Version="5.0.1.1416" />
 
     <!-- Microsoft AspNetCore -->
-    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="9.0.8" />
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="9.0.9" />
 
     <!-- Microsoft Cognitive Services -->
-    <PackageVersion Include="Microsoft.CognitiveServices.Speech" Version="1.45.0" />
+    <PackageVersion Include="Microsoft.CognitiveServices.Speech" Version="1.46.0" />
 
     <!-- Microsoft Extensions -->
-    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="9.0.8" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="9.0.8" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="9.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="9.0.9" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="9.0.9" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="9.0.8" />
-    <PackageVersion Include="Microsoft.Extensions.Logging" Version="9.0.8" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.8" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="9.0.8" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="9.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="9.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="9.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="9.0.9" />
 
     <!-- Microsoft MAUI -->
@@ -39,9 +39,9 @@
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
 
     <!-- Microsoft Web and Windows -->
-    <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.2839.39" />
-    <PackageVersion Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.1742" />
-    <PackageVersion Include="Microsoft.WindowsAppSDK" Version="1.6.250124002" />
+    <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.3485.44" />
+    <PackageVersion Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.6584" />
+    <PackageVersion Include="Microsoft.WindowsAppSDK" Version="1.8.250916003" />
     <PackageVersion Include="Microsoft.Xaml.Behaviors.WinUI.Managed" Version="3.0.0" />
 
     <!-- Audio -->
@@ -59,10 +59,10 @@
     <PackageVersion Include="SkiaSharp.Skottie" Version="3.116.1" />
 
     <!-- System -->
-    <PackageVersion Include="System.Text.Json" Version="9.0.8" />
+    <PackageVersion Include="System.Text.Json" Version="9.0.9" />
 
     <!-- UI Extensions -->
-    <PackageVersion Include="WinUIEx" Version="2.6.0" />
+    <PackageVersion Include="WinUIEx" Version="2.8.0" />
 
     <!-- Testing -->
     <PackageVersion Include="coverlet.collector" Version="6.0.2" />
