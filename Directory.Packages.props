@@ -41,7 +41,7 @@
     <PackageVersion Include="SoundFlow" Version="1.2.1" />
     <PackageVersion Include="SoundFlow.Extensions.WebRtc.Apm" Version="1.0.4" />
     <!-- QR Code and Images -->
-    <PackageVersion Include="QRCoder" Version="1.6.0" />
+    <PackageVersion Include="ZXing.Net" Version="0.16.10" />
     <PackageVersion Include="SixLabors.ImageSharp" Version="3.1.11" />
     <PackageVersion Include="SkiaSharp" Version="3.116.1" />
     <PackageVersion Include="SkiaSharp.NativeAssets.Linux" Version="3.116.1" />

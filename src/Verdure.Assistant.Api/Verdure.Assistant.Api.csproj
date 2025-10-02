@@ -32,7 +32,7 @@
     <PackageReference Include="System.Device.Gpio"  />
     <PackageReference Include="Iot.Device.Bindings"  />
     <PackageReference Include="SixLabors.ImageSharp"  />
-    <PackageReference Include="QRCoder"  />
+    <PackageReference Include="ZXing.Net"  />
   </ItemGroup>
 
   <ItemGroup>
