@@ -596,12 +596,10 @@ public class VoiceChatService : IVoiceChatService
     /// <summary>
     /// 关键词检测事件处理（对应py-xiaozhi的_on_wake_word_detected回调）
     /// </summary>
-    private void OnKeywordDetected(object? sender, KeywordDetectedEventArgs e)
+    private async void OnKeywordDetected(object? sender, KeywordDetectedEventArgs e)
     {
         _logger?.LogInformation($"检测到关键词: {e.Keyword} (完整文本: {e.FullText})");
-
-        // 在后台线程处理关键词检测事件（对应py-xiaozhi的_handle_wake_word_detected）
-        Task.Run(async () => await HandleKeywordDetectedAsync(e.Keyword));
+        await HandleKeywordDetectedAsync(e.Keyword);
     }
 
     /// <summary>
@@ -1130,14 +1128,12 @@ public class VoiceChatService : IVoiceChatService
         }
         else
         {
-            _stateMachine?.RequestTransition(ConversationTrigger.ServerDisconnected, "Connection lost");
-
-
             if (_communicationClient != null)
             {
                 _logger?.LogInformation("连接断开，尝试断开WebSocket连接");
                 await _communicationClient.DisconnectAsync();
             }
+            _stateMachine?.RequestTransition(ConversationTrigger.ServerDisconnected, "Connection lost");
         }
     }
 
@@ -1233,16 +1229,22 @@ public class VoiceChatService : IVoiceChatService
 
     private void HandleTtsStarted(TtsEventArgs e)
     {
-        // TTS开始播放时，从监听状态切换到说话状态
-        _stateMachine?.RequestTransition(ConversationTrigger.TtsStarted, $"TTS started: {e.Text}");
+        _audioPlayer?.Reset(); // 重置播放器，准备播放新语音    
+        // 只记录日志和触发事件，不切换状态
+        // 状态切换由实际的音频数据接收 (HandleAudioDataReceived) 控制
+        _logger?.LogInformation("TTS started: {Text}, 当前状态: {State}, 监听模式: {Mode}",
+            e.Text, CurrentState, _listeningMode);
         TtsStateChanged?.Invoke(this, e.TtsMessage!);
     }
 
     private void HandleTtsStopped(TtsEventArgs e)
     {
-        // TTS停止播放时，从说话状态切换回空闲或监听状态
-        _stateMachine?.RequestTransition(ConversationTrigger.TtsCompleted, "TTS completed");
+        // 只记录日志和触发事件，不切换状态
+        // 状态切换由音频播放完成事件 (OnAudioPlaybackStopped) 控制
+        _logger?.LogInformation("TTS stopped, 当前状态: {State}, 监听模式: {Mode}",
+            CurrentState, _listeningMode);
         TtsStateChanged?.Invoke(this, e.TtsMessage!);
+        _audioPlayer?.CompleteAdding(); // 标记音频数据添加完成
     }
 
     private void HandleTtsSentenceStarted(TtsEventArgs e)
@@ -1271,9 +1273,6 @@ public class VoiceChatService : IVoiceChatService
             // 解码并播放音频数据 - 使用输出采样率
             var pcmData = _audioCodec.Decode(e.AudioData, _config.AudioOutputSampleRate, _config.AudioChannels);
             await _audioPlayer.PlayAsync(pcmData, _config.AudioOutputSampleRate, _config.AudioChannels);
-
-            // 注意：不要在这里立即停止播放，因为可能还有更多音频数据要来
-            // 播放完成应该由播放器的PlaybackStopped事件或者明确的停止指令来触发
         }
     }
 
