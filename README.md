@@ -107,12 +107,27 @@
 
 *现代化的 Windows 桌面应用界面，支持语音交互和实时状态显示*
 
+<p align="center">
+  <a href="assets/videos/winui-app.mp4">▶️ 演示视频</a>
+</p>
+
 ### 📱 MAUI 移动应用（Android）
 <p align="center">
   <img src="assets/screenshots/maui-app.jpg" alt="MAUI Application Screenshot" width="800">
 </p>
 
 *基于 .NET MAUI 的 Android 移动应用，支持后台语音处理和音乐播放*
+
+<p align="center">
+  <a href="assets/videos/maui-app.mp4">▶️ 演示视频</a>
+</p>
+
+### ⌚ MAUI 安卓手表应用（Android Watch）
+<p align="center">
+  <img src="assets/screenshots/maui-android-watch.jpg" alt="MAUI Android Watch Application Screenshot" width="800">
+</p>
+
+*基于 .NET MAUI 的安卓手表应用，适配圆形/方形表盘，支持语音助手核心功能*
 
 ### 💻 控制台应用
 <p align="center">
@@ -121,11 +136,10 @@
 
 *轻量级命令行界面，适合服务器端部署和开发调试*
 
-### 🎬 视频演示
+<p align="center">
+  <a href="assets/videos/console-app.mp4">▶️ 演示视频</a>
+</p>
 
-- **WinUI 应用演示**: [查看视频](assets/videos/winui-app.mp4)
-- **MAUI 移动应用演示**: [查看视频](assets/videos/maui-app.mp4)
-- **控制台应用演示**: [查看视频](assets/videos/console-app.mp4)
 
 ## ✨ 功能特性
 
