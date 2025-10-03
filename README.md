@@ -102,21 +102,21 @@
 
 ### 🖥️ WinUI 桌面应用
 <p align="center">
-  <img src="assets/screenshots/winui-app.png" alt="WinUI Application Screenshot" width="800">
+  <img src="assets/screenshots/winui-app.jpg" alt="WinUI Application Screenshot" width="800">
 </p>
 
 *现代化的 Windows 桌面应用界面，支持语音交互和实时状态显示*
 
 ### 📱 MAUI 移动应用（Android）
 <p align="center">
-  <img src="assets/screenshots/maui-app.png" alt="MAUI Application Screenshot" width="800">
+  <img src="assets/screenshots/maui-app.jpg" alt="MAUI Application Screenshot" width="800">
 </p>
 
 *基于 .NET MAUI 的 Android 移动应用，支持后台语音处理和音乐播放*
 
 ### 💻 控制台应用
 <p align="center">
-  <img src="assets/screenshots/console-app.png" alt="Console Application Screenshot" width="800">
+  <img src="assets/screenshots/console-app.jpg" alt="Console Application Screenshot" width="800">
 </p>
 
 *轻量级命令行界面，适合服务器端部署和开发调试*
