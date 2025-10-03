@@ -300,13 +300,13 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
 
         try
         {
-            if (_dataProvider?.SamplesAvailable > 200)
+            // 启动播放设备
+            _playbackDevice.Start();
+            _logger?.LogDebug("🔊 SoundFlow播放设备启动");
+
+            if (_dataProvider?.SamplesAvailable > 1000)
             {
                 _isPlaying = true;
-
-                // 启动播放设备
-                _playbackDevice.Start();
-                _logger?.LogDebug("🔊 SoundFlow播放设备启动");
 
                 // 启动播放器
                 _soundPlayer.Play();

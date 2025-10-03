@@ -1235,6 +1235,9 @@ public class VoiceChatService : IVoiceChatService
         _logger?.LogInformation("TTS started: {Text}, 当前状态: {State}, 监听模式: {Mode}",
             e.Text, CurrentState, _listeningMode);
         TtsStateChanged?.Invoke(this, e.TtsMessage!);
+        // Use state machine to transition to speaking when audio is received
+        _stateMachine?.RequestTransition(ConversationTrigger.AudioReceived, $"WebSocket audio data received");
+
     }
 
     private void HandleTtsStopped(TtsEventArgs e)
@@ -1267,9 +1270,6 @@ public class VoiceChatService : IVoiceChatService
 
         if (_audioPlayer != null && _audioCodec != null && _config != null)
         {
-            // Use state machine to transition to speaking when audio is received
-            _stateMachine?.RequestTransition(ConversationTrigger.AudioReceived, $"WebSocket audio data received: {e.AudioData.Length} bytes");
-
             // 解码并播放音频数据 - 使用输出采样率
             var pcmData = _audioCodec.Decode(e.AudioData, _config.AudioOutputSampleRate, _config.AudioChannels);
             await _audioPlayer.PlayAsync(pcmData, _config.AudioOutputSampleRate, _config.AudioChannels);

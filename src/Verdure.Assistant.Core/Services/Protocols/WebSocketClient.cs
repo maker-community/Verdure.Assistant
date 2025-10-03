@@ -462,8 +462,9 @@ public class WebSocketClient : ICommunicationClient, IDisposable
                     Array.Copy(buffer, audioData, result.Count);
                     _logger?.LogDebug("收到WebSocket音频数据，长度: {Length}", audioData.Length);
 
-                    // 使用 Channel 优化的音频处理器处理接收到的音频数据
-                    _audioHandler?.TryProcessReceivedAudio(audioData);
+                    // 直接分发音频数据事件，保证与TTS事件顺序线性
+                    _eventManager.TriggerMessageEvent(WebSocketEventTrigger.AudioDataReceived,
+                        audioData: audioData, context: $"Audio data: {audioData.Length} bytes");
                 }
                 else if (result.MessageType == WebSocketMessageType.Close)
                 {
