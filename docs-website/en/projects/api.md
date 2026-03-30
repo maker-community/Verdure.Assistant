@@ -18,7 +18,7 @@ The API service is designed to be the core backend for intelligent voice assista
 
 ### Requirements
 
-- **.NET 9.0 SDK**
+- **.NET 10.0 SDK**
 - **Linux ARM64** (Raspberry Pi 4 recommended) or any .NET-supported system
 - **At least 1GB RAM** (2GB+ recommended)
 - **Network connection** (for voice service calls)
@@ -90,11 +90,11 @@ Content-Type: application/json
 ### Dockerfile
 
 ```dockerfile
-FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS base
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS base
 WORKDIR /app
 EXPOSE 80
 
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY ["src/Verdure.Assistant.Api/Verdure.Assistant.Api.csproj", "src/Verdure.Assistant.Api/"]
 RUN dotnet restore "src/Verdure.Assistant.Api/Verdure.Assistant.Api.csproj"
@@ -114,7 +114,7 @@ ENTRYPOINT ["dotnet", "Verdure.Assistant.Api.dll"]
 ### System Setup
 
 ```bash
-# Install .NET 9
+# Install .NET 10
 wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
 chmod +x ./dotnet-install.sh
 ./dotnet-install.sh --version latest --runtime aspnetcore

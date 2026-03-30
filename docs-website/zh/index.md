@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "Verdure Assistant"
   text: "绿荫助手"
-  tagline: 基于 .NET 9 的智能语音助手 - 跨平台 AI 交互解决方案
+  tagline: 基于 .NET 10 的智能语音助手 - 跨平台 AI 交互解决方案
   image:
     src: /logo.png
     alt: Verdure Assistant
@@ -22,7 +22,7 @@ features:
     details: 支持实时语音识别、自然语音合成，具备关键词唤醒功能，提供流畅的语音对话体验
   - icon: 🌐
     title: 跨平台支持
-    details: 基于 .NET 9 开发，支持 Windows、Linux、macOS，提供 API、MAUI、WinUI、Console 多种部署方式
+    details: 基于 .NET 10 开发，支持 Windows、Linux、macOS，提供 API、MAUI、WinUI、Console 多种部署方式
   - icon: 🏗️
     title: 模块化架构
     details: 采用现代化软件架构设计，清晰的分层结构，易于扩展和维护，支持依赖注入
@@ -34,16 +34,16 @@ features:
     details: 支持树莓派机器人、Android MAUI 应用、Windows 桌面应用、控制台应用等多种形态
   - icon: 🎯
     title: 零基础友好
-    details: 详细的技术栈解释和开发指南，帮助零基础开发者快速上手 .NET 9 和 C# 生态系统
+    details: 详细的技术栈解释和开发指南，帮助零基础开发者快速上手 .NET 10 和 C# 生态系统
 ---
 
 ## 项目概述
 
-绿荫助手（Verdure Assistant）是一个基于 .NET 9.0 开发的多服务智能助手，提供了完整的AI语音交互解决方案。项目采用现代化的软件架构设计，支持多种部署方式，可在Windows、Linux、macOS等平台运行。
+绿荫助手（Verdure Assistant）是一个基于 .NET 10.0 开发的多服务智能助手，提供了完整的AI语音交互解决方案。项目采用现代化的软件架构设计，支持多种部署方式，可在Windows、Linux、macOS等平台运行。
 
 ### 🎯 设计目标
 
-- **教育导向** - 帮助开发者学习 .NET 9 和 C# 生态系统
+- **教育导向** - 帮助开发者学习 .NET 10 和 C# 生态系统
 - **实用性强** - 提供完整的智能语音助手解决方案
 - **易于扩展** - 模块化架构，支持自定义功能开发
 - **跨平台兼容** - 一次开发，多平台部署
@@ -61,7 +61,7 @@ features:
 
 通过学习本项目，您将掌握：
 
-- **.NET 9** 最新特性和开发实践
+- **.NET 10** 最新特性和开发实践
 - **C# 语言** 高级特性和设计模式
 - **依赖注入** 和服务容器使用
 - **异步编程** 和并发处理

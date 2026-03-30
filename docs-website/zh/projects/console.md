@@ -73,7 +73,7 @@ src/Verdure.Assistant.Console/
 
 ### 环境要求
 
-- **.NET 9.0 SDK** 或更高版本
+- **.NET 10.0 SDK** 或更高版本
 - **支持的操作系统**：Windows 7+, Linux (多数发行版), macOS 10.15+
 - **音频支持**：系统需要有麦克风和扬声器设备
 - **网络连接**：用于连接语音服务
@@ -851,7 +851,7 @@ public static class ConsoleUI
         DisplayTitle("欢迎使用绿荫助手");
         
         Console.WriteLine();
-        DisplayInfo("绿荫助手是基于 .NET 9 开发的智能语音助手");
+        DisplayInfo("绿荫助手是基于 .NET 10 开发的智能语音助手");
         DisplayInfo("支持语音交互、文本聊天和多种配置选项");
         Console.WriteLine();
         
@@ -1324,7 +1324,7 @@ public class CommandLineParser
         
         Console.WriteLine($"绿荫助手 控制台版本 v{version}");
         Console.WriteLine($"构建时间: {buildDate:yyyy-MM-dd HH:mm:ss}");
-        Console.WriteLine("基于 .NET 9.0 开发");
+        Console.WriteLine("基于 .NET 10.0 开发");
         Console.WriteLine();
         Console.WriteLine("Copyright (c) 2024 Maker Community");
         Console.WriteLine("开源许可: MIT License");

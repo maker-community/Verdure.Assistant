@@ -39,7 +39,7 @@ Create `.vscode/launch.json`:
             "name": "Console",
             "type": "coreclr",
             "request": "launch",
-            "program": "${workspaceFolder}/src/Verdure.Assistant.Console/bin/Debug/net9.0/Verdure.Assistant.Console.dll",
+            "program": "${workspaceFolder}/src/Verdure.Assistant.Console/bin/Debug/net10.0/Verdure.Assistant.Console.dll",
             "args": [],
             "cwd": "${workspaceFolder}/src/Verdure.Assistant.Console",
             "console": "internalConsole",
@@ -49,7 +49,7 @@ Create `.vscode/launch.json`:
             "name": "API",
             "type": "coreclr", 
             "request": "launch",
-            "program": "${workspaceFolder}/src/Verdure.Assistant.Api/bin/Debug/net9.0/Verdure.Assistant.Api.dll",
+            "program": "${workspaceFolder}/src/Verdure.Assistant.Api/bin/Debug/net10.0/Verdure.Assistant.Api.dll",
             "args": [],
             "cwd": "${workspaceFolder}/src/Verdure.Assistant.Api",
             "env": {

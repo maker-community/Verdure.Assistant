@@ -70,7 +70,7 @@ src/Verdure.Assistant.Api/
 
 ### 环境要求
 
-- **.NET 9.0 SDK**
+- **.NET 10.0 SDK**
 - **Linux ARM64** (树莓派 4 推荐) 或任何支持 .NET 的系统
 - **至少 1GB RAM** (推荐 2GB+)
 - **网络连接** (用于语音服务调用)
@@ -569,7 +569,7 @@ public class DeviceManagerService : IDeviceManagerService
 ### Dockerfile
 
 ```dockerfile
-FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS base
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS base
 WORKDIR /app
 EXPOSE 80
 EXPOSE 443
@@ -577,7 +577,7 @@ EXPOSE 443
 # 安装音频库依赖
 RUN apk add --no-cache alsa-lib-dev portaudio-dev
 
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # 复制项目文件
@@ -691,7 +691,7 @@ echo "健康检查: http://localhost:5000/health"
 # 更新系统
 sudo apt update && sudo apt upgrade -y
 
-# 安装 .NET 9
+# 安装 .NET 10
 wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
 chmod +x ./dotnet-install.sh
 ./dotnet-install.sh --version latest --runtime aspnetcore
@@ -720,7 +720,7 @@ dotnet publish src/Verdure.Assistant.Api -c Release -r linux-arm64 --self-contai
 dotnet publish src/Verdure.Assistant.Api -c Release
 
 # 复制到运行目录
-sudo cp -r src/Verdure.Assistant.Api/bin/Release/net9.0/publish/* /opt/verdure-api/
+sudo cp -r src/Verdure.Assistant.Api/bin/Release/net10.0/publish/* /opt/verdure-api/
 
 # 创建服务配置
 sudo tee /etc/systemd/system/verdure-api.service > /dev/null <<EOF

@@ -26,8 +26,8 @@ Verdure.Assistant.MAUI is a cross-platform mobile application built with .NET Mu
 ### Requirements
 
 #### Universal Requirements
-- **.NET 9.0 SDK**
-- **Visual Studio 2022 17.8+** or **Visual Studio Code**
+- **.NET 10.0 SDK**
+- **Visual Studio 2026** or **Visual Studio Code**
 
 #### Android Development
 - **Android SDK** (API 21+)
@@ -45,26 +45,26 @@ Verdure.Assistant.MAUI is a cross-platform mobile application built with .NET Mu
 
 ```bash
 # Build Android version
-dotnet build -f net9.0-android
+dotnet build -f net10.0-android
 
 # Run in emulator
-dotnet run -f net9.0-android
+dotnet run -f net10.0-android
 
 # Deploy to connected device
-dotnet run -f net9.0-android --device "device-id"
+dotnet run -f net10.0-android --device "device-id"
 ```
 
 #### iOS (macOS required)
 
 ```bash
 # Build iOS version
-dotnet build -f net9.0-ios
+dotnet build -f net10.0-ios
 
 # Run in simulator
-dotnet run -f net9.0-ios --simulator
+dotnet run -f net10.0-ios --simulator
 
 # Deploy to device (requires developer certificate)
-dotnet run -f net9.0-ios --device "device-udid"
+dotnet run -f net10.0-ios --device "device-udid"
 ```
 
 ## Project Configuration
@@ -219,10 +219,10 @@ keytool -genkey -v -keystore verdure-assistant.keystore -alias verdure -keyalg R
 
 ```bash
 # Build Release APK
-dotnet publish -f net9.0-android -c Release
+dotnet publish -f net10.0-android -c Release
 
 # Build AAB (Android App Bundle)
-dotnet publish -f net9.0-android -c Release -p:AndroidPackageFormat=aab
+dotnet publish -f net10.0-android -c Release -p:AndroidPackageFormat=aab
 ```
 
 ### iOS Packaging
@@ -231,7 +231,7 @@ dotnet publish -f net9.0-android -c Release -p:AndroidPackageFormat=aab
 
 ```bash
 # Build for App Store
-dotnet publish -f net9.0-ios -c Release -p:RuntimeIdentifier=ios-arm64 -p:ArchiveOnBuild=true
+dotnet publish -f net10.0-ios -c Release -p:RuntimeIdentifier=ios-arm64 -p:ArchiveOnBuild=true
 ```
 
 ## Testing and Debugging

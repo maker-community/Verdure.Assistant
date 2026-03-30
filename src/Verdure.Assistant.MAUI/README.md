@@ -202,7 +202,7 @@ Verdure.Assistant.MAUI/
 ## 📱 部署要求
 
 - **Android API Level**: 21+ (Android 5.0)
-- **目标框架**: .NET 9.0
+- **目标框架**: .NET 10.0
 - **Android版本**: 推荐Android 8.0+以获得最佳前台服务体验
 - **存储空间**: 至少50MB可用空间
 - **网络**: 需要网络连接进行AI对话

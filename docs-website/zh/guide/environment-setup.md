@@ -6,41 +6,41 @@
 
 | 组件 | 最低版本 | 推荐版本 | 必需性 |
 |------|---------|----------|-------|
-| .NET SDK | 9.0.0 | 最新版本 | ✅ 必需 |
-| Visual Studio | 2022 17.8+ | 2022 最新版 | 🔶 可选 |
+| .NET SDK | 10.0.0 | 最新版本 | ✅ 必需 |
+| Visual Studio | 2026 | 2026 最新版 | 🔶 可选 |
 | VS Code | 最新版 | 最新版 | 🔶 可选 |
 | Git | 2.30+ | 最新版 | ✅ 必需 |
 | Windows SDK | 10.0.19041+ | 最新版 | 🔶 WinUI需要 |
 
 ## 🔧 核心环境安装
 
-### 1. 安装 .NET 9 SDK
+### 1. 安装 .NET 10 SDK
 
-.NET 9 是项目的核心依赖，提供了最新的语言特性和性能优化。
+.NET 10 是项目的核心依赖，提供了最新的语言特性和性能优化。
 
 #### Windows 安装
 
 **方法一：官方安装器（推荐）**
 
-1. 访问 [.NET 下载页面](https://dotnet.microsoft.com/download/dotnet/9.0)
-2. 下载 ".NET 9.0 SDK" Windows 安装器
+1. 访问 [.NET 下载页面](https://dotnet.microsoft.com/download/dotnet/10.0)
+2. 下载 ".NET 10.0 SDK" Windows 安装器
 3. 运行安装器，按向导完成安装
 
 **方法二：使用 winget（Windows 10/11）**
 
 ```powershell
-# 安装最新版 .NET 9 SDK
-winget install Microsoft.DotNet.SDK.9
+# 安装最新版 .NET 10 SDK
+winget install Microsoft.DotNet.SDK.10
 
 # 或指定具体版本
-winget install Microsoft.DotNet.SDK.9 --version 9.0.0
+winget install Microsoft.DotNet.SDK.10 --version 10.0.0
 ```
 
 #### macOS 安装
 
 **方法一：官方安装器**
 
-1. 访问 [.NET 下载页面](https://dotnet.microsoft.com/download/dotnet/9.0)
+1. 访问 [.NET 下载页面](https://dotnet.microsoft.com/download/dotnet/10.0)
 2. 选择 macOS 对应的架构（Intel 或 Apple Silicon）
 3. 下载并运行 .pkg 安装器
 
@@ -50,7 +50,7 @@ winget install Microsoft.DotNet.SDK.9 --version 9.0.0
 # 安装 Homebrew（如果未安装）
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-# 安装 .NET 9
+# 安装 .NET 10
 brew install --cask dotnet-sdk
 ```
 
@@ -63,9 +63,9 @@ brew install --cask dotnet-sdk
 wget https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
 sudo dpkg -i packages-microsoft-prod.deb
 
-# 安装 .NET 9 SDK
+# 安装 .NET 10 SDK
 sudo apt-get update
-sudo apt-get install -y dotnet-sdk-9.0
+sudo apt-get install -y dotnet-sdk-10.0
 ```
 
 **CentOS/RHEL/Fedora：**
@@ -74,8 +74,8 @@ sudo apt-get install -y dotnet-sdk-9.0
 # 添加 Microsoft 包存储库
 sudo rpm -Uvh https://packages.microsoft.com/config/centos/8/packages-microsoft-prod.rpm
 
-# 安装 .NET 9 SDK
-sudo dnf install dotnet-sdk-9.0
+# 安装 .NET 10 SDK
+sudo dnf install dotnet-sdk-10.0
 ```
 
 #### 验证安装
@@ -83,7 +83,7 @@ sudo dnf install dotnet-sdk-9.0
 ```bash
 # 检查版本
 dotnet --version
-# 应该显示 9.0.x
+# 应该显示 10.0.x
 
 # 查看安装的 SDK
 dotnet --list-sdks
@@ -137,11 +137,11 @@ git config --global core.editor "notepad"      # Windows 记事本
 
 ## 🛠️ 开发工具选择
 
-### Option 1: Visual Studio 2022（推荐 Windows 用户）
+### Option 1: Visual Studio 2026（推荐 Windows 用户）
 
 Visual Studio 是微软官方的集成开发环境，对 .NET 项目支持最完整。
 
-#### 安装 Visual Studio 2022
+#### 安装 Visual Studio 2026
 
 1. 访问 [Visual Studio 下载页面](https://visualstudio.microsoft.com/downloads/)
 2. 选择 "Community"（免费版）或其他版本

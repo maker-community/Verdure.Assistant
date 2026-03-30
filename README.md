@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  🤖 基于 .NET 9.0 的多服务智能助手 | 跨平台 AI 语音交互解决方案
+  🤖 基于 .NET 10.0 的多服务智能助手 | 跨平台 AI 语音交互解决方案
 </p>
 
 <p align="center">
@@ -36,7 +36,7 @@
 
 ## 📖 项目简介
 
-绿荫助手（Verdure Assistant）是一个基于 .NET 9.0 开发的多服务智能助手，提供了完整的AI语音交互解决方案。项目采用现代化的软件架构设计，支持多种部署方式，可在Windows、Linux、macOS、Android等平台运行。
+绿荫助手（Verdure Assistant）是一个基于 .NET 10.0 开发的多服务智能助手，提供了完整的AI语音交互解决方案。项目采用现代化的软件架构设计，支持多种部署方式，可在Windows、Linux、macOS、Android等平台运行。
 
 作为一个多服务集成平台，绿荫助手不仅支持原有的小智服务，还计划集成更多AI助手服务，为用户提供更丰富的智能交互体验。
 
@@ -247,7 +247,7 @@ verdure-assistant/
 
 ## � 多平台支持
 
-本项目充分展示了 **.NET 9.0 的跨平台能力**，提供多种部署方式，适合不同场景和学习目标：
+本项目充分展示了 **.NET 10.0 的跨平台能力**，提供多种部署方式，适合不同场景和学习目标：
 
 ### 🖥️ Windows 桌面应用 (WinUI 3)
 
@@ -274,7 +274,7 @@ verdure-assistant/
 **适用场景**: 移动端语音助手、跨平台移动开发学习
 
 **技术栈**:
-- .NET MAUI 9.0
+- .NET MAUI 10.0
 - Android 前台服务
 - Material Design
 - 共享 ViewModels (MVVM)
@@ -297,7 +297,7 @@ verdure-assistant/
 **支持平台**: Windows、Linux、macOS
 
 **技术栈**:
-- .NET 9.0 Console Application
+- .NET 10.0 Console Application
 - 跨平台音频处理
 - 命令行交互
 
@@ -388,8 +388,8 @@ verdure-assistant/
 ### 环境要求
 
 #### 基础要求
-- **.NET 9.0 SDK** 或更高版本 - [下载地址](https://dotnet.microsoft.com/download/dotnet/9.0)
-- **Visual Studio 2022 (17.8+)** 或 **Visual Studio Code**
+- **.NET 10.0 SDK** 或更高版本 - [下载地址](https://dotnet.microsoft.com/download/dotnet/10.0)
+- **Visual Studio 2026** 或 **Visual Studio Code**
 
 #### 平台特定要求
 
@@ -451,7 +451,7 @@ verdure-assistant/
    <details>
    <summary><b>📱 MAUI版本 (Android)</b></summary>
    
-   在 Visual Studio 2022 中：
+   在 Visual Studio 2026 中：
    1. 打开 `Verdure.Assistant.sln`
    2. 设置 `Verdure.Assistant.MAUI` 为启动项目
    3. 选择 Android 模拟器或连接真机
@@ -460,7 +460,7 @@ verdure-assistant/
    或使用命令行：
    ```bash
    # 部署到连接的Android设备
-   dotnet build src/Verdure.Assistant.MAUI -t:Run -f net9.0-android
+   dotnet build src/Verdure.Assistant.MAUI -t:Run -f net10.0-android
    ```
    
    适合：移动端用户、Android应用开发学习
@@ -850,10 +850,10 @@ ENTRYPOINT ["./Verdure.Assistant.Console"]
 
 ### IDE配置
 
-#### Visual Studio 2022
+#### Visual Studio 2026
 1. 打开 `Verdure.Assistant.sln`
 2. 设置启动项目为 `Verdure.Assistant.Console` 或 `Verdure.Assistant.WinUI`
-3. 确保选择了正确的目标框架 (.NET 9.0)
+3. 确保选择了正确的目标框架 (.NET 10.0)
 
 #### Visual Studio Code
 1. 安装C# DevKit扩展
@@ -1001,9 +1001,9 @@ ENTRYPOINT ["./Verdure.Assistant.Console"]
 
 #### 🎯 核心技术
 
-- **.NET 9.0** - 最新的 .NET 平台特性
-  - [官方文档](https://learn.microsoft.com/dotnet/core/whats-new/dotnet-9)
-  - C# 13 新特性
+- **.NET 10.0** - 最新的 .NET 平台特性
+  - [官方文档](https://learn.microsoft.com/dotnet/core/whats-new/dotnet-10)
+  - C# 14 新特性
   - 性能优化和改进
 
 - **跨平台开发** - 一次编写，到处运行

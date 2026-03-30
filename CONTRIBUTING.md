@@ -4,8 +4,8 @@
 
 ## 开发环境要求
 
-- .NET 9.0 SDK 或更高版本
-- Visual Studio 2022 或 Visual Studio Code
+- .NET 10.0 SDK 或更高版本
+- Visual Studio 2026 或 Visual Studio Code
 - Windows 10/11（用于WinUI开发）
 
 ## 如何贡献

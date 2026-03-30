@@ -82,8 +82,8 @@ src/Verdure.Assistant.WinUI/
 
 - **Windows 10 版本 1809** (10.0; Build 17763) 或更高版本
 - **Windows 11** (推荐)
-- **.NET 9.0 SDK** 
-- **Visual Studio 2022** 17.8 或更高版本
+- **.NET 10.0 SDK** 
+- **Visual Studio 2026** 17.8 或更高版本
 - **Windows App SDK** (通过 NuGet 自动安装)
 
 ### 本地运行
@@ -110,7 +110,7 @@ start ../../Verdure.Assistant.sln
 在 Visual Studio 中：
 - 右键点击 `Verdure.Assistant.WinUI` 项目
 - 选择"设为启动项目"
-- 确保目标框架为 `net9.0-windows10.0.19041.0`
+- 确保目标框架为 `net10.0-windows10.0.19041.0`
 
 4. **运行项目**
 
@@ -880,7 +880,7 @@ public class ThemeService : IThemeService
     <DisplayName>绿荫助手</DisplayName>
     <PublisherDisplayName>Maker Community</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
-    <Description>基于 .NET 9 的智能语音助手</Description>
+    <Description>基于 .NET 10 的智能语音助手</Description>
   </Properties>
 
   <Dependencies>

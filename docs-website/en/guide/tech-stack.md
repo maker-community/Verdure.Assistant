@@ -4,16 +4,16 @@ Overview of the technologies and frameworks used in Verdure Assistant.
 
 ## Core Technologies
 
-### .NET 9 Platform
+### .NET 10 Platform
 
-**.NET 9** is Microsoft's latest cross-platform development framework, providing:
+**.NET 10** is Microsoft's latest cross-platform development framework, providing:
 
 - **Cross-platform compatibility** - Run on Windows, Linux, macOS
 - **Performance optimizations** - JIT compiler improvements, faster startup
 - **Memory management** - Improved garbage collector, reduced memory usage
 - **Asynchronous programming** - Native support for async/await patterns
 
-### C# 12 Language Features
+### C# 14 Language Features
 
 Modern C# features used throughout the project:
 
@@ -141,8 +141,8 @@ public class EncryptionService : IEncryptionService
 ## Learning Resources
 
 ### Official Documentation
-- [.NET 9 Documentation](https://docs.microsoft.com/dotnet/core/whats-new/dotnet-9)
-- [C# 12 Features](https://docs.microsoft.com/dotnet/csharp/whats-new/csharp-12)
+- [.NET 10 Documentation](https://docs.microsoft.com/dotnet/core/whats-new/dotnet-10)
+- [C# 14 Features](https://docs.microsoft.com/dotnet/csharp/whats-new/csharp-14)
 - [WinUI 3 Documentation](https://docs.microsoft.com/windows/apps/winui/)
 
 ## Next Steps

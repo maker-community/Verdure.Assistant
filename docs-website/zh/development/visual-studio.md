@@ -1,13 +1,13 @@
 # Visual Studio 开发环境
 
-使用 Visual Studio 2022 开发 Verdure Assistant 项目的完整指南。
+使用 Visual Studio 2026 开发 Verdure Assistant 项目的完整指南。
 
 ## 环境配置
 
 ### 必需组件
 
-- Visual Studio 2022 17.8 或更高版本
-- .NET 9.0 SDK
+- Visual Studio 2026 17.8 或更高版本
+- .NET 10.0 SDK
 - 以下工作负载：
   - .NET 桌面开发
   - ASP.NET 和 Web 开发

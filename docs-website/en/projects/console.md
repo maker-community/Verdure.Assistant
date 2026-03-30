@@ -16,7 +16,7 @@ Verdure.Assistant.Console is the command-line version of the project, providing 
 
 ### Requirements
 
-- **.NET 9.0 SDK** or higher
+- **.NET 10.0 SDK** or higher
 - **Supported OS**: Windows 7+, Linux (most distributions), macOS 10.15+
 - **Audio Support**: System needs microphone and speaker devices
 - **Network Connection**: For voice service connectivity

@@ -4,7 +4,7 @@ Comprehensive development guides for Verdure Assistant project.
 
 ## Development Environment Setup
 
-- **[Visual Studio Development](/en/development/visual-studio)** - Complete guide for VS 2022 setup and usage
+- **[Visual Studio Development](/en/development/visual-studio)** - Complete guide for VS 2026 setup and usage
 - **[VS Code Development](/en/development/vs-code)** - Lightweight editor configuration and extensions
 - **[Environment Setup](/en/guide/environment-setup)** - System requirements and installation
 

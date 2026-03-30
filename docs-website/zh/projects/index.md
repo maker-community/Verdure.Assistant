@@ -119,8 +119,8 @@ Console → API → WinUI → MAUI
 
 所有项目都需要以下基础环境：
 
-- **.NET 9.0 SDK** 或更高版本
-- **Visual Studio 2022** 或 **Visual Studio Code**
+- **.NET 10.0 SDK** 或更高版本
+- **Visual Studio 2026** 或 **Visual Studio Code**
 - **Git** 版本控制
 
 特定项目的额外要求请参考各项目的详细文档。

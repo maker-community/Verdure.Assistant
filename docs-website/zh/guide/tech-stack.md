@@ -1,6 +1,6 @@
 # 技术栈介绍
 
-Verdure Assistant 采用现代化的技术栈，基于 .NET 9 构建。本章将深入介绍项目中使用的各种技术和框架，帮助您理解项目的技术选型和设计理念。
+Verdure Assistant 采用现代化的技术栈，基于 .NET 10 构建。本章将深入介绍项目中使用的各种技术和框架，帮助您理解项目的技术选型和设计理念。
 
 ## 🏗️ 整体技术架构
 
@@ -31,13 +31,13 @@ graph TB
 
 ## 🎯 核心技术栈
 
-### .NET 9 平台
+### .NET 10 平台
 
-**.NET 9** 是微软最新的跨平台开发框架，为项目提供了强大的基础能力。
+**.NET 10** 是微软最新的跨平台开发框架，为项目提供了强大的基础能力。
 
 #### 关键特性
 ```csharp
-// .NET 9 的新特性示例
+// .NET 10 的新特性示例
 
 // 1. 性能优化的集合操作
 var numbers = [1, 2, 3, 4, 5];
@@ -65,9 +65,9 @@ await foreach (var item in GetItemsAsync())
 - **内存管理**：垃圾回收器改进，内存占用降低
 - **异步编程**：原生支持 async/await 模式
 
-### C# 12 语言特性
+### C# 14 语言特性
 
-项目充分利用了 C# 12 的现代语言特性：
+项目充分利用了 C# 14 的现代语言特性：
 
 #### Primary Constructors（主构造函数）
 ```csharp
@@ -82,7 +82,7 @@ public class AudioService
     }
 }
 
-// C# 12 主构造函数写法
+// C# 14 主构造函数写法
 public class AudioService(ILogger<AudioService> logger)
 {
     public void PlaySound() => logger.LogInformation("Playing sound...");
@@ -94,7 +94,7 @@ public class AudioService(ILogger<AudioService> logger)
 // 传统写法
 var supportedFormats = new List<string> { "wav", "mp3", "opus" };
 
-// C# 12 集合表达式
+// C# 14 集合表达式
 var supportedFormats = ["wav", "mp3", "opus"];
 ```
 
@@ -651,8 +651,8 @@ public class EncryptionService : IEncryptionService
 ## 📚 学习资源
 
 ### 官方文档
-- [.NET 9 文档](https://docs.microsoft.com/dotnet/core/whats-new/dotnet-9)
-- [C# 12 新特性](https://docs.microsoft.com/dotnet/csharp/whats-new/csharp-12)
+- [.NET 10 文档](https://docs.microsoft.com/dotnet/core/whats-new/dotnet-10)
+- [C# 14 新特性](https://docs.microsoft.com/dotnet/csharp/whats-new/csharp-14)
 - [WinUI 3 文档](https://docs.microsoft.com/windows/apps/winui/)
 - [.NET MAUI 文档](https://docs.microsoft.com/dotnet/maui/)
 

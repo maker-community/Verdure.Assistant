@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "Verdure Assistant"
   text: "Intelligent Voice Assistant"
-  tagline: AI-powered Voice Interaction Solution based on .NET 9 - Cross-platform Development
+  tagline: AI-powered Voice Interaction Solution based on .NET 10 - Cross-platform Development
   image:
     src: /logo.png
     alt: Verdure Assistant
@@ -22,7 +22,7 @@ features:
     details: Real-time speech recognition, natural speech synthesis, keyword wake-up, providing smooth voice conversation experience
   - icon: 🌐
     title: Cross-platform Support
-    details: Built on .NET 9, supports Windows, Linux, macOS with API, MAUI, WinUI, Console deployment options
+    details: Built on .NET 10, supports Windows, Linux, macOS with API, MAUI, WinUI, Console deployment options
   - icon: 🏗️
     title: Modular Architecture
     details: Modern software architecture design with clear layered structure, easy to extend and maintain, supports dependency injection
@@ -34,16 +34,16 @@ features:
     details: Supports Raspberry Pi robots, Android MAUI apps, Windows desktop apps, console applications
   - icon: 🎯
     title: Beginner Friendly
-    details: Detailed tech stack explanations and development guides to help beginners quickly get started with .NET 9 and C#
+    details: Detailed tech stack explanations and development guides to help beginners quickly get started with .NET 10 and C#
 ---
 
 ## Project Overview
 
-Verdure Assistant is a multi-service intelligent assistant developed based on .NET 9.0, providing a complete AI voice interaction solution. The project adopts modern software architecture design and supports multiple deployment methods, running on Windows, Linux, macOS and other platforms.
+Verdure Assistant is a multi-service intelligent assistant developed based on .NET 10.0, providing a complete AI voice interaction solution. The project adopts modern software architecture design and supports multiple deployment methods, running on Windows, Linux, macOS and other platforms.
 
 ### 🎯 Design Goals
 
-- **Education-oriented** - Help developers learn .NET 9 and C# ecosystem
+- **Education-oriented** - Help developers learn .NET 10 and C# ecosystem
 - **Practical** - Provide complete intelligent voice assistant solution
 - **Easy to extend** - Modular architecture supporting custom feature development
 - **Cross-platform compatible** - Develop once, deploy everywhere
@@ -61,7 +61,7 @@ Verdure Assistant is a multi-service intelligent assistant developed based on .N
 
 By studying this project, you will master:
 
-- **.NET 9** latest features and development practices
+- **.NET 10** latest features and development practices
 - **C# Language** advanced features and design patterns
 - **Dependency Injection** and service container usage
 - **Asynchronous Programming** and concurrency handling

@@ -4,7 +4,7 @@ Welcome to the world of Verdure Assistant! This guide will help you quickly unde
 
 ## 🎯 Project Introduction
 
-Verdure Assistant is an intelligent voice assistant project based on .NET 9, providing a complete voice interaction solution. Whether you're a beginner or an experienced developer, you can learn the essence of modern .NET development from this project.
+Verdure Assistant is an intelligent voice assistant project based on .NET 10, providing a complete voice interaction solution. Whether you're a beginner or an experienced developer, you can learn the essence of modern .NET development from this project.
 
 ### Core Features
 
@@ -19,9 +19,9 @@ Verdure Assistant is an intelligent voice assistant project based on .NET 9, pro
 
 Ensure your development environment meets the following requirements:
 
-- ✅ [.NET 9.0 SDK](https://dotnet.microsoft.com/download/dotnet/9.0) or higher
+- ✅ [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) or higher
 - ✅ [Git](https://git-scm.com/) version control tool
-- ✅ Code editor (recommended [Visual Studio 2022](https://visualstudio.microsoft.com/) or [VS Code](https://code.visualstudio.com/))
+- ✅ Code editor (recommended [Visual Studio 2026](https://visualstudio.microsoft.com/) or [VS Code](https://code.visualstudio.com/))
 
 ### Step 1: Clone the Project
 
@@ -130,7 +130,7 @@ Choose the project type that interests you for in-depth learning:
 
 ### Q: Missing dependencies error when running?
 
-**A:** Make sure .NET 9 SDK is installed and run `dotnet restore` to restore packages:
+**A:** Make sure .NET 10 SDK is installed and run `dotnet restore` to restore packages:
 
 ```bash
 dotnet restore

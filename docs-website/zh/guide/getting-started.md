@@ -4,7 +4,7 @@
 
 ## 🎯 项目简介
 
-绿荫助手是一个基于 .NET 9 的智能语音助手项目，提供了完整的语音交互解决方案。无论您是初学者还是有经验的开发者，都能从这个项目中学到现代 .NET 开发的精髓。
+绿荫助手是一个基于 .NET 10 的智能语音助手项目，提供了完整的语音交互解决方案。无论您是初学者还是有经验的开发者，都能从这个项目中学到现代 .NET 开发的精髓。
 
 ### 核心特性
 
@@ -19,9 +19,9 @@
 
 确保您的开发环境满足以下要求：
 
-- ✅ [.NET 9.0 SDK](https://dotnet.microsoft.com/download/dotnet/9.0) 或更高版本
+- ✅ [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) 或更高版本
 - ✅ [Git](https://git-scm.com/) 版本控制工具
-- ✅ 代码编辑器（推荐 [Visual Studio 2022](https://visualstudio.microsoft.com/) 或 [VS Code](https://code.visualstudio.com/)）
+- ✅ 代码编辑器（推荐 [Visual Studio 2026](https://visualstudio.microsoft.com/) 或 [VS Code](https://code.visualstudio.com/)）
 
 ### 步骤一：克隆项目
 
@@ -36,7 +36,7 @@ cd Verdure.Assistant
 
 ```bash
 dotnet --version
-# 应该显示 9.0.x 或更高版本
+# 应该显示 10.0.x 或更高版本
 ```
 
 ### 步骤三：构建项目
@@ -130,7 +130,7 @@ dotnet run
 
 ### Q: 运行时提示缺少依赖？
 
-**A:** 确保已安装 .NET 9 SDK，并运行 `dotnet restore` 恢复包：
+**A:** 确保已安装 .NET 10 SDK，并运行 `dotnet restore` 恢复包：
 
 ```bash
 dotnet restore

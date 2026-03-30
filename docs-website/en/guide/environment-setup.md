@@ -4,21 +4,21 @@ Complete guide for setting up the development environment for Verdure Assistant.
 
 ## System Requirements
 
-- **.NET 9.0 SDK** or higher
-- **Visual Studio 2022** 17.8+ or **Visual Studio Code**
+- **.NET 10.0 SDK** or higher
+- **Visual Studio 2026** or **Visual Studio Code**
 - **Git** for version control
 - **Windows 10/11** (for WinUI development)
 
 ## Installation Steps
 
-### 1. Install .NET 9 SDK
+### 1. Install .NET 10 SDK
 
-Download and install from [.NET download page](https://dotnet.microsoft.com/download/dotnet/9.0)
+Download and install from [.NET download page](https://dotnet.microsoft.com/download/dotnet/10.0)
 
 Verify installation:
 ```bash
 dotnet --version
-# Should display 9.0.x or higher
+# Should display 10.0.x or higher
 ```
 
 ### 2. Clone the Repository
@@ -42,7 +42,7 @@ dotnet build --configuration Release
 
 ## Development Tools
 
-### Visual Studio 2022
+### Visual Studio 2026
 
 Required workloads:
 - .NET desktop development

@@ -18,8 +18,8 @@ Verdure.Assistant.WinUI is a modern Windows desktop application built with WinUI
 
 - **Windows 10 version 1809** (10.0; Build 17763) or higher
 - **Windows 11** (recommended)
-- **.NET 9.0 SDK**
-- **Visual Studio 2022** 17.8 or higher
+- **.NET 10.0 SDK**
+- **Visual Studio 2026** 17.8 or higher
 - **Windows App SDK** (automatically installed via NuGet)
 
 ### Running Locally
@@ -46,7 +46,7 @@ start ../../Verdure.Assistant.sln
 In Visual Studio:
 - Right-click `Verdure.Assistant.WinUI` project
 - Select "Set as Startup Project"
-- Ensure target framework is `net9.0-windows10.0.19041.0`
+- Ensure target framework is `net10.0-windows10.0.19041.0`
 
 4. **Run the project**
 
@@ -239,7 +239,7 @@ public class ThemeService : IThemeService
 
   <Properties>
     <DisplayName>Verdure Assistant</DisplayName>
-    <Description>Intelligent Voice Assistant based on .NET 9</Description>
+    <Description>Intelligent Voice Assistant based on .NET 10</Description>
   </Properties>
 
   <Applications>

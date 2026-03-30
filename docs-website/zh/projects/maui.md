@@ -105,8 +105,8 @@ src/Verdure.Assistant.MAUI/
 ### 环境要求
 
 #### 通用要求
-- **.NET 9.0 SDK**
-- **Visual Studio 2022 17.8+** 或 **Visual Studio Code**
+- **.NET 10.0 SDK**
+- **Visual Studio 2026** 或 **Visual Studio Code**
 
 #### Android 开发
 - **Android SDK** (API 21+)
@@ -205,39 +205,39 @@ public static class MauiProgram
 
 ```bash
 # 构建 Android 版本
-dotnet build -f net9.0-android
+dotnet build -f net10.0-android
 
 # 在模拟器中运行
-dotnet run -f net9.0-android
+dotnet run -f net10.0-android
 
 # 部署到连接的设备
-dotnet run -f net9.0-android --device "device-id"
+dotnet run -f net10.0-android --device "device-id"
 
 # 生成 APK
-dotnet publish -f net9.0-android -c Release
+dotnet publish -f net10.0-android -c Release
 ```
 
 #### iOS (需要 macOS)
 
 ```bash
 # 构建 iOS 版本
-dotnet build -f net9.0-ios
+dotnet build -f net10.0-ios
 
 # 在模拟器中运行
-dotnet run -f net9.0-ios --simulator
+dotnet run -f net10.0-ios --simulator
 
 # 部署到设备 (需要开发者证书)
-dotnet run -f net9.0-ios --device "device-udid"
+dotnet run -f net10.0-ios --device "device-udid"
 ```
 
 #### Windows
 
 ```bash
 # 构建 Windows 版本
-dotnet build -f net9.0-windows10.0.19041.0
+dotnet build -f net10.0-windows10.0.19041.0
 
 # 运行
-dotnet run -f net9.0-windows10.0.19041.0
+dotnet run -f net10.0-windows10.0.19041.0
 ```
 
 ## 📱 用户界面设计
@@ -1189,7 +1189,7 @@ keytool -list -v -keystore verdure-assistant.keystore -alias verdure
 
 ```xml
 <!-- 在 .csproj 中添加签名配置 -->
-<PropertyGroup Condition="'$(Configuration)' == 'Release' And '$(TargetFramework)' == 'net9.0-android'">
+<PropertyGroup Condition="'$(Configuration)' == 'Release' And '$(TargetFramework)' == 'net10.0-android'">
     <AndroidKeyStore>True</AndroidKeyStore>
     <AndroidSigningKeyStore>verdure-assistant.keystore</AndroidSigningKeyStore>
     <AndroidSigningKeyAlias>verdure</AndroidSigningKeyAlias>
@@ -1202,10 +1202,10 @@ keytool -list -v -keystore verdure-assistant.keystore -alias verdure
 
 ```bash
 # 构建 Release APK
-dotnet publish -f net9.0-android -c Release
+dotnet publish -f net10.0-android -c Release
 
 # 构建 AAB (Android App Bundle) - 推荐用于 Google Play
-dotnet publish -f net9.0-android -c Release -p:AndroidPackageFormat=aab
+dotnet publish -f net10.0-android -c Release -p:AndroidPackageFormat=aab
 ```
 
 ### iOS 打包
@@ -1214,7 +1214,7 @@ dotnet publish -f net9.0-android -c Release -p:AndroidPackageFormat=aab
 
 ```xml
 <!-- 在 .csproj 中配置 -->
-<PropertyGroup Condition="'$(Configuration)' == 'Release' And '$(TargetFramework)' == 'net9.0-ios'">
+<PropertyGroup Condition="'$(Configuration)' == 'Release' And '$(TargetFramework)' == 'net10.0-ios'">
     <CodesignKey>iPhone Distribution: Your Company Name</CodesignKey>
     <CodesignProvision>Your_Provisioning_Profile</CodesignProvision>
     <CodesignEntitlements>Entitlements.plist</CodesignEntitlements>
@@ -1225,7 +1225,7 @@ dotnet publish -f net9.0-android -c Release -p:AndroidPackageFormat=aab
 
 ```bash
 # 构建用于 App Store 的版本
-dotnet publish -f net9.0-ios -c Release -p:RuntimeIdentifier=ios-arm64 -p:ArchiveOnBuild=true
+dotnet publish -f net10.0-ios -c Release -p:RuntimeIdentifier=ios-arm64 -p:ArchiveOnBuild=true
 ```
 
 ### 部署脚本
@@ -1250,22 +1250,22 @@ dotnet restore
 
 # 构建 Android 版本
 echo "构建 Android APK..."
-dotnet publish -f net9.0-android -c $BUILD_CONFIG -p:ApplicationVersion=$VERSION
+dotnet publish -f net10.0-android -c $BUILD_CONFIG -p:ApplicationVersion=$VERSION
 
 # 构建 Android AAB (如果需要)
 echo "构建 Android AAB..."
-dotnet publish -f net9.0-android -c $BUILD_CONFIG -p:ApplicationVersion=$VERSION -p:AndroidPackageFormat=aab
+dotnet publish -f net10.0-android -c $BUILD_CONFIG -p:ApplicationVersion=$VERSION -p:AndroidPackageFormat=aab
 
 # 构建 iOS 版本 (仅在 macOS 上)
 if [[ "$OSTYPE" == "darwin"* ]]; then
     echo "构建 iOS 应用..."
-    dotnet publish -f net9.0-ios -c $BUILD_CONFIG -p:ApplicationVersion=$VERSION
+    dotnet publish -f net10.0-ios -c $BUILD_CONFIG -p:ApplicationVersion=$VERSION
 fi
 
 # 构建 Windows 版本
 if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
     echo "构建 Windows 应用..."
-    dotnet publish -f net9.0-windows10.0.19041.0 -c $BUILD_CONFIG -p:ApplicationVersion=$VERSION
+    dotnet publish -f net10.0-windows10.0.19041.0 -c $BUILD_CONFIG -p:ApplicationVersion=$VERSION
 fi
 
 echo "构建完成！"

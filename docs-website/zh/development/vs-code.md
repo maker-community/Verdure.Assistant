@@ -36,7 +36,7 @@ code .
             "name": "Console",
             "type": "coreclr",
             "request": "launch",
-            "program": "${workspaceFolder}/src/Verdure.Assistant.Console/bin/Debug/net9.0/Verdure.Assistant.Console.dll",
+            "program": "${workspaceFolder}/src/Verdure.Assistant.Console/bin/Debug/net10.0/Verdure.Assistant.Console.dll",
             "args": [],
             "cwd": "${workspaceFolder}/src/Verdure.Assistant.Console",
             "console": "internalConsole",

@@ -119,8 +119,8 @@ Core     Server   Desktop  Mobile
 
 All projects require the following basic environment:
 
-- **.NET 9.0 SDK** or higher
-- **Visual Studio 2022** or **Visual Studio Code**
+- **.NET 10.0 SDK** or higher
+- **Visual Studio 2026** or **Visual Studio Code**
 - **Git** version control
 
 For additional requirements specific to each project, please refer to their detailed documentation.
