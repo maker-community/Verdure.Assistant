@@ -1,6 +1,12 @@
 # 绿荫助手（Verdure Assistant）
 
 <p align="center">
+  <a href="README.en.md"><strong>English README</strong></a> |
+  <a href="https://verdure-assistant.verdure-hiro.cn/zh/"><strong>在线文档</strong></a> |
+  <a href="https://verdure-assistant.verdure-hiro.cn/en/"><strong>English Docs</strong></a>
+</p>
+
+<p align="center">
   <img src="assets/logo.png" alt="Verdure Assistant Logo" width="200" height="200">
 </p>
 
