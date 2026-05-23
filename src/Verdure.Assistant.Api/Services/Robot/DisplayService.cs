@@ -18,6 +18,7 @@ public class DisplayService : IDisposable
     private readonly ILogger<DisplayService> _logger;
     private readonly Dictionary<string, LottieRenderer> _lottieRenderers;
     private bool _disposed = false;
+    private volatile bool _isPlayingEmotion = false;
 
     // 屏幕尺寸配置
     private const int Display24Width = 320;
@@ -176,6 +177,7 @@ public class DisplayService : IDisposable
         int frameDurationMs = 1000 / fps;
         int currentLoop = 0;
 
+        _isPlayingEmotion = true;
         try
         {
             while ((loops == -1 || currentLoop < loops) && !cancellationToken.IsCancellationRequested)
@@ -217,6 +219,10 @@ public class DisplayService : IDisposable
         {
             _logger.LogError(ex, $"表情播放 {emotionType} 发生错误");
         }
+        finally
+        {
+            _isPlayingEmotion = false;
+        }
     }
 
     /// <summary>
@@ -229,6 +235,7 @@ public class DisplayService : IDisposable
             _logger.LogDebug("2.4寸显示器未初始化，跳过时间显示");
             return;
         }
+        if (_isPlayingEmotion) return;
         try
         {
             var now = DateTime.Now;
@@ -253,6 +260,7 @@ public class DisplayService : IDisposable
             _logger.LogDebug("2.4寸显示器未初始化，跳过时间网络信息显示");
             return;
         }
+        if (_isPlayingEmotion) return;
         try
         {
             var now = DateTime.Now;
