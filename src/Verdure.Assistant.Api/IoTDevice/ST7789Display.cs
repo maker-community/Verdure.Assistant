@@ -646,6 +646,15 @@ public class ST7789Display : IDisposable
         return pix;
     }
 
+    // 绘制全帧 RGB565 数据（与参考实现一致：每次先 SetAddressWindow 再发送数据）
+    public void DrawRgb565(byte[] data)
+    {
+        if (data.Length != _width * _height * 2)
+            throw new ArgumentException($"RGB565 data must be exactly {_width * _height * 2} bytes.", nameof(data));
+        SetAddressWindow(0, 0, _width, _height);
+        SendData(data);
+    }
+
     // 填充纯色
     public void FillScreen(ushort color)
     {

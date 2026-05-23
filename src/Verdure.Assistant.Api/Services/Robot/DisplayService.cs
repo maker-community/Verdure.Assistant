@@ -188,7 +188,7 @@ public class DisplayService : IDisposable
                     byte[] frameData = renderer.RenderFrame(frame, Display24Width, Display24Height);
 
                     // 发送到2.4寸屏幕 - 使用ConfigureAwait(false)避免死锁
-                    await Task.Run(() => _display24Inch.SendData(frameData), cancellationToken).ConfigureAwait(false);
+                    await Task.Run(() => _display24Inch.DrawRgb565(frameData), cancellationToken).ConfigureAwait(false);
 
                     // 帧率控制 - 更精确的时间控制
                     var elapsed = (DateTime.Now - startTime).TotalMilliseconds;
@@ -233,7 +233,7 @@ public class DisplayService : IDisposable
         {
             var now = DateTime.Now;
             var imageData = CreateTimeImage(now.ToString("HH:mm:ss"), now.ToString("yyyy-MM-dd"), Display24Width, Display24Height);
-            await Task.Run(() => _display24Inch.SendData(imageData), cancellationToken).ConfigureAwait(false);
+            await Task.Run(() => _display24Inch.DrawRgb565(imageData), cancellationToken).ConfigureAwait(false);
             _logger.LogDebug($"2.4寸显示器时间已更新: {now:HH:mm:ss}");
         }
         catch (OperationCanceledException) { }
@@ -261,7 +261,7 @@ public class DisplayService : IDisposable
                 imageData = CreateTimeWithNetworkImage(now.ToString("HH:mm:ss"), now.ToString("yyyy-MM-dd"), ipAddress, Display24Width, Display24Height);
             else
                 imageData = CreateTimeImage(now.ToString("HH:mm:ss"), now.ToString("yyyy-MM-dd"), Display24Width, Display24Height);
-            await Task.Run(() => _display24Inch.SendData(imageData), cancellationToken).ConfigureAwait(false);
+            await Task.Run(() => _display24Inch.DrawRgb565(imageData), cancellationToken).ConfigureAwait(false);
             _logger.LogDebug($"2.4寸显示器时间+网络信息已更新: {now:HH:mm:ss} IP:{ipAddress}");
         }
         catch (OperationCanceledException) { }
