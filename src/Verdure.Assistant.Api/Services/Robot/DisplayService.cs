@@ -14,7 +14,6 @@ namespace Verdure.Assistant.Api.Services.Robot;
 public class DisplayService : IDisposable
 {
     private ST7789Display? _display24Inch;  // 2.4寸屏幕 - 表情
-    private ST7789Display? _display147Inch; // 1.47寸屏幕 - 时间
     private GpioController? _gpio;
     private readonly ILogger<DisplayService> _logger;
     private readonly Dictionary<string, LottieRenderer> _lottieRenderers;
@@ -23,8 +22,6 @@ public class DisplayService : IDisposable
     // 屏幕尺寸配置
     private const int Display24Width = 320;
     private const int Display24Height = 240;
-    private const int Display147Width = 320;
-    private const int Display147Height = 172;
 
     public DisplayService(ILogger<DisplayService> logger)
     {
@@ -227,27 +224,9 @@ public class DisplayService : IDisposable
     /// </summary>
     public async Task DisplayTimeAsync(CancellationToken cancellationToken = default)
     {
-        if (_display147Inch == null)
-        {
-            _logger.LogDebug("1.47寸显示器未初始化，跳过时间显示");
-            return;
-        }
-
-        try
-        {
-            var timeText = DateTime.Now.ToString("HH:mm:ss");
-            var dateText = DateTime.Now.ToString("yyyy-MM-dd");
-
-            // 创建时间显示的位图
-            var timeImage = CreateTimeImage(timeText, dateText, Display147Width, Display147Height);
-
-            // 发送到1.47寸屏幕
-            await Task.Run(() => _display147Inch.SendData(timeImage), cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "时间显示发生错误");
-        }
+        // 1.47寸屏幕已移除（泰山派 3M 仅保留 2.4 寸主屏幕）
+        _logger.LogDebug("1.47寸显示器不可用，跳过时间显示");
+        await Task.CompletedTask;
     }
 
     /// <summary>
@@ -255,37 +234,9 @@ public class DisplayService : IDisposable
     /// </summary>
     public async Task DisplayTimeWithNetworkInfoAsync(string? ipAddress, CancellationToken cancellationToken = default)
     {
-        if (_display147Inch == null)
-        {
-            _logger.LogDebug("1.47寸显示器未初始化，跳过时间显示");
-            return;
-        }
-
-        try
-        {
-            var timeText = DateTime.Now.ToString("HH:mm:ss");
-            var dateText = DateTime.Now.ToString("yyyy-MM-dd");
-
-            // 如果有IP地址，显示时间+网络信息；否则只显示时间
-            _logger.LogInformation("显示时间和网络信息: IP={IpAddress}", ipAddress ?? "无");
-
-            byte[] timeImage;
-            if (!string.IsNullOrEmpty(ipAddress))
-            {
-                timeImage = CreateTimeWithNetworkImage(timeText, dateText, ipAddress, Display147Width, Display147Height);
-            }
-            else
-            {
-                timeImage = CreateTimeImage(timeText, dateText, Display147Width, Display147Height);
-            }
-
-            // 发送到1.47寸屏幕
-            await Task.Run(() => _display147Inch.SendData(timeImage), cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "时间网络信息显示发生错误");
-        }
+        // 1.47寸屏幕已移除（泰山派 3M 仅保留 2.4 寸主屏幕）
+        _logger.LogDebug("1.47寸显示器不可用，跳过时间网络信息显示");
+        await Task.CompletedTask;
     }
 
     /// <summary>
@@ -453,11 +404,7 @@ public class DisplayService : IDisposable
                 _display24Inch.FillScreen(color);
                 _logger.LogDebug($"已清除2.4寸屏幕 (颜色: 0x{color:X4})");
             }
-            else if (!is24Inch && _display147Inch != null)
-            {
-                _display147Inch.FillScreen(color);
-                _logger.LogDebug($"已清除1.47寸屏幕 (颜色: 0x{color:X4})");
-            }
+            // 1.47寸屏幕已移除，忽略非24寸清屏请求
         }
         catch (Exception ex)
         {
@@ -522,7 +469,6 @@ public class DisplayService : IDisposable
             _lottieRenderers.Clear();
 
             _display24Inch?.Dispose();
-            _display147Inch?.Dispose();
             _gpio?.Dispose();
 
             _logger.LogInformation("显示服务已释放资源");

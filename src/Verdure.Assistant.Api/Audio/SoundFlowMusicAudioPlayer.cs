@@ -107,7 +107,7 @@ namespace Verdure.Assistant.Api.Audio
                 _engine = new MiniAudioEngine();
                 
                 // 选择默认播放设备
-                _engine.UpdateDevicesInfo();
+                _engine.UpdateAudioDevicesInfo();
                 var playbackDevices = _engine.PlaybackDevices;
                 
                 if (playbackDevices.Length == 0)
