@@ -220,23 +220,55 @@ public class DisplayService : IDisposable
     }
 
     /// <summary>
-    /// 在1.47寸屏幕上显示时间
+    /// 在2.4寸屏幕上显示时间
     /// </summary>
     public async Task DisplayTimeAsync(CancellationToken cancellationToken = default)
     {
-        // 1.47寸屏幕已移除（泰山派 3M 仅保留 2.4 寸主屏幕）
-        _logger.LogDebug("1.47寸显示器不可用，跳过时间显示");
-        await Task.CompletedTask;
+        if (_display24Inch == null)
+        {
+            _logger.LogDebug("2.4寸显示器未初始化，跳过时间显示");
+            return;
+        }
+        try
+        {
+            var now = DateTime.Now;
+            var imageData = CreateTimeImage(now.ToString("HH:mm:ss"), now.ToString("yyyy-MM-dd"), Display24Width, Display24Height);
+            await Task.Run(() => _display24Inch.SendData(imageData), cancellationToken).ConfigureAwait(false);
+            _logger.LogDebug($"2.4寸显示器时间已更新: {now:HH:mm:ss}");
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "2.4寸显示器时间显示失败");
+        }
     }
 
     /// <summary>
-    /// 在1.47寸屏幕上显示时间和网络信息（IP+端口）
+    /// 在2.4寸屏幕上显示时间和网络信息（IP+端口）
     /// </summary>
     public async Task DisplayTimeWithNetworkInfoAsync(string? ipAddress, CancellationToken cancellationToken = default)
     {
-        // 1.47寸屏幕已移除（泰山派 3M 仅保留 2.4 寸主屏幕）
-        _logger.LogDebug("1.47寸显示器不可用，跳过时间网络信息显示");
-        await Task.CompletedTask;
+        if (_display24Inch == null)
+        {
+            _logger.LogDebug("2.4寸显示器未初始化，跳过时间网络信息显示");
+            return;
+        }
+        try
+        {
+            var now = DateTime.Now;
+            byte[] imageData;
+            if (!string.IsNullOrEmpty(ipAddress))
+                imageData = CreateTimeWithNetworkImage(now.ToString("HH:mm:ss"), now.ToString("yyyy-MM-dd"), ipAddress, Display24Width, Display24Height);
+            else
+                imageData = CreateTimeImage(now.ToString("HH:mm:ss"), now.ToString("yyyy-MM-dd"), Display24Width, Display24Height);
+            await Task.Run(() => _display24Inch.SendData(imageData), cancellationToken).ConfigureAwait(false);
+            _logger.LogDebug($"2.4寸显示器时间+网络信息已更新: {now:HH:mm:ss} IP:{ipAddress}");
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "2.4寸显示器时间网络信息显示失败");
+        }
     }
 
     /// <summary>
