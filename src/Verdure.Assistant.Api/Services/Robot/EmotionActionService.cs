@@ -9,6 +9,7 @@ public class EmotionActionService : IDisposable
 {
     private readonly DisplayService _displayService;
     private readonly RobotActionService _robotActionService;
+    private readonly RgbLedService _rgbLedService;
     private readonly ILogger<EmotionActionService> _logger;
     
     private readonly Dictionary<string, EmotionConfig> _emotionConfigs;
@@ -22,10 +23,12 @@ public class EmotionActionService : IDisposable
     public EmotionActionService(
         DisplayService displayService, 
         RobotActionService robotActionService,
+        RgbLedService rgbLedService,
         ILogger<EmotionActionService> logger)
     {
         _displayService = displayService;
         _robotActionService = robotActionService;
+        _rgbLedService = rgbLedService;
         _logger = logger;
         _emotionConfigs = InitializeEmotionConfigs();
         
@@ -155,6 +158,9 @@ public class EmotionActionService : IDisposable
 
         _logger.LogInformation($"开始播放情感 {emotionType}，包含动作: {request.IncludeAction}，包含表情: {request.IncludeEmotion}");
 
+        // 按情绪点亮对应颜色
+        _rgbLedService.SetColorForEmotion(emotionType);
+
         try
         {
             var cancellationToken = _currentPlaybackCts.Token;
@@ -202,6 +208,10 @@ public class EmotionActionService : IDisposable
             }
             _logger.LogError(ex, $"情感 {emotionType} 播放发生错误");
             return false;
+        }
+        finally
+        {
+            _rgbLedService.TurnOff();
         }
     }
 

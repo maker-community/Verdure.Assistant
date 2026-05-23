@@ -138,6 +138,7 @@ builder.Services.AddSingleton<ISharedAudioRecorder>(provider => provider.GetRequ
 // Register Robot Services
 builder.Services.AddSingleton<Verdure.Assistant.Api.Services.Robot.DisplayService>();
 builder.Services.AddSingleton<Verdure.Assistant.Api.Services.Robot.RobotActionService>();
+builder.Services.AddSingleton<Verdure.Assistant.Api.Services.Robot.RgbLedService>();
 builder.Services.AddSingleton<Verdure.Assistant.Api.Services.Robot.EmotionActionService>();
 
 // Register WiFi Setup Services
