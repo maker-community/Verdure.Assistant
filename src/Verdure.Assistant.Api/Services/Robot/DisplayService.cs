@@ -1,5 +1,6 @@
 using SkiaSharp;
 using System.Device.Gpio;
+using System.Device.Gpio.Drivers;
 using System.Device.Spi;
 using System.Runtime.InteropServices;
 using Verdure.Assistant.Api.IoTDevice;
@@ -49,29 +50,21 @@ public class DisplayService : IDisposable
     {
         try
         {
-            _gpio = new GpioController();
+            // 泰山派 3M RK3576: gpiochip2, LibGpiodV2Driver
+            _gpio = new GpioController(new LibGpiodV2Driver(2));
 
-            var settings1 = new SpiConnectionSettings(0, 0)
+            // 泰山派 3M RK3576: SPI1_M1 → /dev/spidev1.0
+            var settings1 = new SpiConnectionSettings(1, 0)
             {
                 ClockFrequency = 24_000_000,
                 Mode = SpiMode.Mode0,
             };
 
-            var settings2 = new SpiConnectionSettings(0, 1)
-            {
-                ClockFrequency = 24_000_000,
-                Mode = SpiMode.Mode0,
-            };
-
-            // 创建2.4寸显示器 (表情显示)
-            _display24Inch = new ST7789Display(settings1, _gpio, true, dcPin: 25, resetPin: 27, displayType: DisplayType.Display24Inch);
-
-            // 创建1.47寸显示器 (时间显示，横屏模式)
-            _display147Inch = new ST7789Display(settings2, _gpio, false, dcPin: 25, resetPin: 27, displayType: DisplayType.Display147Inch, isLandscape: true);
+            // 泰山派 3M RK3576: DC=gpiochip2 line30(GPIO2_D6), RESET=gpiochip2 line22(GPIO2_C6)
+            _display24Inch = new ST7789Display(settings1, _gpio, true, dcPin: 30, resetPin: 22, displayType: DisplayType.Display24Inch);
 
             // 清屏
             _display24Inch.FillScreen(0x0000);  // 黑色
-            _display147Inch.FillScreen(0x0000); // 黑色
 
             _logger.LogInformation("显示器初始化成功");
         }

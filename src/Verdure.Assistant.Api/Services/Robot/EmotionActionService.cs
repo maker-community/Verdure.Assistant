@@ -47,8 +47,7 @@ public class EmotionActionService : IDisposable
                 Duration = 3000,
                 ActionAngles = new Dictionary<int, float>
                 {
-                    { 4, 5 },     // 左耳轻微动作
-                    { 8, 5 },     // 右耳轻微动作
+                    { 2, 0 },     // 头部中位
                     { 12, 10 },   // 脖子轻柔摆动
                 }
             },
@@ -60,8 +59,7 @@ public class EmotionActionService : IDisposable
                 Duration = 3500,
                 ActionAngles = new Dictionary<int, float>
                 {
-                    { 4, 15 },    // 左耳活跃
-                    { 8, 15 },    // 右耳活跃
+                    { 2, 10 },    // 头部上仰（欢乐）
                     { 6, 45 },    // 左臂欢快摆动
                     { 10, 135 },  // 右臂欢快摆动
                     { 12, 20 },   // 脖子快乐摆动
@@ -75,8 +73,7 @@ public class EmotionActionService : IDisposable
                 Duration = 4000,
                 ActionAngles = new Dictionary<int, float>
                 {
-                    { 4, -10 },   // 左耳下垂
-                    { 8, -10 },   // 右耳下垂
+                    { 2, -12 },   // 头部下低（悲伤）
                     { 6, 120 },   // 左臂下垂
                     { 10, 60 },   // 右臂下垂
                     { 12, -15 },  // 脖子低头
@@ -90,8 +87,7 @@ public class EmotionActionService : IDisposable
                 Duration = 4000,
                 ActionAngles = new Dictionary<int, float>
                 {
-                    { 4, 25 },    // 左耳竖起
-                    { 8, 25 },    // 右耳竖起
+                    { 2, 10 },    // 头部前倾（威胁）
                     { 6, 25 },    // 左臂张开威胁
                     { 10, 155 },  // 右臂张开威胁
                     { 12, -30 },  // 脖子威胁姿态
@@ -105,8 +101,7 @@ public class EmotionActionService : IDisposable
                 Duration = 3000,
                 ActionAngles = new Dictionary<int, float>
                 {
-                    { 4, 30 },    // 左耳惊讶竖起
-                    { 8, 30 },    // 右耳惊讶竖起
+                    { 2, 12 },    // 头部上仰（惊讶）
                     { 6, 60 },    // 左臂惊讶张开
                     { 10, 120 },  // 右臂惊讶张开
                     { 12, 25 },   // 脖子惊讶转动
@@ -120,8 +115,7 @@ public class EmotionActionService : IDisposable
                 Duration = 3500,
                 ActionAngles = new Dictionary<int, float>
                 {
-                    { 4, 10 },    // 左耳困惑摆动
-                    { 8, -10 },   // 右耳困惑摆动
+                    { 2, -8 },    // 头部轻微低头（困惑）
                     { 6, 80 },    // 左臂困惑姿态
                     { 10, 100 },  // 右臂困惑姿态
                     { 12, 30 },   // 脖子困惑转动
