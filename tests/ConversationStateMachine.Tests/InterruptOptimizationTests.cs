@@ -26,6 +26,7 @@ public class InterruptOptimizationTests
         // Arrange
         var stateMachine = new Verdure.Assistant.Core.Services.ConversationStateMachine(_logger);
         stateMachine.RequestTransition(ConversationTrigger.StartVoiceChat, "Start listening");
+        stateMachine.RequestTransition(ConversationTrigger.ServerConnected, "Connected");
         Assert.Equal(DeviceState.Listening, stateMachine.CurrentState);
 
         // Act - Manual interrupt during listening should go to keyword wake-up (Connecting)
@@ -42,6 +43,7 @@ public class InterruptOptimizationTests
         // Arrange
         var stateMachine = new Verdure.Assistant.Core.Services.ConversationStateMachine(_logger);
         stateMachine.RequestTransition(ConversationTrigger.StartVoiceChat, "Start listening");
+        stateMachine.RequestTransition(ConversationTrigger.ServerConnected, "Connected");
         Assert.Equal(DeviceState.Listening, stateMachine.CurrentState);
 
         // Act - VAD interrupt during listening should go to keyword wake-up (Connecting)
@@ -59,6 +61,7 @@ public class InterruptOptimizationTests
         var stateMachine = new Verdure.Assistant.Core.Services.ConversationStateMachine(_logger);
         // Set up speaking state
         stateMachine.RequestTransition(ConversationTrigger.StartVoiceChat, "Start conversation");
+        stateMachine.RequestTransition(ConversationTrigger.ServerConnected, "Connected");
         stateMachine.RequestTransition(ConversationTrigger.TtsStarted, "Start speaking");
         Assert.Equal(DeviceState.Speaking, stateMachine.CurrentState);
 
@@ -77,6 +80,7 @@ public class InterruptOptimizationTests
         var stateMachine = new Verdure.Assistant.Core.Services.ConversationStateMachine(_logger);
         // Set up speaking state
         stateMachine.RequestTransition(ConversationTrigger.StartVoiceChat, "Start conversation");
+        stateMachine.RequestTransition(ConversationTrigger.ServerConnected, "Connected");
         stateMachine.RequestTransition(ConversationTrigger.TtsStarted, "Start speaking");
         Assert.Equal(DeviceState.Speaking, stateMachine.CurrentState);
 

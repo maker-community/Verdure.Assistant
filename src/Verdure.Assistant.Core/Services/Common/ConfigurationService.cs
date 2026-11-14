@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 
 namespace Verdure.Assistant.Core.Services;
@@ -28,6 +29,16 @@ public interface IConfigurationService
     MqttConfiguration? MqttInfo { get; }
     string OtaVersionUrl { get; }
     string WebSocketUrl { get; }
+
+    /// <summary>
+    /// WebSocket 鉴权令牌：优先使用设置页填写的 Token，其次是 OTA 下发的 Token
+    /// </summary>
+    string AccessToken { get; }
+
+    /// <summary>
+    /// 从用户设置刷新 Device ID / Token / OTA 与 WebSocket 地址（设置页保存后无需重启即可生效）
+    /// </summary>
+    Task ReloadSettingsAsync();
     OtaResponse? LatestOtaResponse { get; }
     DateTime? LastOtaCheckTime { get; }
     bool IsActivated { get; }
@@ -73,19 +84,82 @@ public class ConfigurationService : IConfigurationService
     public event EventHandler<string>? VerificationCodeReceived;
     public event EventHandler<OtaResponse?>? OtaCheckCompleted;
 
-    public ConfigurationService(ILogger<ConfigurationService>? logger = null)
+    private const string LegacyDefaultWsAddress = "ws://localhost:8765";
+    private const string FallbackAccessToken = "test-token";
+
+    private readonly ISettingsService<AppSettings>? _settingsService;
+    private readonly string _autoDeviceId;
+    private string _settingsToken = string.Empty;
+    private string _otaToken = string.Empty;
+
+    public string AccessToken =>
+        !string.IsNullOrWhiteSpace(_settingsToken) ? _settingsToken
+        : !string.IsNullOrWhiteSpace(_otaToken) ? _otaToken
+        : FallbackAccessToken;
+
+    public ConfigurationService(ILogger<ConfigurationService>? logger = null,
+        ISettingsService<AppSettings>? settingsService = null)
     {
         _logger = logger;
+        _settingsService = settingsService;
         _httpClient = new HttpClient();
         _httpClient.Timeout = TimeSpan.FromSeconds(30);
 
         // 初始化设备信息
         ClientId = GenerateClientId();
-        DeviceId = GetMacAddress();
+        _autoDeviceId = GetMacAddress();
+        DeviceId = _autoDeviceId;
         UserAgent = $"verdure-assistant/{CurrentVersion} ({Environment.OSVersion.Platform})";
 
-        _logger?.LogInformation("配置服务初始化完成 - DeviceId: {DeviceId}, ClientId: {ClientId}", DeviceId, ClientId);
+        try
+        {
+            // 在线程池上同步等待，避免在 UI 线程上死锁
+            Task.Run(ReloadSettingsAsync).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "读取用户设置失败，使用自动生成的设备信息");
+        }
+
+        _logger?.LogInformation("配置服务初始化完成 - DeviceId: {DeviceId}（{Source}）, ClientId: {ClientId}, Token: {TokenSource}, OTA: {Ota}, WS: {Ws}",
+            DeviceId, DeviceId == _autoDeviceId ? "自动生成" : "来自设置", ClientId, DescribeTokenSource(), OtaVersionUrl, WebSocketUrl);
     }
+
+    public async Task ReloadSettingsAsync()
+    {
+        if (_settingsService == null) return;
+
+        var settings = await _settingsService.LoadSettingsAsync().ConfigureAwait(false);
+
+        var deviceId = settings.DeviceId?.Trim();
+        DeviceId = string.IsNullOrEmpty(deviceId) ? _autoDeviceId : deviceId;
+        _settingsToken = settings.WsToken?.Trim() ?? string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(settings.OtaAddress))
+        {
+            OtaVersionUrl = NormalizeUrl(settings.OtaProtocol, settings.OtaAddress);
+        }
+
+        if (!string.IsNullOrWhiteSpace(settings.WsAddress))
+        {
+            var wsUrl = NormalizeUrl(settings.WsProtocol, settings.WsAddress);
+            if (!string.Equals(wsUrl.TrimEnd('/'), LegacyDefaultWsAddress, StringComparison.OrdinalIgnoreCase))
+            {
+                WebSocketUrl = wsUrl;
+            }
+        }
+    }
+
+    private static string NormalizeUrl(string? protocol, string address)
+    {
+        address = address.Trim();
+        return address.Contains("://") ? address : $"{protocol}{address}";
+    }
+
+    private string DescribeTokenSource() =>
+        !string.IsNullOrWhiteSpace(_settingsToken) ? "来自设置"
+        : !string.IsNullOrWhiteSpace(_otaToken) ? "OTA 下发"
+        : "默认占位（未配置）";
 
     /// <summary>
     /// 执行OTA检查并获取配置信息
@@ -96,6 +170,8 @@ public class ConfigurationService : IConfigurationService
         {
             _logger?.LogInformation("开始OTA检查...");
             LastOtaCheckTime = DateTime.Now;
+
+            await ReloadSettingsAsync().ConfigureAwait(false);
 
             var deviceInfo = await GetDeviceInfoAsync();
             var networkInfo = await GetNetworkInfoAsync();
@@ -412,6 +488,12 @@ public class ConfigurationService : IConfigurationService
             _logger?.LogInformation("更新WebSocket URL: {Url}", WebSocketUrl);
         }
 
+        if (otaResponse.WebSocket != null && !string.IsNullOrEmpty(otaResponse.WebSocket.Token))
+        {
+            _otaToken = otaResponse.WebSocket.Token;
+            _logger?.LogInformation("已获取OTA下发的WebSocket令牌");
+        }
+
         // 检查固件更新
         if (otaResponse.Firmware != null && !string.IsNullOrEmpty(otaResponse.Firmware.Url))
         {
@@ -473,28 +555,32 @@ public class ConfigurationService : IConfigurationService
     {
         try
         {
-            var networkInterface = NetworkInterface.GetAllNetworkInterfaces()
-                .FirstOrDefault(nic => nic.OperationalStatus == OperationalStatus.Up &&
-                                      nic.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
-                                      nic.NetworkInterfaceType != NetworkInterfaceType.Tunnel);
+            // 跳过没有物理地址的虚拟网卡（VPN/Hyper-V/WSL 等），优先选择以太网与 Wi-Fi
+            var candidates = NetworkInterface.GetAllNetworkInterfaces()
+                .Where(nic => nic.OperationalStatus == OperationalStatus.Up &&
+                              nic.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
+                              nic.NetworkInterfaceType != NetworkInterfaceType.Tunnel)
+                .Select(nic => (nic, bytes: nic.GetPhysicalAddress().GetAddressBytes()))
+                .Where(x => x.bytes.Length == 6 && x.bytes.Any(b => b != 0))
+                .OrderBy(x => x.nic.NetworkInterfaceType is NetworkInterfaceType.Ethernet or NetworkInterfaceType.Wireless80211 ? 0 : 1)
+                .ToList();
 
-            if (networkInterface != null)
+            if (candidates.Count > 0)
             {
-                var addressBytes = networkInterface.GetPhysicalAddress().GetAddressBytes();
-                return string.Join(":", addressBytes.Select(b => b.ToString("x2")));
+                return string.Join(":", candidates[0].bytes.Select(b => b.ToString("x2")));
             }
         }
         catch (Exception ex)
         {
-            _logger?.LogWarning(ex, "无法获取MAC地址，使用默认值");
+            _logger?.LogWarning(ex, "无法获取MAC地址，使用基于机器名的稳定标识");
         }
 
-        // 如果无法获取MAC地址，生成一个随机的MAC地址格式
-        var random = new Random();
-        var randomMacBytes = new byte[6];
-        random.NextBytes(randomMacBytes);
-        randomMacBytes[0] = (byte)(randomMacBytes[0] & 0xFE | 0x02); // 设置为本地管理地址
-        return string.Join(":", randomMacBytes.Select(b => b.ToString("x2")));
+        // 取不到真实 MAC 时，用机器名+用户名生成稳定的本地管理地址，保证每次启动 Device ID 不变（否则每次都会被当作新设备要求重新绑定）
+        var hash = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes($"{Environment.MachineName}|{Environment.UserName}"));
+        var macBytes = hash[..6];
+        macBytes[0] = (byte)(macBytes[0] & 0xFE | 0x02); // 本地管理的单播地址
+        return string.Join(":", macBytes.Select(b => b.ToString("x2")));
     }
 
     private string GetLocalIpAddress()

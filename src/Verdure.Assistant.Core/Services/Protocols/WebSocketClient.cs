@@ -35,7 +35,20 @@ public class WebSocketClient : ICommunicationClient, IDisposable
     private readonly ILogger? _logger;
     private bool _isConnected;
     private string? _sessionId;
-    private readonly TaskCompletionSource<bool> _helloReceived = new();
+    private volatile TaskCompletionSource<bool> _helloReceived = NewHelloSignal();
+
+    private static TaskCompletionSource<bool> NewHelloSignal()
+        => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
+    /// 等待服务器 Hello 握手完成的最长时间；超时后按"服务器不发 Hello"的兼容模式继续
+    /// </summary>
+    public TimeSpan HelloTimeout { get; set; } = TimeSpan.FromSeconds(8);
+
+    /// <summary>
+    /// 建立 WebSocket 连接（TCP/TLS 握手）的超时时间
+    /// </summary>
+    public TimeSpan ConnectTimeout { get; set; } = TimeSpan.FromSeconds(10);
 
     private bool _mcpInitialized = false;
     // 统一事件管理器
@@ -69,26 +82,45 @@ public class WebSocketClient : ICommunicationClient, IDisposable
         _audioHandler.AudioDataReceived += OnAudioDataReceived;
     }
 
+    private static string MaskToken(string token) =>
+        string.IsNullOrEmpty(token) ? "无" : token.Length <= 6 ? "***" : $"{token[..3]}***{token[^2..]}（{token.Length}位）";
+
     public async Task ConnectAsync()
     {
         if (_isConnected) return;
 
         try
         {
+            await _configurationService.ReloadSettingsAsync().ConfigureAwait(false);
             _webSocket = new ClientWebSocket();
 
-            // 设置WebSocket头部，参考Python实现
-            var accessToken = "test"; // TODO: 从配置获取真实的访问令牌
+            var accessToken = _configurationService.AccessToken;
             _webSocket.Options.SetRequestHeader("Authorization", $"Bearer {accessToken}");
             _webSocket.Options.SetRequestHeader("Protocol-Version", "1");
             _webSocket.Options.SetRequestHeader("Device-Id", _configurationService.DeviceId);
             _webSocket.Options.SetRequestHeader("Client-Id", _configurationService.ClientId);
+            _logger?.LogInformation("正在连接 {Url}（DeviceId: {DeviceId}，Token: {Token}）",
+                _configurationService.WebSocketUrl, _configurationService.DeviceId, MaskToken(accessToken));
 
-            _cancellationTokenSource = new CancellationTokenSource();
+            var lifetimeCts = new CancellationTokenSource();
+            _cancellationTokenSource = lifetimeCts;
+            var lifetimeToken = lifetimeCts.Token;
+            _helloReceived = NewHelloSignal();
 
-            // 连接WebSocket
+            // 连接WebSocket（带超时，避免网络不通时一直挂起）
             var websocketUrl = _configurationService.WebSocketUrl;
-            await _webSocket.ConnectAsync(new Uri(websocketUrl), _cancellationTokenSource.Token);
+            using (var connectCts = CancellationTokenSource.CreateLinkedTokenSource(lifetimeToken))
+            {
+                connectCts.CancelAfter(ConnectTimeout);
+                try
+                {
+                    await _webSocket.ConnectAsync(new Uri(websocketUrl), connectCts.Token);
+                }
+                catch (OperationCanceledException) when (!lifetimeToken.IsCancellationRequested)
+                {
+                    throw new TimeoutException($"连接 {ConnectTimeout.TotalSeconds:0}s 超时");
+                }
+            }
             _isConnected = true;
 
             // 触发连接建立事件
@@ -98,8 +130,8 @@ public class WebSocketClient : ICommunicationClient, IDisposable
 
             // 开始接收消息 - 使用 LongRunning 任务避免占用线程池
             _receiveTask = Task.Factory.StartNew(
-                ReceiveMessagesAsync,
-                _cancellationTokenSource.Token,
+                () => ReceiveMessagesAsync(lifetimeToken),
+                lifetimeToken,
                 TaskCreationOptions.LongRunning,
                 TaskScheduler.Default
             ).Unwrap();
@@ -119,6 +151,14 @@ public class WebSocketClient : ICommunicationClient, IDisposable
             await SendTextAsync(helloMessage);
 
             _logger?.LogDebug("已发送Hello消息: {Message}", helloMessage);
+
+            // 等待服务器 Hello，拿到会话 ID 后才算握手完成，之后才能安全地发送 listen 等控制消息
+            var helloSignal = _helloReceived;
+            var completed = await Task.WhenAny(helloSignal.Task, Task.Delay(HelloTimeout));
+            if (completed != helloSignal.Task)
+            {
+                _logger?.LogWarning("等待服务器Hello超时（{Timeout}s），按兼容模式继续", HelloTimeout.TotalSeconds);
+            }
         }
         catch (Exception ex)
         {
@@ -147,8 +187,8 @@ public class WebSocketClient : ICommunicationClient, IDisposable
                 _logger?.LogDebug("已发送Goodbye消息");
             }
 
-            // 取消接收任务
-            _cancellationTokenSource?.Cancel();
+            // 取消接收任务（重复断开时 CTS 可能已被释放）
+            try { _cancellationTokenSource?.Cancel(); } catch (ObjectDisposedException) { }
 
             // 等待接收任务完成（设置超时避免无限等待）
             if (_receiveTask != null && !_receiveTask.IsCompleted)
@@ -173,10 +213,19 @@ public class WebSocketClient : ICommunicationClient, IDisposable
                 }
             }
 
-            // 关闭 WebSocket 连接
+            // 关闭 WebSocket 连接（带超时：对端不回应关闭帧时不能让断开/释放无限期挂起）
             if (_webSocket?.State == WebSocketState.Open)
             {
-                await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Client disconnect", CancellationToken.None);
+                using var closeCts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                try
+                {
+                    await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Client disconnect", closeCts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger?.LogWarning("等待服务器确认关闭超时，强制中止连接");
+                    _webSocket.Abort();
+                }
             }
         }
         catch (Exception ex)
@@ -191,6 +240,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
             //ConnectionStateChanged?.Invoke(this, false);
             _webSocket?.Dispose();
             _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = null;
             _logger?.LogInformation("WebSocket连接已断开");
         }
     }
@@ -439,15 +489,15 @@ public class WebSocketClient : ICommunicationClient, IDisposable
 
 
 
-    private async Task ReceiveMessagesAsync()
+    private async Task ReceiveMessagesAsync(CancellationToken ct)
     {
         var buffer = new byte[8192];
 
         try
         {
-            while (_isConnected && _webSocket?.State == WebSocketState.Open && !_cancellationTokenSource!.Token.IsCancellationRequested)
+            while (_isConnected && _webSocket?.State == WebSocketState.Open && !ct.IsCancellationRequested)
             {
-                var result = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), _cancellationTokenSource.Token);
+                var result = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), ct);
 
                 if (result.MessageType == WebSocketMessageType.Text)
                 {
@@ -468,7 +518,8 @@ public class WebSocketClient : ICommunicationClient, IDisposable
                 }
                 else if (result.MessageType == WebSocketMessageType.Close)
                 {
-                    _logger?.LogInformation("服务器关闭了WebSocket连接");
+                    _logger?.LogWarning("服务器关闭了WebSocket连接（状态码: {Status}，原因: {Reason}）。若为鉴权问题，请检查 Device ID / Token 是否已在 xiaozhi.me 激活",
+                        result.CloseStatus?.ToString() ?? "无", string.IsNullOrEmpty(result.CloseStatusDescription) ? "服务器未说明" : result.CloseStatusDescription);
                     break;
                 }
             }
@@ -602,10 +653,7 @@ public class WebSocketClient : ICommunicationClient, IDisposable
         _sessionId = message.SessionId;
 
         // 设置Hello接收事件
-        if (!_helloReceived.Task.IsCompleted)
-        {
-            _helloReceived.SetResult(true);
-        }
+        _helloReceived.TrySetResult(true);
 
         // 触发Hello接收事件
         _eventManager.TriggerConnectionEvent(WebSocketEventTrigger.HelloReceived, true,
@@ -784,7 +832,15 @@ public class WebSocketClient : ICommunicationClient, IDisposable
 
     public void Dispose()
     {
-        DisconnectAsync().Wait();
+        try
+        {
+            // 释放路径不能无限期等待：DisconnectAsync 内部已有超时，这里再兜底一层
+            DisconnectAsync().Wait(TimeSpan.FromSeconds(10));
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogDebug(ex, "释放时断开连接出现警告");
+        }
         _audioHandler?.Dispose();
     }
 }

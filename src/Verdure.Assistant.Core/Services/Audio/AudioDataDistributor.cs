@@ -17,7 +17,9 @@ namespace Verdure.Assistant.Core.Services
         private readonly Channel<(byte[] Data, EventHandler<byte[]>? MainHandler)> _dataChannel;
         private readonly ChannelWriter<(byte[] Data, EventHandler<byte[]>? MainHandler)> _writer;
         private readonly ChannelReader<(byte[] Data, EventHandler<byte[]>? MainHandler)> _reader;
-        private readonly ConcurrentBag<EventHandler<byte[]>> _subscribers = new();
+        // 写时复制的订阅者数组：分发循环读取快照，订阅/取消订阅只在锁内替换数组，彼此不会互相干扰
+        private EventHandler<byte[]>[] _subscribers = Array.Empty<EventHandler<byte[]>>();
+        private readonly object _subscribersLock = new();
         private readonly Task _distributionTask;
         private readonly CancellationTokenSource _cancellationTokenSource;
         private readonly ILogger? _logger;
@@ -51,7 +53,10 @@ namespace Verdure.Assistant.Core.Services
         {
             if (handler != null)
             {
-                _subscribers.Add(handler);
+                lock (_subscribersLock)
+                {
+                    _subscribers = [.. _subscribers, handler];
+                }
                 _logger?.LogDebug("音频数据订阅者已添加");
             }
         }
@@ -61,21 +66,15 @@ namespace Verdure.Assistant.Core.Services
         /// </summary>
         public void Unsubscribe(EventHandler<byte[]> handler)
         {
-            // ConcurrentBag 不支持直接移除，需要重建
-            var newSubscribers = new List<EventHandler<byte[]>>();
-            foreach (var subscriber in _subscribers)
+            lock (_subscribersLock)
             {
-                if (!ReferenceEquals(subscriber, handler))
+                var index = Array.IndexOf(_subscribers, handler);
+                if (index >= 0)
                 {
-                    newSubscribers.Add(subscriber);
+                    var updated = new List<EventHandler<byte[]>>(_subscribers);
+                    updated.RemoveAt(index);
+                    _subscribers = updated.ToArray();
                 }
-            }
-
-            // 清空并重新添加
-            while (_subscribers.TryTake(out _)) { }
-            foreach (var subscriber in newSubscribers)
-            {
-                _subscribers.Add(subscriber);
             }
 
             _logger?.LogDebug("音频数据订阅者已移除");

@@ -23,6 +23,12 @@ public class VerdureConfig
     /// 启动时是否自动连接到语音助手服务
     /// </summary>
     public bool AutoConnect { get; set; } = false;
+
+    /// <summary>
+    /// 说话（TTS 播放）期间是否保持唤醒词识别，以便用唤醒词打断。
+    /// 扬声器外放且回声明显时可关闭，避免 AI 自己念出唤醒词时误触发。
+    /// </summary>
+    public bool AllowKeywordInterruptWhileSpeaking { get; set; } = true;
     
     /// <summary>
     /// 关键词模型配置

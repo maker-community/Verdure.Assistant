@@ -81,11 +81,7 @@ namespace Verdure.Assistant.Api.Controllers
         {
             try
             {
-                if (!_voiceChatService.IsConnected)
-                {
-                    return BadRequest("服务未连接，请先初始化");
-                }
-
+                // StartVoiceChat 会在需要时先建立连接（Idle → Connecting → Listening），不再要求事先已连接
                 if (_voiceChatService.IsVoiceChatActive)
                 {
                     return BadRequest("语音对话已经在进行中");
@@ -246,12 +242,13 @@ namespace Verdure.Assistant.Api.Controllers
         /// </summary>
         /// <returns>操作结果</returns>
         [HttpPost("disconnect")]
-        public IActionResult Disconnect()
+        public async Task<IActionResult> Disconnect()
         {
             try
             {
                 _logger.LogInformation("API断开语音聊天连接");
-                _voiceChatService.Dispose();
+                // 不能对单例服务调用 Dispose（之后将无法再次初始化），使用 DisconnectAsync
+                await _voiceChatService.DisconnectAsync();
                 return Ok(new { Success = true, Message = "连接已断开" });
             }
             catch (Exception ex)

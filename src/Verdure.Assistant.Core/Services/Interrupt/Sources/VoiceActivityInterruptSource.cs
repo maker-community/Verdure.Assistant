@@ -364,7 +364,7 @@ public class VoiceActivityInterruptSource : InterruptSourceBase
                     var voiceDuration = (DateTime.Now - _voiceStartTime).TotalMilliseconds;
                     if (voiceDuration > _vadConfig.MaxSilenceDurationMs * 10) // 超时阈值
                     {
-                        _logger?.LogWarning("Voice activity timeout detected, resetting VAD state");
+                        _logger?.LogDebug("Voice activity timeout detected, resetting VAD state");
                         _isVoiceActive = false;
                         _consecutiveVoiceFrames = 0;
                         _consecutiveSilenceFrames = 0;

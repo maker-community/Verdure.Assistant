@@ -47,6 +47,12 @@ public interface IVoiceChatService : IDisposable
     Task InitializeAsync(VerdureConfig config);
 
     /// <summary>
+    /// 断开连接并停止录音、唤醒词检测等后台工作；服务本身仍可再次调用 <see cref="InitializeAsync"/>。
+    /// 界面上的"断开"应调用此方法，而不是对（单例）服务调用 Dispose。
+    /// </summary>
+    Task DisconnectAsync();
+
+    /// <summary>
     /// 开始语音对话
     /// </summary>
     Task StartVoiceChatAsync();    
@@ -151,4 +157,14 @@ public interface IVoiceChatService : IDisposable
     /// <param name="modelFileName">模型文件名</param>
     /// <returns>切换是否成功</returns>
     Task<bool> SwitchKeywordModelAsync(string modelFileName);
+
+    /// <summary>
+    /// 唤醒词在空闲状态命中时的外部路由。返回 true 表示已由外部对话后端处理，不再启动小智对话。
+    /// </summary>
+    Func<string, Task<bool>>? KeywordInterceptor { get; set; }
+
+    /// <summary>
+    /// 外部对话后端占用麦克风期间暂停/恢复唤醒词识别
+    /// </summary>
+    void HoldKeywordDetection(bool hold);
 }

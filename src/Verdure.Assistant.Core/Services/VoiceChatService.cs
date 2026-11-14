@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using System.Threading.Channels;
 using Verdure.Assistant.Core.Constants;
 using Verdure.Assistant.Core.Events;
 using Verdure.Assistant.Core.Interfaces;
@@ -30,6 +31,23 @@ public class VoiceChatService : IVoiceChatService
     // State machine for conversation logic
     private ConversationStateMachine? _stateMachine;
     private ConversationStateMachineContext? _stateMachineContext;
+
+    private readonly ILoggerFactory? _loggerFactory;
+    private bool _disposed;
+    private bool _initialized;
+    private readonly SemaphoreSlim _initLock = new(1, 1);
+
+    // 连接阶段取消：离开 Connecting 状态时立即取消正在进行的连接，避免状态机被卡住的连接拖住
+    private CancellationTokenSource? _connectCts;
+
+    // 唤醒词去抖：同一次唤醒在短时间内只处理一次
+    private DateTime _lastKeywordHandledUtc = DateTime.MinValue;
+    private static readonly TimeSpan KeywordDebounce = TimeSpan.FromMilliseconds(1200);
+
+    // 麦克风数据发送队列：保证编码/发送严格按采集顺序进行（原先每帧一个 async void，帧可能乱序）
+    private Channel<byte[]>? _audioSendChannel;
+    private CancellationTokenSource? _audioSendCts;
+    private Task? _audioSendTask;
 
     /// <summary>
     /// 暴露状态机供外部直接访问，实现状态事件的直接订阅
@@ -82,6 +100,10 @@ public class VoiceChatService : IVoiceChatService
             if (_keepListening != value)
             {
                 _keepListening = value;
+                if (_stateMachine != null)
+                {
+                    _stateMachine.KeepListening = value;
+                }
                 _logger?.LogInformation("Keep listening mode changed: {KeepListening}", value);
 
                 if (value)
@@ -105,6 +127,13 @@ public class VoiceChatService : IVoiceChatService
     /// </summary>
     public DeviceState PreviousState => _stateMachine?.PreviousState ?? DeviceState.Idle;
 
+    /// <summary>
+    /// 连接服务器的超时时间
+    /// </summary>
+    public TimeSpan ConnectTimeout { get; set; } = TimeSpan.FromSeconds(15);
+
+    private ILogger<T>? CreateLogger<T>() => _loggerFactory?.CreateLogger<T>();
+
     #region 构造函数和初始化
     public VoiceChatService(IConfigurationService configurationService,
         IKeywordSpottingService keywordSpottingService,
@@ -112,11 +141,13 @@ public class VoiceChatService : IVoiceChatService
         IAudioPlayer audioPlayer,
         McpServer mcpServer,
         IMusicPlayerService? musicPlayerService = null,
-        ILogger<VoiceChatService>? logger = null)
+        ILogger<VoiceChatService>? logger = null,
+        ILoggerFactory? loggerFactory = null)
     {
         _configurationService = configurationService;
         _audioStreamManager = audioStreamManager;
         _logger = logger;
+        _loggerFactory = loggerFactory;
         _musicPlayerService = musicPlayerService;
 
         // 初始化音频编解码器 - 使用OpusSharp
@@ -147,8 +178,7 @@ public class VoiceChatService : IVoiceChatService
         _mcpServer = mcpServer;
 
         // Initialize direct interrupt service management (replaces EnhancedInterruptManager)
-        _interruptService = new Interrupt.InterruptService(
-            Microsoft.Extensions.Logging.LoggerFactory.Create(builder => { }).CreateLogger<Interrupt.InterruptService>());
+        _interruptService = new Interrupt.InterruptService(CreateLogger<Interrupt.InterruptService>());
         _interruptService.InterruptOccurred += OnInterruptOccurred;
 
         // Initialize music player service if provided
@@ -168,9 +198,10 @@ public class VoiceChatService : IVoiceChatService
 
     private void InitializeStateMachine()
     {
-        _stateMachine = new ConversationStateMachine();
-        _stateMachineContext = new ConversationStateMachineContext(_stateMachine)
+        _stateMachine = new ConversationStateMachine(CreateLogger<ConversationStateMachine>()) { KeepListening = _keepListening };
+        _stateMachineContext = new ConversationStateMachineContext(_stateMachine, CreateLogger<ConversationStateMachineContext>())
         {
+            ConnectingTimeout = ConnectTimeout + TimeSpan.FromSeconds(10),
             // Set up state machine actions
             OnEnterListening = async () =>
                 {
@@ -220,8 +251,7 @@ public class VoiceChatService : IVoiceChatService
             _logger?.LogInformation("Initializing interrupt sources directly in VoiceChatService...");
 
             // Create and register interrupt sources
-            _manualSource = new Interrupt.Sources.ManualInterruptSource(
-                Microsoft.Extensions.Logging.LoggerFactory.Create(builder => { }).CreateLogger<Interrupt.Sources.ManualInterruptSource>());
+            _manualSource = new Interrupt.Sources.ManualInterruptSource(CreateLogger<Interrupt.Sources.ManualInterruptSource>());
             _interruptService.RegisterInterruptSource(_manualSource);
 
             // Hotkey interrupt source
@@ -230,8 +260,7 @@ public class VoiceChatService : IVoiceChatService
             //_interruptService.RegisterInterruptSource(_hotkeySource);
 
             // API interrupt source
-            _apiSource = new Interrupt.Sources.ApiInterruptSource(
-                Microsoft.Extensions.Logging.LoggerFactory.Create(builder => { }).CreateLogger<Interrupt.Sources.ApiInterruptSource>());
+            _apiSource = new Interrupt.Sources.ApiInterruptSource(CreateLogger<Interrupt.Sources.ApiInterruptSource>());
             _interruptService.RegisterInterruptSource(_apiSource);
 
             // Voice activity interrupt source with proper configuration (optional, based on config)
@@ -251,7 +280,7 @@ public class VoiceChatService : IVoiceChatService
                     _audioStreamManager,
                     this,
                     vadConfig,
-                    Microsoft.Extensions.Logging.LoggerFactory.Create(builder => { }).CreateLogger<Interrupt.Sources.VoiceActivityInterruptSource>());
+                    CreateLogger<Interrupt.Sources.VoiceActivityInterruptSource>());
                 _interruptService.RegisterInterruptSource(_vadSource);
             }
 
@@ -270,49 +299,148 @@ public class VoiceChatService : IVoiceChatService
 
     public async Task InitializeAsync(VerdureConfig config)
     {
-        _config = config;
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        await _initLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            await _configurationService.CheckOtaUpdateAsync();
+            _config = config;
+
             // 将配置传递给关键词检测服务
-            if (_keywordSpottingService != null)
+            _keywordSpottingService?.SetConfig(config);
+
+            // OTA 检查依赖网络，失败/超时不应阻止语音功能启动
+            await TryCheckOtaAsync().ConfigureAwait(false);
+
+            if (_initialized)
             {
-                _keywordSpottingService.SetConfig(config);
+                // 重复初始化（例如界面上的"连接"按钮）：只确保唤醒词检测在运行
+                _logger?.LogDebug("语音聊天服务已初始化，仅刷新唤醒词检测");
+                await EnsureKeywordDetectionRunningAsync().ConfigureAwait(false);
+                return;
             }
 
-            // 启动连续音频录制（程序启动后立即开始，直到程序关闭才停止）
-            if (_config?.EnableVoice == true && _audioStreamManager != null)
+            // 启动连续音频录制（直到 DisconnectAsync/程序关闭才停止）
+            if (_config.EnableVoice && _audioStreamManager != null)
             {
                 _logger?.LogInformation("启动连续音频录制模式...");
-                await _audioStreamManager.StartRecordingAsync(_config.AudioSampleRate, _config.AudioChannels);
+                await _audioStreamManager.StartRecordingAsync(_config.AudioSampleRate, _config.AudioChannels).ConfigureAwait(false);
                 _logger?.LogInformation("连续音频录制已启动，音频数据将根据状态机决定是否传输");
-            }
 
-            // 初始化中断源（替换增强的打断管理器）
-            if (_config?.EnableVoice == true)
-            {
+                StartAudioSendLoop();
+
                 _logger?.LogInformation("正在初始化中断源...");
-                await InitializeInterruptSources();
-                _logger?.LogInformation("中断源初始化完成");
+                await InitializeInterruptSources().ConfigureAwait(false);
             }
 
+            _initialized = true;
             _logger?.LogInformation("语音聊天服务初始化完成");
 
             // 启动关键词唤醒检测（对应py-xiaozhi的_start_wake_word_detector调用）
-            if (_keywordSpottingService != null)
-            {
-                _logger?.LogInformation("正在启动关键词唤醒检测...");
-                await StartKeywordDetectionAsync();
-            }
-
+            await EnsureKeywordDetectionRunningAsync().ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            // Use state machine to handle connection failure
             _stateMachine?.RequestTransition(ConversationTrigger.ConnectionFailed, $"Initialization failed: {ex.Message}");
             _logger?.LogError(ex, "初始化语音聊天服务失败");
             ErrorOccurred?.Invoke(this, $"初始化失败: {ex.Message}");
             throw;
+        }
+        finally
+        {
+            _initLock.Release();
+        }
+    }
+
+    private async Task TryCheckOtaAsync()
+    {
+        try
+        {
+            await _configurationService.CheckOtaUpdateAsync().WaitAsync(TimeSpan.FromSeconds(15)).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "OTA 检查失败，继续使用本地配置启动");
+        }
+    }
+
+    private async Task EnsureKeywordDetectionRunningAsync()
+    {
+        if (_keywordSpottingService == null)
+        {
+            return;
+        }
+
+        if (_keywordSpottingService.IsRunning || _keywordSpottingService.IsPaused)
+        {
+            _keywordDetectionEnabled = true;
+            ApplyKeywordPolicy(CurrentState);
+            return;
+        }
+
+        _logger?.LogInformation("正在启动关键词唤醒检测...");
+        await StartKeywordDetectionAsync().ConfigureAwait(false);
+        ApplyKeywordPolicy(CurrentState);
+    }
+
+    /// <summary>
+    /// 断开连接并停止所有音频相关后台工作，但保持服务可再次 <see cref="InitializeAsync"/>。
+    /// 这是界面"断开"按钮应该调用的方法（不要对单例服务调用 Dispose）。
+    /// </summary>
+    public async Task DisconnectAsync()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        await _initLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            _logger?.LogInformation("正在断开语音聊天服务...");
+
+            // 先清除初始化标志，避免 ForceIdle 触发的 EnterIdle 把唤醒词检测又拉起来
+            _initialized = false;
+            KeepListening = false;
+            _stateMachine?.RequestTransition(ConversationTrigger.ForceIdle, "Disconnect requested");
+
+            await StopKeywordDetectionAsync().ConfigureAwait(false);
+
+            try { await _interruptService.StopAllAsync().ConfigureAwait(false); }
+            catch (Exception ex) { _logger?.LogDebug(ex, "停止中断源时出现警告"); }
+
+            // 打断源需要在下次初始化时重新创建
+            foreach (var source in _interruptService.GetAllInterruptSources().ToArray())
+            {
+                _interruptService.UnregisterInterruptSource(source.Name);
+            }
+            _manualSource = null;
+            _apiSource = null;
+            _vadSource = null;
+
+            await StopAudioSendLoopAsync().ConfigureAwait(false);
+
+            if (_communicationClient != null)
+            {
+                try { await _communicationClient.DisconnectAsync().ConfigureAwait(false); }
+                catch (Exception ex) { _logger?.LogDebug(ex, "断开通信客户端时出现警告"); }
+            }
+
+            if (_audioStreamManager?.IsRecording == true)
+            {
+                try { await _audioStreamManager.StopRecordingAsync().ConfigureAwait(false); }
+                catch (Exception ex) { _logger?.LogDebug(ex, "停止录音时出现警告"); }
+            }
+
+            _isVoiceChatActive = false;
+            VoiceChatStateChanged?.Invoke(this, false);
+            _initialized = false;
+
+            _logger?.LogInformation("语音聊天服务已断开");
+        }
+        finally
+        {
+            _initLock.Release();
         }
     }
     #endregion
@@ -332,16 +460,92 @@ public class VoiceChatService : IVoiceChatService
     }
     public bool IsKeywordDetectionEnabled => _keywordDetectionEnabled;
 
+    /// <summary>
+    /// 唤醒词在空闲状态命中时的外部路由：返回 true 表示已处理，不再启动小智对话
+    /// </summary>
+    public Func<string, Task<bool>>? KeywordInterceptor { get; set; }
+
+    private volatile bool _externalKeywordHold;
+
+    /// <summary>
+    /// 外部对话后端（如 DeepSeek 语音）占用麦克风期间暂停/恢复唤醒词识别
+    /// </summary>
+    public void HoldKeywordDetection(bool hold)
+    {
+        _externalKeywordHold = hold;
+        ApplyKeywordPolicy(CurrentState);
+    }
+
 
     /// <summary>
     /// 处理状态机状态变化，简化状态同步逻辑
     /// </summary>
     private void OnStateMachineStateChanged(object? sender, StateTransitionEventArgs e)
     {
+        // 离开 Connecting 时立即取消仍在进行的连接尝试
+        if (e.FromState == DeviceState.Connecting)
+        {
+            CancelPendingConnect();
+        }
+
+        // 唤醒词识别与对话流程协调：对话进行中不占用音频流/不产生重复唤醒
+        ApplyKeywordPolicy(e.ToState);
+
         // 直接转发状态机事件
         DeviceStateChanged?.Invoke(this, e.ToState);
 
         _logger?.LogDebug("State synchronized from state machine: {FromState} -> {ToState}", e.FromState, e.ToState);
+    }
+
+    private void CancelPendingConnect()
+    {
+        var cts = Interlocked.Exchange(ref _connectCts, null);
+        if (cts == null)
+        {
+            return;
+        }
+
+        try { cts.Cancel(); } catch (ObjectDisposedException) { }
+    }
+
+    /// <summary>
+    /// 根据对话状态暂停/恢复唤醒词识别：
+    /// Idle 时识别；连接与聆听时暂停（避免与采集/上传抢音频流并杜绝回声误触发）；
+    /// 说话时按 <see cref="VerdureConfig.AllowKeywordInterruptWhileSpeaking"/> 决定是否保留"说唤醒词打断"。
+    /// </summary>
+    private void ApplyKeywordPolicy(DeviceState state)
+    {
+        var keyword = _keywordSpottingService;
+        if (keyword == null)
+        {
+            return;
+        }
+
+        try
+        {
+            var shouldRun = !_externalKeywordHold && state switch
+            {
+                DeviceState.Idle => true,
+                DeviceState.Speaking => _config?.AllowKeywordInterruptWhileSpeaking ?? true,
+                _ => false
+            };
+
+            if (shouldRun)
+            {
+                if (keyword.IsPaused)
+                {
+                    keyword.Resume();
+                }
+            }
+            else if (!keyword.IsPaused)
+            {
+                keyword.Pause();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "调整唤醒词识别状态时出错 (state: {State})", state);
+        }
     }
 
     /// <summary>
@@ -399,18 +603,20 @@ public class VoiceChatService : IVoiceChatService
                 return;
             }
 
+            var musicWasPlaying = _isMusicPlaying;
+
             // Stop music playback for all interrupts
             await StopMusicPlayback($"{e.SourceName} interrupt: {e.Description}");
 
-            // Send abort message to WebSocket server
-            if (_communicationClient is WebSocketClient wsClient)
+            // Send abort message to WebSocket server (only meaningful when there is a live session)
+            if (_communicationClient is WebSocketClient wsClient && wsClient.IsConnected && CurrentState != DeviceState.Idle)
             {
                 await wsClient.SendAbortAsync(e.AbortReason);
                 _logger?.LogDebug("Sent abort message to server with reason: {Reason}", e.AbortReason);
             }
 
             // Handle interrupt based on type and current state
-            await HandleInterruptWithStateMachine(e);
+            HandleInterruptWithStateMachine(e, musicWasPlaying);
 
             _logger?.LogInformation("Interrupt processed successfully");
         }
@@ -422,49 +628,34 @@ public class VoiceChatService : IVoiceChatService
     }
 
     /// <summary>
-    /// Handle interrupt using state machine (centralized interrupt logic)
+    /// Handle interrupt using state machine (centralized interrupt logic).
+    /// 具体的"状态 + 打断类型 → 新状态"矩阵由状态机的转换表统一定义，这里只负责补充业务条件。
     /// </summary>
-    private async Task HandleInterruptWithStateMachine(Interrupt.InterruptEventArgs e)
+    private void HandleInterruptWithStateMachine(Interrupt.InterruptEventArgs e, bool musicWasPlaying)
     {
-        // Determine state machine trigger based on interrupt type
         var trigger = IsVadInterrupt(e.InterruptType)
             ? ConversationTrigger.VadInterrupt
             : ConversationTrigger.ManualInterrupt;
 
-        // Use state machine to handle interrupt based on current state
         switch (CurrentState)
         {
-            case DeviceState.Listening:
-                // 聆听中打断进入关键词唤醒 - Both manual and VAD interrupts should trigger keyword wake-up
-                _stateMachine?.RequestTransition(ConversationTrigger.ServerDisconnected, "Connection lost");
-
-
-                if (_communicationClient != null)
+            case DeviceState.Idle:
+                // 空闲时只有"打断了正在播放的音乐"才视为一次唤醒；单纯的手动/API 打断没有对话可打断
+                if (!musicWasPlaying)
                 {
-                    _logger?.LogInformation("连接断开，尝试断开WebSocket连接");
-                    await _communicationClient.DisconnectAsync();
+                    _logger?.LogDebug("Interrupt received in idle state with nothing playing, no action needed");
+                    return;
                 }
+                KeepListening = true;
                 break;
 
             case DeviceState.Speaking:
-                // 播放语音或音乐中打断进入聆听状态 - Both manual and VAD interrupts should go to listening
-                KeepListening = true; // 启用持续监听模式
-                _stateMachine?.RequestTransition(ConversationTrigger.ManualInterrupt, $"Keyword detected in idle state");
-                break;
-
-            case DeviceState.Idle:
-                // 聆听中打断进入关键词唤醒 - Both manual and VAD interrupts should trigger keyword wake-up
-                _stateMachine?.RequestTransition(ConversationTrigger.ServerDisconnected, "Connection lost");
-                // Already idle, just log the interrupt
-                _logger?.LogDebug("Interrupt received in idle state, no action needed");
-                break;
-
-            case DeviceState.Connecting:
-                // Cancel connection attempt - use UserInterrupt for compatibility
-                _stateMachine?.RequestTransition(ConversationTrigger.UserInterrupt,
-                    $"Connection interrupted: {e.Description}");
+                // 说话中被打断：接着聆听用户（持续监听）
+                KeepListening = true;
                 break;
         }
+
+        _stateMachine?.RequestTransition(trigger, $"{e.SourceName} interrupt: {e.Description}");
     }
 
     /// <summary>
@@ -598,94 +789,89 @@ public class VoiceChatService : IVoiceChatService
     /// </summary>
     private async void OnKeywordDetected(object? sender, KeywordDetectedEventArgs e)
     {
-        _logger?.LogInformation($"检测到关键词: {e.Keyword} (完整文本: {e.FullText})");
-        await HandleKeywordDetectedAsync(e.Keyword);
-    }
-
-    /// <summary>
-    /// 处理关键词检测事件（对应py-xiaozhi的_handle_wake_word_detected方法）
-    /// </summary>
-    private async Task HandleKeywordDetectedAsync(string keyword)
-    {
         try
         {
-            switch (CurrentState)
-            {
-                case DeviceState.Idle:
-                    // 在空闲状态检测到关键词，启动对话（对应py-xiaozhi的唤醒逻辑）
-                    _logger?.LogInformation("在空闲状态检测到关键词，启动语音对话");
-
-                    // 添加小延迟确保keyword detection pause完成，避免音频流冲突
-                    //await Task.Delay(50);
-                    KeepListening = true; // 启用持续监听模式
-                    _stateMachine?.RequestTransition(ConversationTrigger.KeywordDetected, $"Keyword '{keyword}' detected in idle state");
-                    break;
-
-                case DeviceState.Speaking:
-                    // 在AI说话时检测到关键词，中断对话（对应py-xiaozhi的中断逻辑）
-                    _logger?.LogInformation("在AI说话时检测到关键词，中断当前对话");
-
-                    // Use state machine to handle keyword interrupt
-                    _stateMachine?.RequestTransition(ConversationTrigger.ManualInterrupt, $"Keyword '{keyword}' detected during speaking - interrupt");
-
-                    await Task.Delay(50);
-
-                    // 恢复关键词检测服务，准备下一次唤醒
-                    try
-                    {
-                        //_keywordSpottingService?.Resume();
-                        _logger?.LogDebug("关键词检测服务已恢复");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogWarning(ex, "恢复关键词检测服务时出错");
-                    }
-                    break;
-
-                case DeviceState.Listening:
-                    // 在监听状态检测到关键词，可能是误触发，忽略
-                    _logger?.LogDebug("在监听状态检测到关键词，忽略（可能是误触发）");
-                    // 在空闲状态检测到关键词，启动对话（对应py-xiaozhi的唤醒逻辑）
-                    _logger?.LogInformation("在空闲状态检测到关键词，启动语音对话");
-
-                    // 添加小延迟确保keyword detection pause完成，避免音频流冲突
-                    //await Task.Delay(50);
-                    KeepListening = true; // 启用持续监听模式
-                    _stateMachine?.RequestTransition(ConversationTrigger.KeywordDetected, $"Keyword '{keyword}' detected in idle state");
-                    break;
-
-                case DeviceState.Connecting:
-                    // 在连接状态检测到关键词，暂不处理
-                    _logger?.LogDebug("在连接状态检测到关键词，暂不处理");
-                    break;
-
-                default:
-                    _logger?.LogDebug($"在状态 {CurrentState} 检测到关键词，暂不处理");
-                    break;
-            }
+            _logger?.LogInformation("检测到关键词: {Keyword} (完整文本: {FullText})", e.Keyword, e.FullText);
+            await HandleKeywordDetectedAsync(e.Keyword);
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "处理关键词检测事件时发生错误");
+            _logger?.LogError(ex, "处理关键词事件时发生未预期的错误");
         }
     }
 
     /// <summary>
-    /// 关键词检测错误处理
+    /// 处理关键词检测事件（对应py-xiaozhi的_handle_wake_word_detected方法）。
+    /// 状态机负责判定各状态下该做什么（Idle→开始对话，Speaking→打断，Listening/Connecting→忽略），
+    /// 这里负责去抖、副作用（停止音乐、通知服务器）和 KeepListening 的设置。
+    /// </summary>
+    private async Task HandleKeywordDetectedAsync(string keyword)
+    {
+        // 去抖：识别器自身有冷却，但状态切换过程中仍可能收到相邻的重复事件
+        var now = DateTime.UtcNow;
+        if (now - _lastKeywordHandledUtc < KeywordDebounce)
+        {
+            _logger?.LogDebug("忽略重复的关键词事件 (距上次 {Elapsed:0}ms)", (now - _lastKeywordHandledUtc).TotalMilliseconds);
+            return;
+        }
+
+        var state = CurrentState;
+
+        // 外部路由（例如"DeepSeek 对话"后端）：拦截器接手则不再走小智流程
+        var interceptor = KeywordInterceptor;
+        if (interceptor != null && state == DeviceState.Idle)
+        {
+            try
+            {
+                if (await interceptor(keyword).ConfigureAwait(false))
+                {
+                    _lastKeywordHandledUtc = now;
+                    _logger?.LogInformation("关键词 '{Keyword}' 已由外部对话后端处理", keyword);
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "关键词拦截器执行失败，回退到默认流程");
+            }
+        }
+
+        switch (state)
+        {
+            case DeviceState.Idle:
+                _lastKeywordHandledUtc = now;
+                _logger?.LogInformation("在空闲状态检测到关键词，启动语音对话");
+                // 唤醒后保持持续对话，回复结束自动回到聆听
+                KeepListening = true;
+                await StopMusicPlayback($"keyword '{keyword}'");
+                _stateMachine?.RequestTransition(ConversationTrigger.KeywordDetected, $"Keyword '{keyword}' detected in idle state");
+                break;
+
+            case DeviceState.Speaking:
+                _lastKeywordHandledUtc = now;
+                _logger?.LogInformation("在AI说话时检测到关键词，中断当前对话");
+                KeepListening = true;
+                if (_communicationClient is WebSocketClient wsClient && wsClient.IsConnected)
+                {
+                    await wsClient.SendAbortAsync(AbortReason.WakeWordDetected);
+                }
+                _stateMachine?.RequestTransition(ConversationTrigger.KeywordDetected, $"Keyword '{keyword}' detected during speaking - interrupt");
+                break;
+
+            default:
+                // Connecting / Listening：多半是回声或重复触发，忽略
+                _logger?.LogDebug("在状态 {State} 检测到关键词，忽略", state);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// 关键词检测错误处理。识别服务内部带有自动重试与退避，这里只做记录并向上层提示。
     /// </summary>
     private void OnKeywordDetectionError(object? sender, string error)
     {
-        _logger?.LogError($"关键词检测错误: {error}");
-
-        // 尝试在空闲状态重新启动检测器（对应py-xiaozhi的错误恢复逻辑）
-        if (CurrentState == DeviceState.Idle)
-        {
-            Task.Run(async () =>
-            {
-                await Task.Delay(1000); // 等待1秒后重试
-                await StartKeywordDetectionAsync();
-            });
-        }
+        _logger?.LogWarning("关键词检测错误: {Error}", error);
+        ErrorOccurred?.Invoke(this, $"唤醒词检测异常: {error}");
     }
 
 
@@ -736,7 +922,13 @@ public class VoiceChatService : IVoiceChatService
     /// </summary>
     private async Task StartListeningInternalAsync()
     {
-        if (!IsConnected) return;
+        if (!IsConnected)
+        {
+            // 理论上 Listening 一定经过 Connecting，这里兜底：没有连接就不要停在 Listening
+            _logger?.LogWarning("进入聆听状态但连接不可用，回到空闲");
+            _stateMachine?.RequestTransition(ConversationTrigger.ConnectionFailed, DeviceState.Listening, "Not connected when entering Listening");
+            return;
+        }
 
         try
         {
@@ -803,11 +995,10 @@ public class VoiceChatService : IVoiceChatService
         try
         {
             // Send stop listen message first
-            if (_communicationClient is WebSocketClient wsClient)
+            if (_communicationClient is WebSocketClient { IsConnected: true } wsClient)
             {
                 await wsClient.SendStopListenAsync();
                 _logger?.LogDebug("已发送停止监听消息");
-                _logger?.LogDebug("Sent stop listen message");
             }
 
             // 新逻辑：不停止录制，只是停止将音频数据发送到WebSocket
@@ -859,13 +1050,13 @@ public class VoiceChatService : IVoiceChatService
     {
         try
         {
-            if (_keywordSpottingService != null)
+            if (_disposed || !_initialized)
             {
-                await StopKeywordDetectionAsync();
-
-                _logger?.LogInformation("正在启动关键词唤醒检测...");
-                await StartKeywordDetectionAsync();
+                return;
             }
+
+            // 暂停/恢复由 ApplyKeywordPolicy 同步完成；这里只需确保识别服务确实在运行
+            await EnsureKeywordDetectionRunningAsync().ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -874,15 +1065,83 @@ public class VoiceChatService : IVoiceChatService
     }
 
     /// <summary>
-    /// Internal method to enter connecting state (called by state machine)
+    /// Internal method to enter connecting state (called by state machine).
+    /// 已连接时立即完成；否则带超时地建立连接并等待 Hello 握手，结果通过状态机回报。
+    /// 离开 Connecting（用户取消、超时看门狗）时会通过 <see cref="_connectCts"/> 立刻中止等待。
     /// </summary>
     private async Task EnterConnectingStateAsync()
     {
-        if (_communicationClient != null)
+        var machine = _stateMachine;
+        var client = _communicationClient;
+
+        if (machine == null || client == null)
         {
-            await _communicationClient.ConnectAsync();
-            // Use state machine to transition to connected state
-            //_stateMachine?.RequestTransition(ConversationTrigger.ServerConnected, "Successfully connected to server");
+            machine?.RequestTransition(ConversationTrigger.ConnectionFailed, DeviceState.Connecting, "No communication client");
+            return;
+        }
+
+        using var cts = new CancellationTokenSource(ConnectTimeout);
+        CancelPendingConnect();
+        Volatile.Write(ref _connectCts, cts);
+
+        try
+        {
+            if (!client.IsConnected)
+            {
+                var connectTask = client.ConnectAsync();
+                // WaitAsync 被取消后底层任务仍会失败；显式观察异常，避免触发"未被观察的任务异常"
+                _ = connectTask.ContinueWith(
+                    t => _logger?.LogDebug("已放弃的连接任务结束: {Error}", t.Exception?.GetBaseException().Message),
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
+                await connectTask.WaitAsync(cts.Token).ConfigureAwait(false);
+            }
+
+            if (client.IsConnected)
+            {
+                machine.RequestTransition(ConversationTrigger.ServerConnected, DeviceState.Connecting, "Connection established");
+            }
+            else
+            {
+                machine.RequestTransition(ConversationTrigger.ConnectionFailed, DeviceState.Connecting, "Connection not established");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // 要么调用方已经离开 Connecting（用户取消），要么是连接超时
+            if (machine.CurrentState == DeviceState.Connecting)
+            {
+                _logger?.LogWarning("连接服务器超时 ({Timeout}s)", ConnectTimeout.TotalSeconds);
+                ErrorOccurred?.Invoke(this, "连接服务器超时");
+                machine.RequestTransition(ConversationTrigger.ConnectionFailed, DeviceState.Connecting, "Connect timeout");
+            }
+
+            // 放弃这次尝试：避免连接在后台悄悄完成后留下一个无人使用的会话
+            _ = SafeDisconnectAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "连接服务器失败");
+            ErrorOccurred?.Invoke(this, $"连接服务器失败: {ex.Message}");
+            machine.RequestTransition(ConversationTrigger.ConnectionFailed, DeviceState.Connecting, $"Connect failed: {ex.Message}");
+        }
+        finally
+        {
+            Interlocked.CompareExchange(ref _connectCts, null, cts);
+        }
+    }
+
+    private async Task SafeDisconnectAsync()
+    {
+        try
+        {
+            if (_communicationClient != null && CurrentState == DeviceState.Idle)
+            {
+                await _communicationClient.DisconnectAsync().ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogDebug(ex, "清理未完成的连接时出现警告");
         }
     }
 
@@ -1045,60 +1304,127 @@ public class VoiceChatService : IVoiceChatService
             ErrorOccurred?.Invoke(this, $"发送文本消息失败: {ex.Message}");
         }
     }
-    private async void OnAudioDataReceived(object? sender, byte[] audioData)
+    /// <summary>
+    /// 音频采集回调：只做入队，编码与发送在单独的循环里严格按顺序进行，
+    /// 这样采集线程不会被编码/网络拖慢，也不会出现"每帧一个 async void"导致的乱序与异常吞没。
+    /// </summary>
+    private void OnAudioDataReceived(object? sender, byte[] audioData)
     {
-        // 新逻辑：只有在语音聊天激活状态下才发送音频数据到WebSocket
-        // 音频录制始终在运行，但数据传输由状态机控制
-        if (!_isVoiceChatActive || _communicationClient == null || _audioCodec == null || _config == null)
+        // 只有在语音聊天激活状态下才发送音频数据；音频录制始终在运行，供关键词检测等功能使用
+        if (!_isVoiceChatActive)
         {
-            // 音频数据被丢弃，但录制继续运行，供关键词检测等功能使用
             return;
         }
 
+        // 复制一份：录音回调的缓冲区可能在回调返回后被复用
+        _audioSendChannel?.Writer.TryWrite((byte[])audioData.Clone());
+    }
+
+    private void StartAudioSendLoop()
+    {
+        if (_audioSendTask is { IsCompleted: false })
+        {
+            return;
+        }
+
+        // 队列满时丢弃最旧的帧：实时语音宁可丢旧帧也不能积压延迟
+        _audioSendChannel = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(200)
+        {
+            FullMode = BoundedChannelFullMode.DropOldest,
+            SingleReader = true,
+            SingleWriter = false
+        });
+        _audioSendCts = new CancellationTokenSource();
+
+        var reader = _audioSendChannel.Reader;
+        var token = _audioSendCts.Token;
+        _audioSendTask = Task.Run(() => AudioSendLoopAsync(reader, token));
+    }
+
+    private async Task StopAudioSendLoopAsync()
+    {
+        var channel = _audioSendChannel;
+        var cts = _audioSendCts;
+        var task = _audioSendTask;
+        _audioSendChannel = null;
+        _audioSendCts = null;
+        _audioSendTask = null;
+
+        channel?.Writer.TryComplete();
+        try { cts?.Cancel(); } catch (ObjectDisposedException) { }
+
+        if (task != null)
+        {
+            try { await task.WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false); }
+            catch (Exception ex) { _logger?.LogDebug(ex, "等待音频发送循环退出时出现警告"); }
+        }
+
+        cts?.Dispose();
+    }
+
+    private async Task AudioSendLoopAsync(ChannelReader<byte[]> reader, CancellationToken ct)
+    {
+        var lastErrorReport = DateTime.MinValue;
+
         try
         {
-            if (_communicationClient.IsConnected == false)
+            await foreach (var audioData in reader.ReadAllAsync(ct).ConfigureAwait(false))
             {
-                _logger?.LogWarning("无法发送音频数据，未连接到服务器");
-                return;
-            }
-            // 编码音频数据
-            var encodedData = _audioCodec.Encode(audioData, _config.AudioSampleRate, _config.AudioChannels);
+                var client = _communicationClient;
+                var codec = _audioCodec;
+                var config = _config;
 
-            var voiceMessage = new VoiceMessage
-            {
-                Type = "voice",
-                Data = encodedData,
-                SampleRate = _config.AudioSampleRate,
-                Channels = _config.AudioChannels,
-                Format = _config.AudioFormat
-            };
-
-            await _communicationClient.SendVoiceAsync(voiceMessage);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "处理音频数据失败");
-
-            // 特殊处理音频流异常
-            if (ex.Message.Contains("PortAudio") || ex.Message.Contains("audio") || ex.Message.Contains("stream"))
-            {
-                _logger?.LogWarning("音频数据处理时检测到音频流异常，启动恢复程序...");
-                _ = Task.Run(async () =>
+                if (!_isVoiceChatActive || client == null || codec == null || config == null || !client.IsConnected)
                 {
-                    var recovered = await RecoverFromAudioStreamErrorAsync(ex);
-                    if (recovered)
-                    {
-                        _logger?.LogInformation("音频数据处理时的音频流异常恢复成功");
-                    }
-                    else
-                    {
-                        _logger?.LogError("音频数据处理时的音频流异常恢复失败");
-                    }
-                });
-            }
+                    continue;
+                }
 
-            ErrorOccurred?.Invoke(this, $"处理音频数据失败: {ex.Message}");
+                try
+                {
+                    var encodedData = codec.Encode(audioData, config.AudioSampleRate, config.AudioChannels);
+
+                    await client.SendVoiceAsync(new VoiceMessage
+                    {
+                        Type = "voice",
+                        Data = encodedData,
+                        SampleRate = config.AudioSampleRate,
+                        Channels = config.AudioChannels,
+                        Format = config.AudioFormat
+                    }).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "处理音频数据失败");
+
+                    // 每帧都会失败时不要刷屏：错误提示与恢复流程最多每 5 秒一次
+                    if (DateTime.UtcNow - lastErrorReport < TimeSpan.FromSeconds(5))
+                    {
+                        continue;
+                    }
+                    lastErrorReport = DateTime.UtcNow;
+
+                    if (ex.Message.Contains("PortAudio") || ex.Message.Contains("audio") || ex.Message.Contains("stream"))
+                    {
+                        _logger?.LogWarning("音频数据处理时检测到音频流异常，启动恢复程序...");
+                        _ = Task.Run(async () =>
+                        {
+                            var recovered = await RecoverFromAudioStreamErrorAsync(ex);
+                            _logger?.Log(recovered ? LogLevel.Information : LogLevel.Error,
+                                "音频数据处理时的音频流异常恢复{Result}", recovered ? "成功" : "失败");
+                        });
+                    }
+
+                    ErrorOccurred?.Invoke(this, $"处理音频数据失败: {ex.Message}");
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // 正常退出
         }
     }
 
@@ -1109,7 +1435,14 @@ public class VoiceChatService : IVoiceChatService
     {
         try
         {
-            // 当音频播放完成时，如果在说话状态，切换回空闲状态
+            // 播放器与外部后端（如 DeepSeek 语音）共用，只有小智处于说话状态时才需要推进状态机
+            if (CurrentState != DeviceState.Speaking)
+            {
+                _logger?.LogDebug("忽略非说话状态下的播放结束事件（状态 {State}）", CurrentState);
+                return;
+            }
+
+            // 当音频播放完成时，如果在说话状态，切换回空闲/聆听状态（取决于 KeepListening）
             _stateMachine?.RequestTransition(ConversationTrigger.AudioPlaybackCompleted, "Audio playback completed");
         }
         catch (Exception ex)
@@ -1120,20 +1453,34 @@ public class VoiceChatService : IVoiceChatService
 
     private async void OnConnectionStateChanged(object? sender, bool isConnected)
     {
-        _logger?.LogInformation("连接状态变化: {IsConnected}", isConnected);
+        try
+        {
+            _logger?.LogInformation("连接状态变化: {IsConnected}", isConnected);
 
-        if (isConnected)
-        {
-            _stateMachine?.RequestTransition(ConversationTrigger.ServerConnected, "Connection established");
-        }
-        else
-        {
+            if (isConnected)
+            {
+                // ServerConnected 由 EnterConnectingStateAsync 在 Hello 握手完成后发出，
+                // 这里不能提前切到 Listening，否则会在握手之前就发送 listen 消息
+                return;
+            }
+
             if (_communicationClient != null)
             {
-                _logger?.LogInformation("连接断开，尝试断开WebSocket连接");
-                await _communicationClient.DisconnectAsync();
+                _logger?.LogInformation("连接断开，清理WebSocket连接（断开时状态: {State}）", _stateMachine?.CurrentState);
+                await _communicationClient.DisconnectAsync().ConfigureAwait(false);
             }
+
+            // 握手阶段被服务器断开最常见的原因是设备未激活或 Token 无效，给用户一个明确的提示而不是静默回到待命
+            if (_stateMachine?.CurrentState == DeviceState.Connecting)
+            {
+                ErrorOccurred?.Invoke(this, "服务器在握手阶段断开了连接：请确认设置里的 Device ID / Token 正确，并且设备已在 xiaozhi.me 绑定验证码");
+            }
+
             _stateMachine?.RequestTransition(ConversationTrigger.ServerDisconnected, "Connection lost");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "处理连接状态变化时出错");
         }
     }
 
@@ -1235,8 +1582,8 @@ public class VoiceChatService : IVoiceChatService
         _logger?.LogInformation("TTS started: {Text}, 当前状态: {State}, 监听模式: {Mode}",
             e.Text, CurrentState, _listeningMode);
         TtsStateChanged?.Invoke(this, e.TtsMessage!);
-        // Use state machine to transition to speaking when audio is received
-        _stateMachine?.RequestTransition(ConversationTrigger.AudioReceived, $"WebSocket audio data received");
+        // 进入说话状态（Listening 或 Idle 下的 TTS 开始都会切到 Speaking；其他状态下该触发会被忽略并记录）
+        _stateMachine?.RequestTransition(ConversationTrigger.TtsStarted, "TTS started");
 
     }
 
@@ -1476,9 +1823,20 @@ public class VoiceChatService : IVoiceChatService
 
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+        _disposed = true;
+        _initialized = false;
+
         try
         {
             _logger?.LogInformation("开始释放VoiceChatService资源");
+
+            CancelPendingConnect();
+            try { StopAudioSendLoopAsync().GetAwaiter().GetResult(); }
+            catch (Exception ex) { _logger?.LogDebug(ex, "停止音频发送循环时出现警告"); }
 
             // 1. 停止语音聊天状态，但不停止录制
             try
