@@ -208,11 +208,13 @@
 - **音量调节** - 实时音量控制
 
 ### 🔧 智能功能
+- **DeepSeek 接入** - 除小智外可直接使用 DeepSeek（思考模式、工具调用、联网搜索、余额/用量），详见 [DeepSeek 接入](docs/DEEPSEEK_INTEGRATION.md)
 - **自动对话模式** - 连续对话体验，无需重复唤醒
-- **状态机管理** - 智能的设备状态切换
+- **状态机管理** - 严格串行、可超时、可诊断的设备状态切换，详见 [稳定性重构](docs/STABILITY_REFACTORING.md)
 - **配置管理** - 灵活的参数配置和OTA更新
 - **错误恢复** - 智能的异常处理和自动恢复
 - **多服务集成** - 支持扩展更多AI助手服务
+- **winapp CLI** - WinUI 项目支持 `dotnet run` / `winapp run` / `winapp pack`，详见 [WinUI 与 winapp CLI](docs/WINUI_WINAPP_CLI.md)
 
 ### 🛠️ 开发者功能
 - **完整的依赖注入** - 松耦合的服务架构

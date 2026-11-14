@@ -7,6 +7,22 @@
 
 ## [未发布]
 
+### 稳定性与新功能（本次大版本重构）
+- 🧠 **DeepSeek 接入**：完整的 DeepSeek API 客户端（流式/非流式、思考模式与思考强度、`reasoning_content` 回传规则、工具调用、联网工具、JSON 输出、FIM/前缀续写、模型列表、余额、错误码与重试），WinUI 新增 DeepSeek 对话页。详见 [docs/DEEPSEEK_INTEGRATION.md](docs/DEEPSEEK_INTEGRATION.md)
+- 🔄 **对话状态机重写**：事件锁外有序派发、动作单队列串行执行、连接超时看门狗、断线回 Idle、唤醒词/打断按状态明确处理、过期回调保护与转换历史。详见 [docs/STABILITY_REFACTORING.md](docs/STABILITY_REFACTORING.md)
+- 🎯 **唤醒词服务重写**：监督循环 + 冷却 + 退避，修复 `Pause/Stop/Dispose` 阻塞到下一次唤醒才返回的问题；对话期间自动暂停，避免与上传/VAD 抢占音频流
+- 🔌 **连接生命周期**：等待小智 `hello` 握手、连接/关闭超时、`DisconnectAsync()` 取代对单例 `Dispose()`、`InitializeAsync()` 幂等、OTA 失败不再阻断启动、麦克风帧有序有界发送
+- 🪟 **WinUI**：支持 winapp CLI（`dotnet run` / `winapp run` / `winapp pack`），清单声明麦克风能力，未打包运行回退文件设置；启动先显示窗口并展示加载/降级/失败状态条；单实例；全局异常记录；有序关闭；滚动文件日志；页面导航缓存。详见 [docs/WINUI_WINAPP_CLI.md](docs/WINUI_WINAPP_CLI.md)
+- 🔐 API Key 保存到 Windows 凭据库（`ISecretStore`），不写入设置 JSON
+- ✅ 新增 `ConversationStateMachine.Tests`（状态机/上下文/唤醒词/VoiceChatService/播放器抖动缓冲，69 个）与 `DeepSeek.Tests`（含语音客户端、端点检测、语音对话编排、图像理解，251 个）
+- 🔑 **设备身份与鉴权修复**：设置页的 Device ID / Token / OTA / WebSocket 地址现在真正生效（此前只保存不使用，WebSocket 的 Token 被写死为 `test`）；取不到物理网卡 MAC 时（如只有虚拟网卡）不再得到空 Device ID（会导致 OTA 报 `Device ID is required`、拿不到激活验证码），改为生成稳定的本机标识；握手阶段被服务器断开时给出明确提示
+- 📋 **日志更清晰**：连接日志显示 Device ID/Token 来源（Token 脱敏）、服务器关闭连接的状态码与原因；唤醒词每 30 秒输出心跳（音频帧数与峰值电平，可判断麦克风是否在送音频），命中时记录模型名、监听时长与音量；修复连接被取消后出现"未被观察的任务异常"；修复连接失败后按住说话被永久锁定（`IsWaitingForResponse` 卡 true）
+- ⏱️ **DeepSeek 语音响应更快、更稳**：每轮输出"判停 → 识别 → 模型首字 → 首段语音"的延迟拆分日志；语音对话默认关闭思考模式（首字更快，可在设置中开启）；判停等待默认由 900ms 降到 700ms 并可调（400~1500ms）；端点检测的噪声底改为自适应（稳定背景噪声会被学成噪声，不再让一句话被拖长），并新增"环境噪声"档位；识别的同时提前建立 TTS 连接，第一个短句在逗号处就先送出
+- 👁️ **DeepSeek 图像理解 + 真实摄像头/截屏**：DeepSeek 页支持附图提问（选择文件、粘贴、摄像头拍照、截屏）；"拍照看看/看看屏幕"工具现在真正取图并交给 DeepSeek 图像理解（此前相机是模拟的，返回 1×1 假图，识图总是失败）；清单新增 `webcam` 能力。详见 [docs/DEEPSEEK_INTEGRATION.md](docs/DEEPSEEK_INTEGRATION.md)
+- 🗣️ **DeepSeek 连续语音对话**：接入 DeepSeek 官方语音识别（ASR）与流式语音合成（TTS），实现"麦克风 → 端点检测 → DeepSeek 识别 → 思考/工具 → 边生成边朗读 → 自动继续聆听"，支持连续对话、按住说话、打断、唤醒词进入；首页新增"小智 / DeepSeek"后端切换，DeepSeek 页新增语音按钮与音色（stella/tide）。详见 [docs/DEEPSEEK_INTEGRATION.md](docs/DEEPSEEK_INTEGRATION.md)
+- 🔊 **TTS 播放抖动缓冲**：播放器原先几乎没有缓冲（约 62ms 就开播），小智服务器按实时速度下发音频，网络稍有抖动就会"断断续续"。现在首帧预缓冲 240ms，缓冲被播空时暂停并重新缓冲 160ms；打断/停止现在会真正停止播放并丢弃服务器后续下发的音频（此前 `StopAsync` 的停止调用被注释，打断后声音仍会继续）；TTS 无音频或比预缓冲更短时也能正确结束，避免状态机卡在"说话中"；结束时输出帧数、最大帧间隔与欠载次数
+- 🎨 **WinUI 界面焕新**：自定义标题栏 + 紧凑侧边导航；首页改为“状态主卡（头像光环 + 状态胶囊 + 回复气泡 + 连续对话/按住说话/打断）+ 对话记录 + 唤醒词/音乐/系统侧栏”，按 Offline/Idle/Connecting/Listening/Speaking 切换配色，宽屏双栏、窄屏单栏；DeepSeek 页与设置页居中卡片化并加入空状态；修复设置页协议下拉框不显示/保存异常的问题；`HomePageViewModel` 新增 `IsServiceReady` / `UiPhase`，修复“连接”按钮语义失效
+
 ### 🌟 重大技术突破
 
 #### **MCP (Model Context Protocol) 协议集成** 
