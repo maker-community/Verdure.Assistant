@@ -19,7 +19,9 @@
   <Folder Name="/tests/">
     <Project Path="tests/ApiCheck/ApiCheck.csproj" />
     <Project Path="tests/CodecTest/CodecTest.csproj" />
+    <Project Path="tests/ConversationStateMachine.Tests/ConversationStateMachine.Tests.csproj" />
     <Project Path="tests/DecodeTest/DecodeTest.csproj" />
+    <Project Path="tests/DeepSeek.Tests/DeepSeek.Tests.csproj" />
     <Project Path="tests/InterruptArchitectureTest/InterruptArchitectureTest.csproj" />
     <Project Path="tests/OpusApiTest/OpusApiTest.csproj" />
     <Project Path="tests/OpusSharpTest/OpusSharpTest.csproj" />

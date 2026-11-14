@@ -108,6 +108,77 @@ namespace Verdure.Assistant.Core.Models
         /// </summary>
         public string AudioCodec { get; set; } = "Opus";
 
+        #region DeepSeek
+
+        /// <summary>
+        /// DeepSeek API 地址（API Key 不在此处保存，而是通过 <see cref="Interfaces.ISecretStore"/> 存入系统凭据库）
+        /// </summary>
+        public string DeepSeekBaseUrl { get; set; } = "https://api.deepseek.com";
+
+        /// <summary>
+        /// DeepSeek 模型：deepseek-flash / deepseek-v4-pro
+        /// </summary>
+        public string DeepSeekModel { get; set; } = "deepseek-flash";
+
+        /// <summary>
+        /// 是否开启思考模式
+        /// </summary>
+        public bool DeepSeekThinkingEnabled { get; set; } = true;
+
+        /// <summary>
+        /// 思考强度：low / high / max
+        /// </summary>
+        public string DeepSeekReasoningEffort { get; set; } = "high";
+
+        /// <summary>
+        /// 自定义系统提示词；为空时使用内置的"绿荫助手"提示词
+        /// </summary>
+        public string DeepSeekSystemPrompt { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 是否启用 DeepSeek 服务端联网搜索
+        /// </summary>
+        public bool DeepSeekEnableWebSearch { get; set; } = false;
+
+        /// <summary>
+        /// 是否把本地 MCP 工具（音乐、设备控制等）暴露给 DeepSeek 调用
+        /// </summary>
+        public bool DeepSeekEnableTools { get; set; } = true;
+
+        /// <summary>
+        /// 收到完整回复后是否朗读
+        /// </summary>
+        public bool DeepSeekSpeakReplies { get; set; } = false;
+
+        /// <summary>
+        /// 语音对话后端：xiaozhi（小智服务器）或 deepseek（本地麦克风 → DeepSeek 语音识别 → DeepSeek 对话 → DeepSeek 语音合成）。
+        /// 唤醒词、连续对话与按住说话都按该后端执行。
+        /// </summary>
+        public string VoiceBackend { get; set; } = "xiaozhi";
+
+        /// <summary>
+        /// DeepSeek 语音合成音色：stella（女声）/ tide（男声）
+        /// </summary>
+        public string DeepSeekVoiceId { get; set; } = "stella";
+
+        /// <summary>
+        /// 语音对话时是否开启思考模式。思考会让首个回答字晚几秒出现，语音场景默认关闭以获得更快的回复。
+        /// </summary>
+        public bool DeepSeekVoiceThinking { get; set; } = false;
+
+        /// <summary>
+        /// 说完话后停顿多久（毫秒）才认为一句话结束并开始识别。越小回复越快，但说话中间的停顿可能被切断。
+        /// </summary>
+        public int DeepSeekVoiceEndSilenceMs { get; set; } = 700;
+
+        /// <summary>
+        /// 环境噪声级别：0 安静、1 普通、2 嘈杂。越嘈杂，判定"有人在说话"所需的音量越高，
+        /// 能减少键盘声/旁人说话把一句话越拖越长，但音量小的话可能被忽略。
+        /// </summary>
+        public int DeepSeekVoiceNoiseLevel { get; set; } = 1;
+
+        #endregion
+
         /// <summary>
         /// 创建默认设置实例
         /// </summary>
@@ -156,7 +227,20 @@ namespace Verdure.Assistant.Core.Models
                 ConnectionTimeout = ConnectionTimeout,
                 AudioSampleRate = AudioSampleRate,
                 AudioChannels = AudioChannels,
-                AudioCodec = AudioCodec
+                AudioCodec = AudioCodec,
+                DeepSeekBaseUrl = DeepSeekBaseUrl,
+                DeepSeekModel = DeepSeekModel,
+                DeepSeekThinkingEnabled = DeepSeekThinkingEnabled,
+                DeepSeekReasoningEffort = DeepSeekReasoningEffort,
+                DeepSeekSystemPrompt = DeepSeekSystemPrompt,
+                DeepSeekEnableWebSearch = DeepSeekEnableWebSearch,
+                DeepSeekEnableTools = DeepSeekEnableTools,
+                DeepSeekSpeakReplies = DeepSeekSpeakReplies,
+                VoiceBackend = VoiceBackend,
+                DeepSeekVoiceId = DeepSeekVoiceId,
+                DeepSeekVoiceThinking = DeepSeekVoiceThinking,
+                DeepSeekVoiceEndSilenceMs = DeepSeekVoiceEndSilenceMs,
+                DeepSeekVoiceNoiseLevel = DeepSeekVoiceNoiseLevel
             };
         }
     }
