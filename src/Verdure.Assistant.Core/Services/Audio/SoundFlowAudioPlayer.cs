@@ -228,7 +228,21 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
             _dataProvider.EndOfStreamReached += (s, e) =>
             {
                 _logger?.LogDebug("SoundFlow数据提供者已到达流末尾");
-                PlaybackStopped?.Invoke(this, EventArgs.Empty);
+                var notify = false;
+                lock (_lock)
+                {
+                    if (_bufferState != BufferState.Idle)
+                    {
+                        _bufferState = BufferState.Idle;
+                        _isPlaying = false;
+                        notify = _streamOpen;
+                    }
+                }
+
+                if (notify)
+                {
+                    PlaybackStopped?.Invoke(this, EventArgs.Empty);
+                }
             };
 
             // 创建播放器
@@ -269,21 +283,16 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
             }
 
             // 如果参数不匹配或设备未就绪，重新初始化设备与播放器
-            if (_sampleRate != sampleRate || _channels != channels || _playbackDevice == null || _soundPlayer == null)
+            lock (_lock)
             {
-                await StopAsync();
-                InitializePlaybackDevice(sampleRate, channels);
-                await InitializePlayer(sampleRate, channels);
-            }
+                if (_sampleRate != sampleRate || _channels != channels || _playbackDevice == null || _soundPlayer == null)
+                {
+                    StopCore(closeStream: false);
+                    InitializePlaybackDevice(sampleRate, channels);
+                    InitializePlayer(sampleRate, channels).GetAwaiter().GetResult();
+                }
 
-            // 直接转换并播放音频数据，不使用Channel
-            await PlayAudioDataDirectly(audioData);
-
-            // 如果还没开始播放设备，启动播放
-            if (!_isPlaying && _playbackDevice != null && _soundPlayer != null)
-            {
-                await StartPlayback();
-                _logger?.LogDebug("开始SoundFlow播放音频");
+                EnqueueWithJitterBuffer(audioData);
             }
 
             await Task.CompletedTask;
@@ -294,78 +303,117 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
         }
     }
 
-    private async Task StartPlayback()
-    {
-        if (_isPlaying || _playbackDevice == null || _soundPlayer == null) return;
+    // 抖动缓冲参数：小智服务器按实时速度下发音频，网络抖动会让队列被播空而出现断续
+    private const int InitialPrerollMs = 240;
+    private const int RebufferMs = 160;
 
-        try
-        {
-            // 启动播放设备
-            _playbackDevice.Start();
-            _logger?.LogDebug("🔊 SoundFlow播放设备启动");
+    private enum BufferState { Idle, Buffering, Playing }
 
-            if (_dataProvider?.SamplesAvailable > 1000)
-            {
-                _isPlaying = true;
+    private BufferState _bufferState = BufferState.Idle;
+    private int _targetBufferSamples;
+    private bool _streamOpen = true;
+    private long _frameCount;
+    private long _totalSamples;
+    private long _underrunCount;
+    private long _lastFrameTicks;
+    private long _maxFrameGapMs;
 
-                // 启动播放器
-                _soundPlayer.Play();
-                _logger?.LogDebug("🔊 SoundFlow播放器启动");
-
-                await Task.CompletedTask;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "启动SoundFlow播放时出错");
-            _isPlaying = false;
-        }
-    }
+    private int MsToSamples(int ms) => _sampleRate * _channels * ms / 1000;
 
     /// <summary>
-    /// 直接播放音频数据，不使用Channel缓冲
+    /// 把一帧 PCM 放入队列，并按抖动缓冲策略决定何时开始/暂停/恢复播放。调用方需持有 _lock。
     /// </summary>
-    private async Task PlayAudioDataDirectly(byte[] audioData)
+    private void EnqueueWithJitterBuffer(byte[] audioData)
     {
-        if (_engine == null || _playbackDevice == null || _dataProvider == null)
+        if (_engine == null || _playbackDevice == null || _dataProvider == null || _soundPlayer == null)
         {
             _logger?.LogWarning("SoundFlow设备未就绪，忽略音频数据");
             return;
         }
 
+        // 打断/停止之后服务器仍可能继续下发剩余音频，直到下一次 TTS 开始前都丢弃
+        if (!_streamOpen)
+        {
+            return;
+        }
+
+        var sampleCount = audioData.Length / 2;
+        var floatSamples = new float[sampleCount];
+        for (var i = 0; i < sampleCount; i++)
+        {
+            floatSamples[i] = BitConverter.ToInt16(audioData, i * 2) / 32768.0f;
+        }
+
+        var now = Environment.TickCount64;
+        if (_frameCount > 0)
+        {
+            _maxFrameGapMs = Math.Max(_maxFrameGapMs, now - _lastFrameTicks);
+        }
+        _lastFrameTicks = now;
+        _frameCount++;
+        _totalSamples += sampleCount;
+
+        var wasDrained = _dataProvider.SamplesAvailable == 0;
+        _dataProvider.AddSamples(floatSamples);
+
+        switch (_bufferState)
+        {
+            case BufferState.Idle:
+                _bufferState = BufferState.Buffering;
+                _targetBufferSamples = MsToSamples(InitialPrerollMs);
+                _isPlaying = true;
+                _playbackDevice.Start();
+                break;
+
+            case BufferState.Playing when wasDrained:
+                // 队列在新帧到达前已被播空：播放器此刻在输出静音。暂停并重新攒一点再播，避免"播一帧、停一下"
+                _underrunCount++;
+                _soundPlayer.Pause();
+                _bufferState = BufferState.Buffering;
+                _targetBufferSamples = MsToSamples(RebufferMs);
+                _logger?.LogWarning("播放缓冲欠载（第 {Count} 次，帧间隔最大 {Gap}ms），暂停并重新缓冲 {Ms}ms", _underrunCount, _maxFrameGapMs, RebufferMs);
+                break;
+        }
+
+        if (_bufferState == BufferState.Buffering && _dataProvider.SamplesAvailable >= _targetBufferSamples)
+        {
+            _soundPlayer.Play();
+            _bufferState = BufferState.Playing;
+            _logger?.LogDebug("缓冲完成，开始播放（已缓冲 {Samples} 采样）", _dataProvider.SamplesAvailable);
+        }
+    }
+
+    private void ResetStreamStats()
+    {
+        _frameCount = 0;
+        _totalSamples = 0;
+        _underrunCount = 0;
+        _lastFrameTicks = 0;
+        _maxFrameGapMs = 0;
+    }
+
+    /// <summary>
+    /// 真正停止播放并清空队列。closeStream 为 true 时，后续帧会被丢弃直到下一次 Reset（新的 TTS 开始）。
+    /// 调用方需持有 _lock。
+    /// </summary>
+    private void StopCore(bool closeStream)
+    {
+        _isPlaying = false;
+        _bufferState = BufferState.Idle;
+
         try
         {
-            // 验证输入数据
-            if (audioData.Length == 0 || audioData.Length % 2 != 0)
-            {
-                _logger?.LogWarning("音频数据长度无效: {Length}字节", audioData.Length);
-                return;
-            }
-
-            // 将16位PCM字节数据正确转换为32位float数组
-            var sampleCount = audioData.Length / 2; // 16-bit = 2 bytes per sample
-            var floatSamples = new float[sampleCount];
-
-            for (int i = 0; i < sampleCount; i++)
-            {
-                // 正确处理字节序列（小端序）
-                var sample = BitConverter.ToInt16(audioData, i * 2);
-                // 正确的归一化：-32768到32767映射到-1.0到1.0
-                floatSamples[i] = sample / 32768.0f;
-            }
-
-            // 添加调试信息
-            var rms = Math.Sqrt(floatSamples.Select(s => s * s).Average());
-            _logger?.LogDebug("直接播放音频: {SampleCount}样本, RMS={Rms:F4}", sampleCount, rms);
-
-            // 直接添加到QueueDataProvider
-            _dataProvider.AddSamples(floatSamples);
-
-            await Task.CompletedTask;
+            _soundPlayer?.Pause();
+            _dataProvider?.Reset();
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "直接播放音频数据时出错");
+            _logger?.LogDebug(ex, "停止播放器时出现警告");
+        }
+
+        if (closeStream)
+        {
+            _streamOpen = false;
         }
     }
 
@@ -373,29 +421,9 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
     {
         try
         {
-            _isPlaying = false;
-            // 停止底层设备与播放器
-            try
+            lock (_lock)
             {
-                //_soundPlayer?.Stop();
-                _logger?.LogDebug("🔇 SoundFlow播放器已停止");
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogDebug(ex, "停止播放器时出现警告");
-            }
-
-            if (_playbackDevice != null)
-            {
-                try
-                {
-                    //_playbackDevice.Stop();
-                    _logger?.LogDebug("🔇 SoundFlow播放设备已停止");
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogWarning(ex, "停止SoundFlow播放设备时出现警告");
-                }
+                StopCore(closeStream: true);
             }
 
             _logger?.LogInformation("SoundFlow音频播放已停止");
@@ -484,11 +512,74 @@ public class SoundFlowAudioPlayer : IAudioPlayer, IDisposable
 
     public void CompleteAdding()
     {
-        _dataProvider?.CompleteAdding();
+        var raiseStopped = false;
+
+        lock (_lock)
+        {
+            if (_dataProvider == null)
+            {
+                // 从未收到过音频（播放器尚未初始化）：直接视为播放结束，否则状态机会一直停在说话中
+                raiseStopped = _streamOpen;
+            }
+            else
+            {
+                CompleteAddingLocked(ref raiseStopped);
+            }
+        }
+
+        if (raiseStopped)
+        {
+            PlaybackStopped?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void CompleteAddingLocked(ref bool raiseStopped)
+    {
+        _logger?.LogInformation("TTS音频接收完成：{Frames} 帧（约 {Seconds:0.0}s），帧间隔最大 {Gap}ms，播放缓冲欠载 {Underruns} 次",
+            _frameCount, _totalSamples / (double)Math.Max(1, _sampleRate * _channels), _maxFrameGapMs, _underrunCount);
+
+        _dataProvider!.CompleteAdding();
+
+        if (_bufferState == BufferState.Buffering)
+        {
+            // 整段回复比预缓冲还短，不会再有新帧触发播放了，直接把剩余的播完
+            if (_dataProvider.SamplesAvailable > 0)
+            {
+                _soundPlayer?.Play();
+                _bufferState = BufferState.Playing;
+            }
+            else
+            {
+                _bufferState = BufferState.Idle;
+                _isPlaying = false;
+                raiseStopped = _streamOpen;
+            }
+        }
+        else if (_bufferState == BufferState.Idle)
+        {
+            // 没有收到任何音频（或已被打断）。仅在 TTS 仍有效时通知播放结束，否则状态机会收到多余的完成事件
+            raiseStopped = _streamOpen;
+        }
     }
 
     public void Reset()
     {
-        _dataProvider?.Reset();
+        lock (_lock)
+        {
+            try
+            {
+                _soundPlayer?.Pause();
+                _dataProvider?.Reset();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "重置播放器时出现警告");
+            }
+
+            _bufferState = BufferState.Idle;
+            _isPlaying = false;
+            _streamOpen = true;
+            ResetStreamStats();
+        }
     }
 }
