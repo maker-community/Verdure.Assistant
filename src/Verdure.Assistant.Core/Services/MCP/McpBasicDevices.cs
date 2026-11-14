@@ -388,22 +388,28 @@ public class McpCameraDevice : McpIoTDevice
 {
     private readonly ILogger<McpCameraDevice>? _deviceLogger;
     private readonly HttpClient _httpClient;
+    private readonly IImageCaptureService? _capture;
+    private readonly IVisionService? _vision;
     private string _explainUrl = "http://api.xiaozhi.me/mcp/vision/explain";
     private string _explainToken = "test-token";
     private byte[]? _lastCapturedImage;
+    private string? _lastCapturedMime;
 
-    public McpCameraDevice(McpServer mcpServer, ILogger<McpCameraDevice>? logger = null)
+    public McpCameraDevice(McpServer mcpServer, ILogger<McpCameraDevice>? logger = null,
+        IImageCaptureService? capture = null, IVisionService? vision = null)
         : base(mcpServer, logger)
     {
         _deviceLogger = logger;
+        _capture = capture;
+        _vision = vision;
         _httpClient = new HttpClient();
         DeviceId = "main_camera";
         Name = "Camera";
-        Description = "智能相机设备 - 支持拍照和AI图像分析";
+        Description = "摄像头与屏幕 - 支持拍照、截屏和AI图像理解";
         Type = "camera";
 
         // 初始化设备状态
-        SetState("available", true);
+        SetState("available", _capture?.IsSupported(ImageCaptureSource.Camera) == true);
         SetState("last_capture_time", "");
         SetState("image_count", 0);
         SetState("resolution", "640x480");
@@ -428,74 +434,46 @@ public class McpCameraDevice : McpIoTDevice
         // 拍照工具
         _mcpServer.AddTool(
             "self.camera.capture",
-            "拍摄一张照片",
+            "用摄像头拍摄一张照片（只拍照，不分析；要看照片内容请用 self.camera.take_photo）",
             new McpPropertyList(),
             async (properties) =>
             {
-                try
+                var (image, error) = await TryCaptureAsync(ImageCaptureSource.Camera);
+                if (image == null)
                 {
-                    var success = await CapturePhotoAsync();
-                    if (success)
-                    {
-                        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                        SetState("last_capture_time", timestamp);
-                        var imageCount = GetState<int>("image_count") + 1;
-                        SetState("image_count", imageCount);
+                    return error ?? "拍照失败";
+                }
 
-                        _deviceLogger?.LogInformation("照片拍摄成功，时间: {Timestamp}", timestamp);
-                        return await Task.FromResult<McpReturnValue>($"照片拍摄成功，时间: {timestamp}");
-                    }
-                    else
-                    {
-                        _deviceLogger?.LogWarning("照片拍摄失败");
-                        return await Task.FromResult<McpReturnValue>("照片拍摄失败，请检查相机是否可用");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _deviceLogger?.LogError(ex, "拍照操作异常");
-                    return await Task.FromResult<McpReturnValue>($"拍照异常: {ex.Message}");
-                }
+                var timestamp = RecordCapture();
+                return $"照片拍摄成功，时间: {timestamp}，尺寸 {image.Width}x{image.Height}";
             });
 
-        // 拍照并解释工具 - 对应ESP32的take_photo工具
+        // 拍照并识别 - 对应ESP32的take_photo工具
         _mcpServer.AddTool(
             "self.camera.take_photo",
-            "拍摄照片并使用AI进行分析解释",
+            "用摄像头拍一张照片并用AI识别回答问题。当用户想让你\"看看\"眼前、面前、摄像头里的东西（例如：这是什么、桌上有什么、我穿了什么）时调用。",
             new McpPropertyList
             {
-                new("question", McpPropertyType.String, "关于照片的问题或分析要求")
+                new("question", McpPropertyType.String, "关于照片的问题或分析要求，例如\"这是什么东西\"")
             },
             async (properties) =>
             {
-                try
-                {
-                    var question = properties["question"].GetValue<string>() ?? "请描述这张照片的内容";
+                var question = properties["question"].GetValue<string>() ?? "请描述这张照片的内容";
+                return await CaptureAndExplainAsync(ImageCaptureSource.Camera, question, "照片");
+            });
 
-                    // 先拍照
-                    var captureSuccess = await CapturePhotoAsync();
-                    if (!captureSuccess)
-                    {
-                        return await Task.FromResult<McpReturnValue>("拍照失败，无法进行分析");
-                    }
-
-                    // 更新状态
-                    var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                    SetState("last_capture_time", timestamp);
-                    var imageCount = GetState<int>("image_count") + 1;
-                    SetState("image_count", imageCount);
-
-                    // 调用AI解释
-                    var explanation = await ExplainPhotoAsync(question);
-
-                    _deviceLogger?.LogInformation("照片拍摄并分析完成，问题: {Question}", question);
-                    return await Task.FromResult<McpReturnValue>($"照片分析结果：\n{explanation}");
-                }
-                catch (Exception ex)
-                {
-                    _deviceLogger?.LogError(ex, "拍照并分析操作异常");
-                    return await Task.FromResult<McpReturnValue>($"操作异常: {ex.Message}");
-                }
+        // 截屏并识别
+        _mcpServer.AddTool(
+            "self.screen.take_screenshot",
+            "截取电脑主屏幕并用AI识别回答问题。当用户想让你\"看看屏幕\"、读屏幕上的文字、解释当前界面或图表时调用。",
+            new McpPropertyList
+            {
+                new("question", McpPropertyType.String, "关于屏幕内容的问题，例如\"屏幕上写了什么\"")
+            },
+            async (properties) =>
+            {
+                var question = properties["question"].GetValue<string>() ?? "请描述屏幕上的内容";
+                return await CaptureAndExplainAsync(ImageCaptureSource.Screen, question, "屏幕截图");
             });
 
         // 设置分辨率工具
@@ -513,75 +491,116 @@ public class McpCameraDevice : McpIoTDevice
                 _deviceLogger?.LogInformation("相机分辨率已设置为: {Resolution}", resolution);
                 return await Task.FromResult<McpReturnValue>($"相机分辨率已设置为: {resolution}");
             });
-    }    /// <summary>
-         /// 拍摄照片 - 对应ESP32的Capture方法
-         /// 在实际应用中可能需要连接真实的摄像头API
-         /// </summary>
-    private async Task<bool> CapturePhotoAsync()
+    }
+
+    /// <summary>
+    /// 取一张图（摄像头或屏幕），保存到 <see cref="_lastCapturedImage"/>。失败时返回面向用户的错误文字。
+    /// </summary>
+    private async Task<(CapturedImage? Image, string? Error)> TryCaptureAsync(ImageCaptureSource source)
     {
+        if (_capture == null || !_capture.IsSupported(source))
+        {
+            return (null, source == ImageCaptureSource.Camera
+                ? "当前平台没有可用的摄像头，无法拍照"
+                : "当前平台不支持截取屏幕");
+        }
+
         try
         {
-            // 模拟拍照过程
-            // 在实际实现中，这里应该调用系统相机API或USB摄像头API
-            await Task.Delay(500); // 模拟拍照延迟
-
-            // 创建一个模拟的JPEG头部和简单图片数据
-            // 这是一个最小的有效JPEG文件字节数组（1x1像素的图片）
-            _lastCapturedImage = new byte[]
-            {
-                0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
-                0x01, 0x01, 0x00, 0x48, 0x00, 0x48, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43,
-                0x00, 0x08, 0x06, 0x06, 0x07, 0x06, 0x05, 0x08, 0x07, 0x07, 0x07, 0x09,
-                0x09, 0x08, 0x0A, 0x0C, 0x14, 0x0D, 0x0C, 0x0B, 0x0B, 0x0C, 0x19, 0x12,
-                0x13, 0x0F, 0x14, 0x1D, 0x1A, 0x1F, 0x1E, 0x1D, 0x1A, 0x1C, 0x1C, 0x20,
-                0x24, 0x2E, 0x27, 0x20, 0x22, 0x2C, 0x23, 0x1C, 0x1C, 0x28, 0x37, 0x29,
-                0x2C, 0x30, 0x31, 0x34, 0x34, 0x34, 0x1F, 0x27, 0x39, 0x3D, 0x38, 0x32,
-                0x3C, 0x2E, 0x33, 0x34, 0x32, 0xFF, 0xC0, 0x00, 0x11, 0x08, 0x00, 0x01,
-                0x00, 0x01, 0x01, 0x01, 0x11, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01,
-                0xFF, 0xC4, 0x00, 0x1F, 0x00, 0x00, 0x01, 0x05, 0x01, 0x01, 0x01, 0x01,
-                0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02,
-                0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0xFF, 0xC4, 0x00,
-                0xB5, 0x10, 0x00, 0x02, 0x01, 0x03, 0x03, 0x02, 0x04, 0x03, 0x05, 0x05,
-                0x04, 0x04, 0x00, 0x00, 0x01, 0x7D, 0x01, 0x02, 0x03, 0x00, 0x04, 0x11,
-                0x05, 0x12, 0x21, 0x31, 0x41, 0x06, 0x13, 0x51, 0x61, 0x07, 0x22, 0x71,
-                0x14, 0x32, 0x81, 0x91, 0xA1, 0x08, 0x23, 0x42, 0xB1, 0xC1, 0x15, 0x52,
-                0xD1, 0xF0, 0x24, 0x33, 0x62, 0x72, 0x82, 0x09, 0x0A, 0x16, 0x17, 0x18,
-                0x19, 0x1A, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x34, 0x35, 0x36, 0x37,
-                0x38, 0x39, 0x3A, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x53,
-                0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A, 0x63, 0x64, 0x65, 0x66, 0x67,
-                0x68, 0x69, 0x6A, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x83,
-                0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x8A, 0x92, 0x93, 0x94, 0x95, 0x96,
-                0x97, 0x98, 0x99, 0x9A, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xA8, 0xA9,
-                0xAA, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7, 0xB8, 0xB9, 0xBA, 0xC2, 0xC3,
-                0xC4, 0xC5, 0xC6, 0xC7, 0xC8, 0xC9, 0xCA, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6,
-                0xD7, 0xD8, 0xD9, 0xDA, 0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7, 0xE8,
-                0xE9, 0xEA, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7, 0xF8, 0xF9, 0xFA,
-                0xFF, 0xDA, 0x00, 0x0C, 0x03, 0x01, 0x00, 0x02, 0x11, 0x03, 0x11, 0x00,
-                0x3F, 0x00, 0xF2, 0x8A, 0x28, 0xAF, 0xC0, 0x0F, 0xFF, 0xD9
-            };
-
-            return true;
+            var image = await _capture.CaptureAsync(source).ConfigureAwait(false);
+            _lastCapturedImage = image.Data;
+            _lastCapturedMime = image.MimeType;
+            _deviceLogger?.LogInformation("{Source} 取图成功：{Width}x{Height}，{Kb}KB", source, image.Width, image.Height, image.Data.Length / 1024);
+            return (image, null);
+        }
+        catch (ImageCaptureException ex)
+        {
+            _deviceLogger?.LogWarning(ex, "{Source} 取图失败", source);
+            return (null, ex.Message);
         }
         catch (Exception ex)
         {
-            _deviceLogger?.LogError(ex, "拍照过程中发生异常");
-            return false;
+            _deviceLogger?.LogError(ex, "{Source} 取图异常", source);
+            return (null, $"取图失败：{ex.Message}");
         }
     }
 
     /// <summary>
     /// 使用AI解释照片 - 对应ESP32的Explain方法
     /// </summary>
+    private string RecordCapture()
+    {
+        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        SetState("last_capture_time", timestamp);
+        SetState("image_count", GetState<int>("image_count") + 1);
+        return timestamp;
+    }
+
+    private async Task<string> CaptureAndExplainAsync(ImageCaptureSource source, string question, string label)
+    {
+        try
+        {
+            var (image, error) = await TryCaptureAsync(source);
+            if (image == null)
+            {
+                return error ?? $"{label}失败";
+            }
+
+            RecordCapture();
+            var explanation = await ExplainPhotoAsync(question);
+            _deviceLogger?.LogInformation("{Label}分析完成，问题: {Question}", label, question);
+            return $"{label}分析结果：\n{explanation}";
+        }
+        catch (Exception ex)
+        {
+            _deviceLogger?.LogError(ex, "{Label}并分析时异常", label);
+            return $"操作异常: {ex.Message}";
+        }
+    }
+
     private async Task<string> ExplainPhotoAsync(string question)
     {
-        if (string.IsNullOrEmpty(_explainUrl))
-        {
-            return "AI解释服务未配置，请先设置解释服务URL";
-        }
-
         if (_lastCapturedImage == null || _lastCapturedImage.Length == 0)
         {
             return "没有可分析的照片，请先拍照";
+        }
+
+        // 优先使用 DeepSeek 图像理解；没有配置 Key 时回退到小智服务器的识图接口
+        if (_vision?.IsAvailable == true)
+        {
+            try
+            {
+                return await _vision.ExplainAsync(_lastCapturedImage, _lastCapturedMime, question).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _deviceLogger?.LogWarning(ex, "DeepSeek 图像理解失败");
+                return $"图像识别失败：{DescribeVisionError(ex)}";
+            }
+        }
+
+        return await ExplainWithXiaoZhiAsync(question).ConfigureAwait(false);
+    }
+
+    private static string DescribeVisionError(Exception ex) => ex switch
+    {
+        Verdure.Assistant.Core.Services.DeepSeek.DeepSeekApiException { IsAuthenticationError: true } => "API Key 无效",
+        Verdure.Assistant.Core.Services.DeepSeek.DeepSeekApiException { IsInsufficientBalance: true } => "账户余额不足",
+        Verdure.Assistant.Core.Services.DeepSeek.DeepSeekApiException { IsRateLimited: true } => "请求太频繁，请稍后再试",
+        TimeoutException => "请求超时",
+        HttpRequestException => "网络连接失败",
+        _ => ex.Message
+    };
+
+    private async Task<string> ExplainWithXiaoZhiAsync(string question)
+    {
+        if (string.IsNullOrEmpty(_explainUrl))
+        {
+            return "图像识别未配置：请在 DeepSeek 页面设置 API Key，或配置小智识图服务";
         }
 
         try
@@ -595,7 +614,7 @@ public class McpCameraDevice : McpIoTDevice
 
             // 添加图片文件
             var imageContent = new ByteArrayContent(_lastCapturedImage);
-            imageContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
+            imageContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(_lastCapturedMime ?? "image/jpeg");
             content.Add(imageContent, "file", "camera.jpg");
 
             // 设置请求头 - 对应ESP32的设备ID和客户端ID

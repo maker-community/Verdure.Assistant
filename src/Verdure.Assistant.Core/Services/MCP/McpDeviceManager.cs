@@ -18,6 +18,8 @@ namespace Verdure.Assistant.Core.Services.MCP
         private readonly McpServer _mcpServer;
         private readonly IMusicPlayerService? _musicPlayerService;
         private readonly Dictionary<string, McpIoTDevice> _devices;
+        private readonly IImageCaptureService? _imageCapture;
+        private readonly IVisionService? _vision;
         private readonly Dictionary<string, McpTool> _deviceTools;
         private bool _disposed = false;
 
@@ -28,11 +30,14 @@ namespace Verdure.Assistant.Core.Services.MCP
         public IReadOnlyDictionary<string, McpIoTDevice> Devices => _devices;
         public IReadOnlyDictionary<string, McpTool> DeviceTools => _deviceTools;
 
-        public McpDeviceManager(ILogger<McpDeviceManager> logger, McpServer mcpServer, IMusicPlayerService? musicPlayerService = null)
+        public McpDeviceManager(ILogger<McpDeviceManager> logger, McpServer mcpServer, IMusicPlayerService? musicPlayerService = null,
+            IImageCaptureService? imageCapture = null, IVisionService? vision = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _mcpServer = mcpServer ?? throw new ArgumentNullException(nameof(mcpServer));
             _musicPlayerService = musicPlayerService;
+            _imageCapture = imageCapture;
+            _vision = vision;
             _devices = new Dictionary<string, McpIoTDevice>();
             _deviceTools = new Dictionary<string, McpTool>();
 
@@ -68,7 +73,7 @@ namespace Verdure.Assistant.Core.Services.MCP
             //var lamp = new McpLampDevice(_mcpServer, null);
             //var speaker = new McpSpeakerDevice(_mcpServer, null);
             var musicPlayer = new McpMusicPlayerDevice(_mcpServer, _musicPlayerService, null);
-            var camera = new McpCameraDevice(_mcpServer, null);
+            var camera = new McpCameraDevice(_mcpServer, null, _imageCapture, _vision);
 
             // Add devices
             //await AddDeviceAsync(lamp);
