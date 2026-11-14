@@ -1,15 +1,19 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Windows.AppLifecycle;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Services;
+using Verdure.Assistant.Core.Services.DeepSeek;
+using Verdure.Assistant.Core.Services.DeepSeek.Speech;
 using Verdure.Assistant.Core.Services.MCP;
 using Verdure.Assistant.Core.Services.Interrupt;
 using Verdure.Assistant.ViewModels;
 using Verdure.Assistant.WinUI.Services;
 using Verdure.Assistant.WinUI.Views;
 using Windows.Storage;
+using WinUIEx;
 
 namespace Verdure.Assistant.WinUI;
 
@@ -18,12 +22,22 @@ namespace Verdure.Assistant.WinUI;
 /// </summary>
 public partial class App : Application
 {
+    private const string SingleInstanceKey = "Verdure.Assistant.Main";
+
     private IHost? _host;
+    private ILogger<App>? _log;
+    private bool _shutdownDone;
 
     /// <summary>
     /// Gets the main window instance
     /// </summary>
     public static Window? MainWindow { get; private set; }
+
+    /// <summary>
+    /// 启动阶段状态（供主窗口展示加载/降级/失败信息）
+    /// </summary>
+    public static StartupStatusService Startup { get; } = new();
+
     /// <summary>
     /// Initializes the singleton application object.  This is the first line of authored code
     /// executed, and as such is the logical equivalent of main() or WinMain().
@@ -31,6 +45,10 @@ public partial class App : Application
     public App()
     {
         InitializeComponent();
+
+        UnhandledException += OnUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
     }
 
     /// <summary>
@@ -39,35 +57,266 @@ public partial class App : Application
     /// <param name="args">Details about the launch request and process.</param>
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
-        // Configure services
-        _host = Host.CreateDefaultBuilder()
-            .ConfigureServices(ConfigureServices)
-            .Build();
-
-        // Start the host
-        await _host.StartAsync();
-
-        MainWindow = new MainWindow();
-        MainWindow.Activate();
-        // Initialize theme service after window is created
-        var themeService = GetService<ThemeService>();
-        if (themeService != null)
+        try
         {
-            await themeService.InitializeAsync();
-            themeService.StartSystemThemeListener();
-        }        // Initialize MCP device management (based on xiaozhi-esp32 architecture)
-        await InitializeMcpDevicesAsync();
+            // 同一时间只允许一个实例：两个进程同时占用麦克风/唤醒词模型会互相冲突
+            if (!await EnsureSingleInstanceAsync())
+            {
+                Exit();
+                return;
+            }
+
+            // 构建（但还不启动）宿主，先把窗口显示出来，慢操作放到窗口显示之后
+            _host = Host.CreateDefaultBuilder()
+                .ConfigureServices(ConfigureServices)
+                .Build();
+            _log = GetService<ILogger<App>>();
+            _log?.LogInformation("Verdure.Assistant 启动 (packaged: {Packaged})", IsPackaged());
+
+            Startup.Report(StartupPhase.Starting, "正在启动…");
+
+            MainWindow = new MainWindow();
+            MainWindow.Closed += OnMainWindowClosed;
+            MainWindow.Activate();
+
+            await StartServicesAsync();
+        }
+        catch (Exception ex)
+        {
+            _log?.LogCritical(ex, "应用启动失败");
+            Startup.Report(StartupPhase.Failed, $"启动失败：{ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 启动后台服务（宿主、主题、MCP 设备）。每一步独立容错：某一步失败时应用降级运行并给出提示，而不是崩溃。
+    /// 也供界面上的"重试"按钮调用。
+    /// </summary>
+    public static Task RetryStartupAsync()
+        => Current is App app ? app.StartServicesAsync() : Task.CompletedTask;
+
+    private async Task StartServicesAsync()
+    {
+        var failures = new List<string>();
+
+        try
+        {
+            if (_host != null)
+            {
+                await _host.StartAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.LogError(ex, "启动宿主服务失败");
+            failures.Add("后台服务");
+        }
+
+        try
+        {
+            var themeService = GetService<ThemeService>();
+            if (themeService != null)
+            {
+                await themeService.InitializeAsync();
+                themeService.StartSystemThemeListener();
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.LogError(ex, "初始化主题失败");
+            failures.Add("主题");
+        }
+
+        // Initialize MCP device management (based on xiaozhi-esp32 architecture)
+        if (!await InitializeMcpDevicesAsync())
+        {
+            failures.Add("设备控制(MCP)");
+        }
+
+        if (failures.Count == 0)
+        {
+            Startup.Report(StartupPhase.Ready, string.Empty);
+        }
+        else
+        {
+            Startup.Report(StartupPhase.Degraded, $"部分功能未能启动：{string.Join("、", failures)}。应用仍可使用，可点击重试。");
+        }
+    }
+
+    private static bool IsPackaged()
+    {
+        try
+        {
+            _ = Windows.ApplicationModel.Package.Current.Id;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task<bool> EnsureSingleInstanceAsync()
+    {
+        try
+        {
+            var mainInstance = AppInstance.FindOrRegisterForKey(SingleInstanceKey);
+            if (mainInstance.IsCurrent)
+            {
+                mainInstance.Activated += OnRedirectedActivation;
+                return true;
+            }
+
+            // 在线程池线程上重定向，避免在 UI(STA) 线程上等待造成死锁
+            var activation = AppInstance.GetCurrent().GetActivatedEventArgs();
+            await Task.Run(() => mainInstance.RedirectActivationToAsync(activation).AsTask());
+            return false;
+        }
+        catch (Exception ex)
+        {
+            // 单实例检测本身失败时不要阻止应用启动
+            System.Diagnostics.Debug.WriteLine($"Single-instance check failed: {ex.Message}");
+            return true;
+        }
+    }
+
+    private void OnRedirectedActivation(object? sender, AppActivationArguments e)
+    {
+        if (MainWindow is not WindowEx window)
+        {
+            return;
+        }
+
+        window.DispatcherQueue.TryEnqueue(() =>
+        {
+            try
+            {
+                window.Show();
+                window.BringToFront();
+            }
+            catch (Exception ex)
+            {
+                _log?.LogDebug(ex, "激活已有窗口失败");
+            }
+        });
+    }
+
+    private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
+    {
+        _log?.LogError(e.Exception, "未处理的界面异常: {Message}", e.Message);
+        // 尽量让应用继续运行，并把问题告诉用户，而不是静默崩溃
+        e.Handled = true;
+        Startup.Report(StartupPhase.Degraded, $"发生未处理的错误：{e.Exception?.Message ?? e.Message}");
+    }
+
+    private void OnDomainUnhandledException(object? sender, System.UnhandledExceptionEventArgs e)
+    {
+        _log?.LogCritical(e.ExceptionObject as Exception, "未处理的域异常 (终止: {Terminating})", e.IsTerminating);
+    }
+
+    private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        _log?.LogError(e.Exception, "未被观察的任务异常");
+        e.SetObserved();
+    }
+
+    private void OnMainWindowClosed(object sender, WindowEventArgs args)
+    {
+        if (_shutdownDone)
+        {
+            return;
+        }
+        _shutdownDone = true;
+
+        // 有序关闭：先停录音/唤醒词/连接，再释放宿主。总等待不超过几秒，避免进程残留在后台占用麦克风
+        try
+        {
+            Task.Run(async () =>
+            {
+                try
+                {
+                    var deepSeekVoice = GetService<DeepSeekVoiceChatService>();
+                    if (deepSeekVoice != null)
+                    {
+                        await deepSeekVoice.StopAsync().WaitAsync(TimeSpan.FromSeconds(3));
+                    }
+
+                    var voice = GetService<IVoiceChatService>();
+                    if (voice != null)
+                    {
+                        await voice.DisconnectAsync().WaitAsync(TimeSpan.FromSeconds(3));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log?.LogWarning(ex, "关闭语音服务时出错");
+                }
+
+                try
+                {
+                    if (_host != null)
+                    {
+                        await _host.StopAsync(TimeSpan.FromSeconds(2));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log?.LogWarning(ex, "停止宿主时出错");
+                }
+            }).Wait(TimeSpan.FromSeconds(6));
+        }
+        catch (Exception ex)
+        {
+            _log?.LogWarning(ex, "应用关闭流程出错");
+        }
+        finally
+        {
+            try { _host?.Dispose(); } catch (Exception ex) { _log?.LogDebug(ex, "释放宿主时出错"); }
+        }
     }
     private void ConfigureServices(IServiceCollection services)
     {
-        // Logging
+        // Logging：控制台/调试输出 + 滚动文件日志（便于排查现场问题）
         services.AddLogging(builder =>
         {
             builder.AddConsole();
             builder.AddDebug();
+            builder.AddProvider(new FileLoggerProvider(FileLoggerProvider.DefaultDirectory));
             builder.SetMinimumLevel(LogLevel.Debug);
-        });        // Settings services
-        services.AddSingleton<ISettingsService<AppSettings>, WindowsSettingsService<AppSettings>>();
+        });
+
+        // 启动状态与机密存储
+        services.AddSingleton(Startup);
+        services.AddSingleton<ISecretStore, PasswordVaultSecretStore>();
+        services.AddSingleton<WinUISpeechService>();
+
+        // DeepSeek：客户端/选项为单例，会话为单例（跨页面导航保留上下文），本地 MCP 工具可开关
+        services.AddDeepSeek();
+        services.AddDeepSeekMcpTools();
+        services.AddSingleton(sp => new SwitchableToolExecutor(sp.GetService<IDeepSeekToolExecutor>()));
+        services.AddSingleton(sp => new DeepSeekChatSession(
+            sp.GetRequiredService<IDeepSeekClient>(),
+            sp.GetRequiredService<DeepSeekOptions>(),
+            sp.GetRequiredService<SwitchableToolExecutor>(),
+            sp.GetService<ILogger<DeepSeekChatSession>>()));
+        services.AddSingleton<DeepSeekChatViewModel>();
+        services.AddTransient<DeepSeekChatPage>();
+
+        // 语音后端：DeepSeek 语音对话 + 小智之间的协调（唤醒词/连续对话/按住说话路由）
+        services.AddSingleton<DeepSeekVoiceChatService>();
+        services.AddSingleton<VoiceBackendCoordinator>();
+
+        // Settings services：打包运行用 ApplicationData；未打包运行（winapp run -p WindowsPackageType=None 等）没有包标识，
+        // 访问 ApplicationData 会抛异常，因此改用基于文件的设置存储
+        if (IsPackaged())
+        {
+            services.AddSingleton<ISettingsService<AppSettings>, WindowsSettingsService<AppSettings>>();
+        }
+        else
+        {
+            services.AddSingleton<ISettingsService<AppSettings>>(sp =>
+                new FileBasedSettingsService<AppSettings>(null, sp.GetService<ILogger<FileBasedSettingsService<AppSettings>>>()));
+        }
 
         // Theme service
         services.AddSingleton<ThemeService>();
@@ -96,6 +345,9 @@ public partial class App : Application
             }
             return new WinUIDispatcher(dispatcherQueue);
         });
+
+        // 摄像头拍照 / 屏幕截图（供 AI 工具与 DeepSeek 页使用）
+        services.AddSingleton<IImageCaptureService, WinUIImageCaptureService>();
 
         // Voice chat service
         services.AddSingleton<IVoiceChatService, VoiceChatService>();
@@ -128,7 +380,7 @@ public partial class App : Application
     /// <summary>
     /// Initialize MCP devices and setup integration (based on xiaozhi-esp32 architecture)
     /// </summary>
-    private async Task InitializeMcpDevicesAsync()
+    private async Task<bool> InitializeMcpDevicesAsync()
     {
         try
         {
@@ -145,13 +397,13 @@ public partial class App : Application
             if (mcpServer == null || mcpDeviceManager == null)
             {
                 logger?.LogError("Required MCP services not found");
-                return;
+                return false;
             }
 
             if (voiceChatService == null)
             {
                 logger?.LogError("VoiceChatService not found");
-                return;
+                return false;
             }
 
             // VoiceChatService now gets music player service via constructor injection
@@ -166,14 +418,23 @@ public partial class App : Application
             await mcpDeviceManager.InitializeAsync();
             logger?.LogInformation("MCP服务器已初始化");
 
+            // 尽早创建语音后端协调器：它负责给唤醒词安装路由，并读取上次选择的对话后端
+            var backend = GetService<VoiceBackendCoordinator>();
+            if (backend != null)
+            {
+                await backend.InitializeAsync();
+            }
+
             logger?.LogInformation("MCP集成服务已设置到语音聊天服务");
 
             logger?.LogInformation("MCP设备初始化完成");
+            return true;
         }
         catch (Exception ex)
         {
             var logger = GetService<ILogger<App>>();
             logger?.LogError(ex, "MCP设备初始化失败");
+            return false;
         }
     }
 

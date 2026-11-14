@@ -6,70 +6,101 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:winuiex="using:WinUIEx"
-    Title="绿荫助手AI客户端"
+    Title="绿荫助手"
+    Width="1280"
+    Height="860"
+    MinWidth="760"
+    MinHeight="600"
     mc:Ignorable="d">
 
     <winuiex:WindowEx.SystemBackdrop>
         <MicaBackdrop Kind="Base" />
     </winuiex:WindowEx.SystemBackdrop>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!--  Custom Title Bar  -->
-        <!--<Grid x:Name="TitleBarGrid" Grid.Row="0" Height="32" Background="Transparent">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-
-        -->
-        <!--  Logo and Title  -->
-        <!--
-            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
-                <Image Source="ms-appx:///Assets/logo.png" Width="20" Height="20" Margin="0,0,8,0" />
-                <TextBlock Text="绿荫助手AI客户端"
-                          VerticalAlignment="Center"
-                          FontSize="14"
-                          FontWeight="SemiBold"
-                          Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-            </StackPanel>
-
-        -->
-        <!--  Drag Region  -->
-        <!--
-            <Border Grid.Column="1" Background="Transparent" />
-        </Grid>-->
-        <!--  Navigation Header  -->
-        <Border
+        <!--  自定义标题栏：图标 + 名称，其余区域可拖动  -->
+        <Grid
+            x:Name="AppTitleBar"
             Grid.Row="0"
-            Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
-            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-            BorderThickness="0,0,0,1">
-            <NavigationView
-                x:Name="MainNavigationView"
-                IsPaneToggleButtonVisible="False"
-                IsSettingsVisible="True"
-                PaneDisplayMode="Top"
-                SelectedItem="{x:Bind ViewModel.SelectedNavigationItem, Mode=OneWay}"
-                SelectionChanged="MainNavigationView_SelectionChanged">
-                <NavigationView.MenuItems>
-                    <NavigationViewItem
-                        x:Name="MainPageNavItem"
-                        x:Uid="MainPageNavItem"
-                        Content="主页"
-                        Icon="Message"
-                        Tag="HomePage" />
-                </NavigationView.MenuItems>
-            </NavigationView>
-        </Border>
-        <!--  Main Content Frame  -->
-        <Frame
-            x:Name="ContentFrame"
+            Height="40">
+            <StackPanel
+                Margin="14,0,0,0"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="10">
+                <Image
+                    Width="18"
+                    Height="18"
+                    Source="ms-appx:///Assets/logo.png" />
+                <TextBlock
+                    VerticalAlignment="Center"
+                    FontSize="12"
+                    Text="绿荫助手" />
+            </StackPanel>
+        </Grid>
+
+        <NavigationView
+            x:Name="MainNavigationView"
             Grid.Row="1"
-            Navigated="ContentFrame_Navigated" />
+            IsBackButtonVisible="Collapsed"
+            IsPaneOpen="False"
+            IsSettingsVisible="True"
+            OpenPaneLength="220"
+            PaneDisplayMode="LeftCompact"
+            SelectedItem="{x:Bind ViewModel.SelectedNavigationItem, Mode=OneWay}"
+            SelectionChanged="MainNavigationView_SelectionChanged">
+            <NavigationView.MenuItems>
+                <NavigationViewItem
+                    x:Name="MainPageNavItem"
+                    Content="语音助手"
+                    Tag="HomePage">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE720;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem
+                    x:Name="DeepSeekNavItem"
+                    Content="DeepSeek 对话"
+                    Tag="DeepSeekPage">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8BD;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+
+            <Grid>
+                <Frame
+                    x:Name="ContentFrame"
+                    HorizontalContentAlignment="Stretch"
+                    VerticalContentAlignment="Stretch"
+                    Navigated="ContentFrame_Navigated" />
+
+                <!--  启动状态：加载 / 降级 / 失败  -->
+                <StackPanel VerticalAlignment="Top">
+                    <ProgressBar
+                        x:Name="StartupProgress"
+                        IsIndeterminate="True"
+                        Visibility="Collapsed" />
+                    <InfoBar
+                        x:Name="StartupInfoBar"
+                        Margin="24,8,24,0"
+                        IsClosable="True"
+                        IsOpen="False">
+                        <InfoBar.ActionButton>
+                            <Button
+                                x:Name="StartupRetryButton"
+                                Click="StartupRetryButton_Click"
+                                Content="重试"
+                                Visibility="Collapsed" />
+                        </InfoBar.ActionButton>
+                    </InfoBar>
+                </StackPanel>
+            </Grid>
+        </NavigationView>
     </Grid>
 </winuiex:WindowEx>

@@ -46,5 +46,10 @@
 
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
+    <Capability Name="internetClient" />
+    <!-- 语音助手需要麦克风；缺少该声明时，打包运行的应用在初始化音频采集设备时可能被系统静默拦截或挂起 -->
+    <DeviceCapability Name="microphone" />
+    <!-- 摄像头拍照（让 AI 看眼前的东西）；首次使用时系统会弹出授权 -->
+    <DeviceCapability Name="webcam" />
   </Capabilities>
 </Package>

@@ -43,7 +43,9 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.WindowsAppSDK"  />
         <PackageReference Include="Microsoft.Web.WebView2"  />
-        <PackageReference Include="Microsoft.Windows.SDK.BuildTools"  />        
+        <PackageReference Include="Microsoft.Windows.SDK.BuildTools"  />
+        <!-- winapp CLI 支持：`dotnet run` / `winapp run` 以包标识(identity)启动应用，详见 docs/WINUI_WINAPP_CLI.md -->
+        <PackageReference Include="Microsoft.Windows.SDK.BuildTools.WinApp" PrivateAssets="all" />
         <PackageReference Include="Microsoft.Extensions.Hosting"  />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug"  />
         <PackageReference Include="Microsoft.Extensions.Configuration.Json"  />        

@@ -1,0 +1,446 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="Verdure.Assistant.WinUI.Views.DeepSeekChatPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:conv="using:Verdure.Assistant.WinUI.Converters"
+    xmlns:vm="using:Verdure.Assistant.ViewModels"
+    mc:Ignorable="d"
+    NavigationCacheMode="Required">
+
+    <Grid x:Name="PageRoot" SizeChanged="PageRoot_SizeChanged">
+    <Grid
+        x:Name="Column"
+        Padding="28,20,28,20"
+        HorizontalAlignment="Center"
+        RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!--  Header  -->
+        <Grid Grid.Row="0" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="6">
+                <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="DeepSeek 对话" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Border
+                        Padding="10,3"
+                        Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                        CornerRadius="10">
+                        <TextBlock FontSize="12" Text="{x:Bind ViewModel.Model, Mode=OneWay}" />
+                    </Border>
+                    <Border
+                        Padding="10,3"
+                        Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                        CornerRadius="10">
+                        <TextBlock FontSize="12" Text="{x:Bind conv:UiFormat.ThinkingChip(ViewModel.ThinkingEnabled, ViewModel.ReasoningEffort), Mode=OneWay}" />
+                    </Border>
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        FontSize="12"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{x:Bind ViewModel.StatusText, Mode=OneWay}" />
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        FontSize="12"
+                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                        Text="{x:Bind ViewModel.BalanceText, Mode=OneWay}" />
+                </StackPanel>
+            </StackPanel>
+            <StackPanel
+                Grid.Column="1"
+                Orientation="Horizontal"
+                Spacing="8">
+                <Button Command="{x:Bind ViewModel.NewChatCommand}" ToolTipService.ToolTip="开始新的对话">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon FontSize="14" Glyph="&#xE710;" />
+                        <TextBlock Text="新对话" />
+                    </StackPanel>
+                </Button>
+                <Button Command="{x:Bind ViewModel.ToggleSettingsCommand}" ToolTipService.ToolTip="API 与模型设置">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon FontSize="14" Glyph="&#xE713;" />
+                        <TextBlock Text="设置" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!--  Settings panel  -->
+        <Border
+            Grid.Row="1"
+            Padding="16"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="12"
+            Visibility="{x:Bind ViewModel.IsSettingsOpen, Mode=OneWay}">
+            <ScrollViewer MaxHeight="400" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="12" Padding="0,0,12,0">
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <PasswordBox
+                        Header="API Key（保存在 Windows 凭据库）"
+                        Password="{x:Bind ViewModel.ApiKeyInput, Mode=TwoWay}"
+                        PlaceholderText="sk-…（留空表示不修改）" />
+                    <TextBox
+                        Grid.Column="1"
+                        Header="API 地址"
+                        Text="{x:Bind ViewModel.BaseUrl, Mode=TwoWay}" />
+                </Grid>
+
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <ComboBox
+                        HorizontalAlignment="Stretch"
+                        Header="模型"
+                        ItemsSource="{x:Bind vm:DeepSeekChatViewModel.ModelChoices}"
+                        SelectedItem="{x:Bind ViewModel.Model, Mode=TwoWay}" />
+                    <ComboBox
+                        Grid.Column="1"
+                        HorizontalAlignment="Stretch"
+                        Header="思考强度"
+                        IsEnabled="{x:Bind ViewModel.ThinkingEnabled, Mode=OneWay}"
+                        ItemsSource="{x:Bind vm:DeepSeekChatViewModel.EffortChoices}"
+                        SelectedItem="{x:Bind ViewModel.ReasoningEffort, Mode=TwoWay}" />
+                    <ToggleSwitch
+                        Grid.Column="2"
+                        Header="思考模式"
+                        IsOn="{x:Bind ViewModel.ThinkingEnabled, Mode=TwoWay}" />
+                </Grid>
+
+                <StackPanel Orientation="Horizontal" Spacing="24">
+                    <ToggleSwitch Header="联网搜索" IsOn="{x:Bind ViewModel.EnableWebSearch, Mode=TwoWay}" />
+                    <ToggleSwitch Header="本地工具（音乐/设备）" IsOn="{x:Bind ViewModel.EnableTools, Mode=TwoWay}" />
+                    <ToggleSwitch Header="朗读回复" IsOn="{x:Bind ViewModel.SpeakReplies, Mode=TwoWay}" />
+                    <ComboBox
+                        Header="语音音色（DeepSeek）"
+                        MinWidth="140"
+                        ItemsSource="{x:Bind vm:DeepSeekChatViewModel.VoiceChoices}"
+                        SelectedItem="{x:Bind ViewModel.VoiceId, Mode=TwoWay}" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Spacing="24">
+                    <ToggleSwitch
+                        Header="语音对话时思考（更慢）"
+                        IsOn="{x:Bind ViewModel.VoiceThinking, Mode=TwoWay}"
+                        ToolTipService.ToolTip="关闭后回复更快：思考模式会让第一个回答字晚几秒才出现" />
+                    <Slider
+                        Width="300"
+                        Header="说完后等待多久再识别（毫秒）"
+                        Maximum="1500"
+                        Minimum="400"
+                        StepFrequency="50"
+                        ToolTipService.ToolTip="越小回复越快，但说话中间的停顿可能被当成说完；环境嘈杂时可适当调大"
+                        Value="{x:Bind ViewModel.VoiceEndSilenceMs, Mode=TwoWay}" />
+                    <ComboBox
+                        MinWidth="120"
+                        Header="环境噪声"
+                        ItemsSource="{x:Bind vm:DeepSeekChatViewModel.NoiseLevelChoices}"
+                        SelectedIndex="{x:Bind ViewModel.VoiceNoiseLevel, Mode=TwoWay}"
+                        ToolTipService.ToolTip="环境吵（键盘声、旁人说话、风扇）时选“嘈杂”，一句话不会被杂音越拖越长" />
+                </StackPanel>
+
+                <TextBox
+                    AcceptsReturn="True"
+                    Header="系统提示词（留空使用内置的“绿荫助手”）"
+                    MaxHeight="120"
+                    MinHeight="64"
+                    Text="{x:Bind ViewModel.SystemPrompt, Mode=TwoWay}"
+                    TextWrapping="Wrap" />
+
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button
+                        Command="{x:Bind ViewModel.SaveSettingsCommand}"
+                        Content="保存"
+                        Style="{StaticResource AccentButtonStyle}" />
+                    <Button Command="{x:Bind ViewModel.ClearApiKeyCommand}" Content="清除 API Key" />
+                    <Button Command="{x:Bind ViewModel.RefreshBalanceCommand}" Content="刷新余额" />
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{x:Bind ViewModel.SettingsMessage, Mode=OneWay}" />
+                </StackPanel>
+            </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!--  Conversation  -->
+        <Grid Grid.Row="2">
+            <!--  空状态：欢迎语 + 快捷提问  -->
+            <StackPanel
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Spacing="14"
+                Visibility="{x:Bind conv:UiFormat.ShowWhenZero(ViewModel.Messages.Count), Mode=OneWay}">
+                <Border
+                    Width="64"
+                    Height="64"
+                    HorizontalAlignment="Center"
+                    Background="{ThemeResource AccentFillColorDefaultBrush}"
+                    CornerRadius="32">
+                    <FontIcon
+                        FontSize="28"
+                        Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                        Glyph="&#xE8BD;" />
+                </Border>
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    Style="{StaticResource TitleTextBlockStyle}"
+                    Text="你好，我是绿荫助手" />
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="由 DeepSeek 驱动，可以思考、联网搜索，也能帮你控制音乐和设备" />
+                <StackPanel
+                    HorizontalAlignment="Center"
+                    Orientation="Horizontal"
+                    Spacing="8">
+                    <Button
+                        Command="{x:Bind ViewModel.UseSuggestionCommand}"
+                        CommandParameter="用三句话介绍一下你能做什么"
+                        Content="你能做什么？" />
+                    <Button
+                        Command="{x:Bind ViewModel.UseSuggestionCommand}"
+                        CommandParameter="帮我播放一首轻松的歌"
+                        Content="播放一首轻松的歌" />
+                    <Button
+                        Command="{x:Bind ViewModel.UseSuggestionCommand}"
+                        CommandParameter="给我讲一个简短的冷知识"
+                        Content="讲个冷知识" />
+                </StackPanel>
+            </StackPanel>
+
+        <ListView
+            x:Name="MessagesList"
+            ItemsSource="{x:Bind ViewModel.Messages}"
+            SelectionMode="None"
+            Visibility="{x:Bind conv:UiFormat.ShowWhenAny(ViewModel.Messages.Count), Mode=OneWay}">
+            <ListView.ItemContainerStyle>
+                <Style BasedOn="{StaticResource DefaultListViewItemStyle}" TargetType="ListViewItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    <Setter Property="Padding" Value="0" />
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="vm:DeepSeekMessageItem">
+                    <Grid Margin="0,6">
+                        <!--  User bubble  -->
+                        <Border
+                            MaxWidth="640"
+                            Padding="14,10"
+                            HorizontalAlignment="Right"
+                            Background="{ThemeResource AccentFillColorDefaultBrush}"
+                            CornerRadius="12"
+                            Visibility="{x:Bind IsUser}">
+                            <StackPanel Spacing="6">
+                                <TextBlock
+                                    Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                                    IsTextSelectionEnabled="True"
+                                    Text="{x:Bind Content, Mode=OneWay}"
+                                    TextWrapping="Wrap"
+                                    Visibility="{x:Bind HasContent, Mode=OneWay}" />
+                                <TextBlock
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextOnAccentFillColorSecondaryBrush}"
+                                    Text="{x:Bind ImageNote, Mode=OneWay}"
+                                    Visibility="{x:Bind HasImageNote, Mode=OneWay}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!--  Assistant card  -->
+                        <StackPanel
+                            MaxWidth="760"
+                            HorizontalAlignment="Left"
+                            Spacing="6"
+                            Visibility="{x:Bind IsAssistant}">
+                            <Expander
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Stretch"
+                                Header="思考过程"
+                                IsExpanded="{x:Bind IsReasoningExpanded, Mode=TwoWay}"
+                                Visibility="{x:Bind HasReasoning, Mode=OneWay}">
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    IsTextSelectionEnabled="True"
+                                    Text="{x:Bind Reasoning, Mode=OneWay}"
+                                    TextWrapping="Wrap" />
+                            </Expander>
+
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{x:Bind ToolSummary, Mode=OneWay}"
+                                TextWrapping="Wrap"
+                                Visibility="{x:Bind HasTools, Mode=OneWay}" />
+
+                            <Border
+                                Padding="14,10"
+                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Visibility="{x:Bind HasContent, Mode=OneWay}">
+                                <TextBlock
+                                    IsTextSelectionEnabled="True"
+                                    Text="{x:Bind Content, Mode=OneWay}"
+                                    TextWrapping="Wrap" />
+                            </Border>
+
+                            <ProgressRing
+                                Width="20"
+                                Height="20"
+                                HorizontalAlignment="Left"
+                                IsActive="{x:Bind IsStreaming, Mode=OneWay}" />
+
+                            <TextBlock
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                Text="{x:Bind UsageText, Mode=OneWay}" />
+                            <TextBlock
+                                FontSize="12"
+                                Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                                Text="{x:Bind Footnote, Mode=OneWay}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+        </Grid>
+
+        <!--  Input  -->
+        <Border
+            Grid.Row="3"
+            Padding="12,8,8,8"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="12">
+        <StackPanel Spacing="8">
+            <ItemsControl
+                ItemsSource="{x:Bind ViewModel.Attachments}"
+                Visibility="{x:Bind ViewModel.HasAttachments, Mode=OneWay}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="8" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:AttachedImageItem">
+                        <Border
+                            Padding="10,4,4,4"
+                            Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                            CornerRadius="14">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontSize="13" Glyph="&#xEB9F;" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    FontSize="12"
+                                    Text="{x:Bind Label}" />
+                                <Button
+                                    Padding="4"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Click="RemoveAttachment_Click"
+                                    Tag="{x:Bind}"
+                                    ToolTipService.ToolTip="移除">
+                                    <FontIcon FontSize="10" Glyph="&#xE711;" />
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        <Grid ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox
+                x:Name="InputBox"
+                AcceptsReturn="True"
+                Background="Transparent"
+                BorderThickness="0"
+                KeyDown="InputBox_KeyDown"
+                MaxHeight="140"
+                Paste="InputBox_Paste"
+                PlaceholderText="输入消息，Enter 发送，Shift+Enter 换行；可粘贴图片或点击右侧添加图片"
+                Text="{x:Bind ViewModel.InputText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Column="1"
+                VerticalAlignment="Bottom"
+                Orientation="Horizontal"
+                Spacing="8">
+                <Button
+                    AutomationProperties.Name="添加图片"
+                    Click="AttachButton_Click"
+                    ToolTipService.ToolTip="添加图片（DeepSeek 图像理解）">
+                    <FontIcon FontSize="14" Glyph="&#xE723;" />
+                </Button>
+                <Button
+                    AutomationProperties.Name="摄像头拍照"
+                    Command="{x:Bind ViewModel.CaptureCameraCommand}"
+                    ToolTipService.ToolTip="用摄像头拍一张照片作为图片"
+                    Visibility="{x:Bind ViewModel.CanCaptureCamera}">
+                    <FontIcon FontSize="14" Glyph="&#xE722;" />
+                </Button>
+                <Button
+                    AutomationProperties.Name="截取屏幕"
+                    Command="{x:Bind ViewModel.CaptureScreenCommand}"
+                    ToolTipService.ToolTip="截取当前屏幕作为图片"
+                    Visibility="{x:Bind ViewModel.CanCaptureScreen}">
+                    <FontIcon FontSize="14" Glyph="&#xE7F4;" />
+                </Button>
+                <TextBlock
+                    VerticalAlignment="Center"
+                    FontSize="12"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="{x:Bind ViewModel.VoiceStatusText, Mode=OneWay}"
+                    Visibility="{x:Bind conv:UiFormat.HasText(ViewModel.VoiceStatusText), Mode=OneWay}" />
+                <Button
+                    Command="{x:Bind ViewModel.ToggleVoiceCommand}"
+                    ToolTipService.ToolTip="用麦克风和 DeepSeek 连续语音对话（DeepSeek 语音识别 + 回复 + 语音合成）"
+                    Visibility="{x:Bind ViewModel.IsVoiceAvailable}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon FontSize="14" Glyph="{x:Bind conv:UiFormat.VoiceButtonGlyph(ViewModel.IsVoiceActive), Mode=OneWay}" />
+                        <TextBlock Text="{x:Bind conv:UiFormat.VoiceButtonText(ViewModel.IsVoiceActive), Mode=OneWay}" />
+                    </StackPanel>
+                </Button>
+                <Button
+                    AutomationProperties.Name="停止"
+                    Command="{x:Bind ViewModel.StopCommand}"
+                    Content="停止"
+                    Visibility="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
+                <Button
+                    AutomationProperties.Name="发送"
+                    Command="{x:Bind ViewModel.SendCommand}"
+                    Style="{StaticResource AccentButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon FontSize="14" Glyph="&#xE724;" />
+                        <TextBlock Text="发送" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+        </StackPanel>
+        </Border>
+    </Grid>
+    </Grid>
+</Page>

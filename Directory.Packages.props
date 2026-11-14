@@ -32,6 +32,8 @@
     <!-- Microsoft Web and Windows -->
     <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.3856.49" />
     <PackageVersion Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7705" />
+    <!-- winapp CLI：让 `dotnet run` 以包标识启动打包的 WinUI 应用 -->
+    <PackageVersion Include="Microsoft.Windows.SDK.BuildTools.WinApp" Version="0.8.0" />
     <PackageVersion Include="Microsoft.WindowsAppSDK" Version="1.8.260317003" />
     <PackageVersion Include="Microsoft.Xaml.Behaviors.WinUI.Managed" Version="3.0.1" />
     <!-- Audio -->

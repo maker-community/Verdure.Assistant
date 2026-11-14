@@ -42,17 +42,49 @@ public sealed partial class HomePage : Page
         // 订阅新的渲染器事件
         BindRendererEvents();
 
-        // 初始化ViewModel
-        _ = _viewModel.InitializeAsync();
+        // 初始化ViewModel（页面启用了导航缓存，只会构造一次；失败时给出提示而不是让异常悄悄丢失）
+        _ = InitializeViewModelAsync();
 
         // 页面加载时初始化UI状态
         this.Loaded += OnPageLoaded;
     }
 
+    private async Task InitializeViewModelAsync()
+    {
+        try
+        {
+            await _viewModel.InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "主页初始化失败");
+            App.Startup.Report(Services.StartupPhase.Degraded, $"语音服务初始化失败：{ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 内容区最大 1320 宽并水平居中。显式设置宽度（而不是 MaxWidth + Stretch），避免在导航缓存页面里出现偏移。
+    /// </summary>
+    private void PageRoot_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var available = e.NewSize.Width;
+        if (available <= 0)
+        {
+            return;
+        }
+
+        RootLayout.Width = Math.Min(1320, available);
+        _logger?.LogDebug("Home layout width: page={Page}, content={Content}", available, RootLayout.Width);
+    }
+
     private void OnPageLoaded(object sender, RoutedEventArgs e)
     {
-        // 初始化连接指示器状态
-        //UpdateConnectionIndicator();
+        // 主按钮：按下/抬起事件会被 Button 自身吞掉，因此以 handledEventsToo 方式订阅
+        TalkButton.AddHandler(PointerPressedEvent, new PointerEventHandler(ManualButton_PointerPressed), true);
+        TalkButton.AddHandler(PointerReleasedEvent, new PointerEventHandler(ManualButton_PointerReleased), true);
+
+        // 同步初始阶段
+        UpdateEmotionAnimationState();
     }
 
     private void BindRendererEvents()
@@ -81,7 +113,7 @@ public sealed partial class HomePage : Page
             {
                 this.DispatcherQueue.TryEnqueue(() => TriggerEmotionAnimation());
             }
-            if (e.PropertyName == nameof(HomePageViewModel.IsListening))
+            if (e.PropertyName == nameof(HomePageViewModel.UiPhase))
             {
                 this.DispatcherQueue.TryEnqueue(() => UpdateEmotionAnimationState());
             }
@@ -113,14 +145,17 @@ public sealed partial class HomePage : Page
     {
         try
         {
-            if (_viewModel.IsListening)
+            // 阶段颜色（状态点/外圈/标题）
+            VisualStateManager.GoToState(this, _viewModel.UiPhase, true);
+
+            if (_viewModel.UiPhase is "Listening" or "Speaking" or "Connecting")
             {
-                // 聆听状态下启动脉冲动画
+                // 对话进行中：外圈呼吸动画
                 StopEmotionAnimations();
                 var pulseStoryboard = Resources["EmotionPulseAnimation"] as Storyboard;
                 pulseStoryboard?.Begin();
 
-                _logger?.LogDebug("Emotion pulse animation started for listening state");
+                _logger?.LogDebug("Emotion pulse animation started for phase {Phase}", _viewModel.UiPhase);
             }
             else
             {
@@ -168,12 +203,12 @@ public sealed partial class HomePage : Page
 
     private void OnScrollToBottomRequested(object? sender, EventArgs e)
     {
-        // 滚动到底部 - 由于移除了消息面板，这个方法现在为空
-        // 将来如果需要其他滚动操作可以在这里实现
         this.DispatcherQueue.TryEnqueue(() =>
         {
-            // MessagesScrollViewer.ChangeView(null, MessagesScrollViewer.ScrollableHeight, null);
-            _logger?.LogDebug("Scroll to bottom requested - currently disabled");
+            if (_viewModel.Messages.Count > 0)
+            {
+                MessagesList.ScrollIntoView(_viewModel.Messages[^1]);
+            }
         });
     }
 
@@ -224,11 +259,7 @@ public sealed partial class HomePage : Page
                     _logger?.LogDebug("Connection indicator updated for property: {PropertyName}", e.PropertyName);
                 }
 
-                // 更新音乐播放按钮图标
-                if (e.PropertyName == nameof(HomePageViewModel.MusicStatus))
-                {
-                    UpdatePlayPauseButtonIcon();
-                }
+                // 播放/暂停图标由 ViewModel.MusicPlayGlyph 绑定
             }
             catch (Exception ex)
             {
@@ -262,26 +293,6 @@ public sealed partial class HomePage : Page
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error updating connection indicator");
-        }
-    }
-
-    private void UpdatePlayPauseButtonIcon()
-    {
-        try
-        {
-            if (PlayPauseIcon != null)
-            {
-                // 根据音乐状态设置播放/暂停图标
-                var glyph = _viewModel.MusicStatus == "播放中"
-                    ? "&#xE769;" // 暂停图标
-                    : "&#xE768;"; // 播放图标
-
-                PlayPauseIcon.Glyph = glyph;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Error updating play/pause button icon");
         }
     }
 
@@ -351,8 +362,7 @@ public sealed partial class HomePage : Page
 
     private async void ManualButton_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        var button = (Button)sender;
-        button.CapturePointer(e.Pointer);
+        ((UIElement)sender).CapturePointer(e.Pointer);
         await _viewModel.StartManualRecordingCommand.ExecuteAsync(null);
     }
 

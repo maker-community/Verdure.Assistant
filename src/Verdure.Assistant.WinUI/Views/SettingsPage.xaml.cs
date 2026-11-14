@@ -19,6 +19,21 @@ public sealed partial class SettingsPage : Page
     private readonly ILogger<SettingsPage>? _logger;    
     public SettingsPageViewModel ViewModel { get; private set; } = null!;
 
+    public string[] OtaProtocols { get; } = { "https://", "http://" };
+
+    public string[] WsProtocols { get; } = { "wss://", "ws://" };
+
+    /// <summary>
+    /// 设置内容最大 820 宽并水平居中；显式设置宽度以避免导航缓存页面里的偏移
+    /// </summary>
+    private void PageRoot_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (e.NewSize.Width > 0)
+        {
+            Column.Width = Math.Min(820, Math.Max(320, e.NewSize.Width - 48));
+        }
+    }
+
     public SettingsPage()
     {
         this.InitializeComponent();

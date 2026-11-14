@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Windows.ApplicationModel.Resources;
 using WinUIEx;
 using Verdure.Assistant.ViewModels;
+using Verdure.Assistant.WinUI.Services;
 
 namespace Verdure.Assistant.WinUI.Views;
 
@@ -35,17 +36,100 @@ public sealed partial class MainWindow : WindowEx
         _viewModel.BackRequested += OnBackRequested;
         _viewModel.WindowStateChangeRequested += OnWindowStateChangeRequested;
 
-        // 配置窗口
+        // 配置窗口：自定义标题栏 + 居中
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/logo.ico"));
         Title = _resourceLoader.GetString("AppDisplayName");
-          // 导航到默认页面 (HomePage)
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(AppTitleBar);
+        this.CenterOnScreen();
+        // 导航到默认页面 (HomePage)
         ContentFrame.Navigate(typeof(HomePage));
         
         // 设置默认选中的导航项
         MainNavigationView.SelectedItem = MainPageNavItem;
 
+        // 启动状态：显示加载进度 / 降级提示 / 失败信息
+        App.Startup.Changed += OnStartupChanged;
+        Closed += (_, _) => App.Startup.Changed -= OnStartupChanged;
+        ApplyStartupStatus();
+
         // 初始化ViewModel
-        _ = _viewModel.InitializeAsync();
+        _ = InitializeViewModelAsync();
+    }
+
+    private async Task InitializeViewModelAsync()
+    {
+        try
+        {
+            await _viewModel.InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "主窗口ViewModel初始化失败");
+        }
+    }
+
+    private void OnStartupChanged(object? sender, EventArgs e)
+    {
+        if (DispatcherQueue.HasThreadAccess)
+        {
+            ApplyStartupStatus();
+        }
+        else
+        {
+            DispatcherQueue.TryEnqueue(ApplyStartupStatus);
+        }
+    }
+
+    private void ApplyStartupStatus()
+    {
+        var startup = App.Startup;
+        StartupProgress.Visibility = startup.Phase == StartupPhase.Starting ? Visibility.Visible : Visibility.Collapsed;
+
+        switch (startup.Phase)
+        {
+            case StartupPhase.Starting:
+                StartupInfoBar.Severity = InfoBarSeverity.Informational;
+                StartupInfoBar.Title = "正在启动";
+                StartupInfoBar.Message = string.IsNullOrEmpty(startup.Message) ? "正在初始化服务…" : startup.Message;
+                StartupInfoBar.IsOpen = true;
+                StartupRetryButton.Visibility = Visibility.Collapsed;
+                break;
+
+            case StartupPhase.Ready:
+                StartupInfoBar.IsOpen = false;
+                break;
+
+            case StartupPhase.Degraded:
+                StartupInfoBar.Severity = InfoBarSeverity.Warning;
+                StartupInfoBar.Title = "部分功能不可用";
+                StartupInfoBar.Message = startup.Message;
+                StartupInfoBar.IsOpen = true;
+                StartupRetryButton.Visibility = Visibility.Visible;
+                break;
+
+            case StartupPhase.Failed:
+                StartupInfoBar.Severity = InfoBarSeverity.Error;
+                StartupInfoBar.Title = "启动失败";
+                StartupInfoBar.Message = startup.Message;
+                StartupInfoBar.IsOpen = true;
+                StartupRetryButton.Visibility = Visibility.Visible;
+                break;
+        }
+    }
+
+    private async void StartupRetryButton_Click(object sender, RoutedEventArgs e)
+    {
+        StartupRetryButton.IsEnabled = false;
+        try
+        {
+            App.Startup.Report(StartupPhase.Starting, "正在重试…");
+            await App.RetryStartupAsync();
+        }
+        finally
+        {
+            StartupRetryButton.IsEnabled = true;
+        }
     }
 
     private void OnNavigationRequested(object? sender, NavigationRequestedEventArgs e)
@@ -55,6 +139,7 @@ public sealed partial class MainWindow : WindowEx
         Type? pageType = e.PageTag switch
         {
             "HomePage" => typeof(HomePage),
+            "DeepSeekPage" => typeof(DeepSeekChatPage),
             "Settings" => typeof(SettingsPage),
             _ => null
         };
@@ -106,6 +191,10 @@ public sealed partial class MainWindow : WindowEx
         if (e.SourcePageType == typeof(HomePage))
         {
             MainNavigationView.SelectedItem = MainPageNavItem;
+        }
+        else if (e.SourcePageType == typeof(DeepSeekChatPage))
+        {
+            MainNavigationView.SelectedItem = DeepSeekNavItem;
         }
         else if (e.SourcePageType == typeof(SettingsPage))
         {
