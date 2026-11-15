@@ -163,11 +163,11 @@ public class SoundFlowAudioRecorder : ISharedAudioRecorder, IDisposable
 
                 _logger?.LogDebug("创建新的SoundFlow音频设备，采样率: {SampleRate}Hz, 声道: {Channels}", sampleRate, channels);
 
-                // 引擎已在构造函数中初始化，直接使用
                 if (_engine == null)
                 {
-                    throw new InvalidOperationException("SoundFlow引擎未正确初始化");
+                    InitializeAudioEngine();
                 }
+                var engine = _engine ?? throw new InvalidOperationException("SoundFlow引擎未正确初始化");
 
                 // 使用指定格式初始化录音设备
                 var format = new AudioFormat
@@ -177,7 +177,7 @@ public class SoundFlowAudioRecorder : ISharedAudioRecorder, IDisposable
                     SampleRate = sampleRate
                 };
 
-                _captureDevice = _engine.InitializeCaptureDevice(null, format, DeviceConfig);
+                _captureDevice = engine.InitializeCaptureDevice(null, format, DeviceConfig);
 
                 _logger?.LogDebug("已选择SoundFlow设备: {DeviceName}", _captureDevice.Info?.Name ?? "默认设备");
                 _logger?.LogDebug("设备格式: {Format}, {Channels}ch, {SampleRate}Hz", 
@@ -236,36 +236,12 @@ public class SoundFlowAudioRecorder : ISharedAudioRecorder, IDisposable
                 audioDataBytes[i * 2 + 1] = bytes[1];
             }
 
-            // 验证音频数据有效性
-            if (IsValidAudioData(audioDataBytes))
-            {
-                // 使用 Channel 优化的音频数据分发，避免在回调中阻塞
-                _audioDistributor.TryDistributeAudioData(audioDataBytes, DataAvailable);
-            }
+            _audioDistributor.TryDistributeAudioData(audioDataBytes, DataAvailable);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "SoundFlow处理音频数据时出错");
         }
-    }
-
-    private bool IsValidAudioData(byte[] audioData)
-    {
-        if (audioData == null || audioData.Length == 0)
-            return false;
-
-        // 简单的音频数据验证
-        bool hasNonZero = false;
-        for (int i = 0; i < Math.Min(audioData.Length, 100); i++)
-        {
-            if (audioData[i] != 0)
-            {
-                hasNonZero = true;
-                break;
-            }
-        }
-
-        return hasNonZero;
     }
 
     /// <summary>
@@ -341,25 +317,7 @@ public class SoundFlowAudioRecorder : ISharedAudioRecorder, IDisposable
         
         if (completedTask == timeoutTask)
         {
-            _logger?.LogWarning("停止SoundFlow音频录制超时，强制设置状态");
-            // 超时情况下，强制清理状态
-            lock (_streamLock)
-            {
-                _isRecording = false;
-                _captureDevice = null;
-                _recorder = null;
-                _engine = null;
-            }
-            
-            // 仍然通知订阅者
-            try
-            {
-                RecordingStopped?.Invoke(this, EventArgs.Empty);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "通知SoundFlow订阅者时出错");
-            }
+            throw new TimeoutException("停止 SoundFlow 音频录制超时，设备仍在清理中");
         }
         else
         {
@@ -458,14 +416,7 @@ public class SoundFlowAudioRecorder : ISharedAudioRecorder, IDisposable
 
             _isDisposed = true;
 
-            try
-            {
-                StopRecordingAsync().Wait(3000);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "SoundFlow Dispose 时停止录制出错");
-            }
+            CleanupStreamInternal();
 
             // 释放 Channel 优化的音频分发器
             _audioDistributor?.Dispose();

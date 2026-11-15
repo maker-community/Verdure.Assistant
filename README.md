@@ -407,6 +407,8 @@ verdure-assistant/
 | **MAUI (Android)** | Android SDK (API 21+)<br>Android Emulator 或真机 |
 | **API (Linux/树莓派)** | mpg123 音频播放器<br>PortAudio (可选) |
 
+当前 SoundFlow WebRTC 原生库尚未满足 Android 16 的 16 KB 页面大小要求，部署前需验证目标设备兼容性。
+
 ### 安装步骤
 
 1. **克隆仓库**

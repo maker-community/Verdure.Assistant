@@ -25,7 +25,7 @@
 - **Microsoft Testing**: xunit, coverlet 等测试包
 - **Microsoft Web and Windows**: WinUI, WebView2, WindowsAppSDK
 - **Audio**: NAudio, OpusSharp, SoundFlow
-- **QR Code and Images**: QRCoder, SkiaSharp, SixLabors.ImageSharp
+- **QR Code and Images**: QRCoder, SkiaSharp
 - **UI Extensions**: WinUIEx
 
 #### Directory.Build.props

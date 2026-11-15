@@ -404,6 +404,12 @@ public class VoiceChatService : IVoiceChatService
             KeepListening = false;
             _stateMachine?.RequestTransition(ConversationTrigger.ForceIdle, "Disconnect requested");
 
+            if (_stateMachineContext != null)
+            {
+                try { await _stateMachineContext.WaitForIdleAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false); }
+                catch (TimeoutException ex) { _logger?.LogWarning(ex, "等待状态机退出当前状态超时，继续断开"); }
+            }
+
             await StopKeywordDetectionAsync().ConfigureAwait(false);
 
             try { await _interruptService.StopAllAsync().ConfigureAwait(false); }
@@ -429,7 +435,7 @@ public class VoiceChatService : IVoiceChatService
             if (_audioStreamManager?.IsRecording == true)
             {
                 try { await _audioStreamManager.StopRecordingAsync().ConfigureAwait(false); }
-                catch (Exception ex) { _logger?.LogDebug(ex, "停止录音时出现警告"); }
+                catch (Exception ex) { _logger?.LogWarning(ex, "停止录音时出现警告"); }
             }
 
             _isVoiceChatActive = false;

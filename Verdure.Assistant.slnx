@@ -30,6 +30,7 @@
     <Project Path="tests/SoundFlow.Samples.VoiceInterruptionMusic/SoundFlow.Samples.VoiceInterruptionMusic.csproj" />
     <Project Path="tests/SoundFlowPlaybackTest/SoundFlowPlaybackTest.csproj" />
     <Project Path="tests/SoundFlowRecordingCodecTest/SoundFlowRecordingCodecTest.csproj" />
+    <Project Path="tests/Verdure.Assistant.Api.Tests/Verdure.Assistant.Api.Tests.csproj" />
   </Folder>
   <Project Path="src/Verdure.Assistant.Console/Verdure.Assistant.Console.csproj" />
   <Project Path="src/Verdure.Assistant.Core/Verdure.Assistant.Core.csproj" />

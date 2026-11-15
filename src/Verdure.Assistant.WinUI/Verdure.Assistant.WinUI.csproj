@@ -35,6 +35,9 @@
     <!-- Emotion Assets -->
     <ItemGroup>
         <Content Include="Assets\Emotions\*.gif" />
+        <Content Include="Assets\keywords\*.table">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
     </ItemGroup>
     <ItemGroup>
       <None Remove="Assets\pig.ico" />

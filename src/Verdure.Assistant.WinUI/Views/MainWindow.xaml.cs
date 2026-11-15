@@ -169,7 +169,7 @@ public sealed partial class MainWindow : WindowEx
                 // 最大化窗口的逻辑
                 break;
             case Verdure.Assistant.ViewModels.WindowState.Closed:
-                this.Close();
+                _ = ((App)Application.Current).ShutdownAndCloseAsync();
                 break;
         }
     }    

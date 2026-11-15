@@ -460,6 +460,23 @@ public class VoiceChatServiceFlowTests
     }
 
     [Fact]
+    public async Task Disconnect_WhileListening_StopsListeningBeforeDisconnecting()
+    {
+        using var h = new Harness(enableVoice: true);
+        await h.Service.InitializeAsync(h.Config);
+        h.Keyword.Raise();
+        Assert.True(await WaitFor(() => h.Service.CurrentState == DeviceState.Listening));
+        Assert.True(await WaitFor(() => h.Server.HasListen("start")));
+
+        await h.Service.DisconnectAsync();
+
+        Assert.True(await WaitFor(() => h.Server.HasListen("stop")), "断开连接前应发送停止聆听消息");
+        Assert.Equal(DeviceState.Idle, h.Service.CurrentState);
+        Assert.False(h.Recorder.IsRecording);
+        Assert.False(h.Keyword.Running);
+    }
+
+    [Fact]
     public async Task Disconnect_ThenInitialize_Again_Works()
     {
         using var h = new Harness();

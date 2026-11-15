@@ -10,7 +10,7 @@ namespace Verdure.Assistant.WinUI.Services;
 /// </summary>
 public class NAudioPlayer : IAudioPlayer, IDisposable
 {
-    private WaveOutEvent? _waveOut;
+    private WaveOut? _waveOut;
     private BufferedWaveProvider? _bufferedProvider;
     private bool _isPlaying;
     private readonly object _lock = new();
@@ -44,16 +44,16 @@ public class NAudioPlayer : IAudioPlayer, IDisposable
             var waveFormat = new WaveFormat(sampleRate, 16, channels); // 16位深度
 
             // 创建缓冲波形提供器
-            _bufferedProvider = new BufferedWaveProvider(waveFormat)
+            _bufferedProvider = new BufferedWaveProvider(waveFormat, TimeSpan.FromSeconds(10))
             {
-                BufferDuration = TimeSpan.FromSeconds(10), // 10秒缓冲区
                 DiscardOnBufferOverflow = false
             };
 
             // 创建音频输出设备
-            _waveOut = new WaveOutEvent
+            _waveOut = new WaveOut
             {
-                DesiredLatency = 60 // 60ms延迟，匹配Python配置
+                BufferMilliseconds = 30,
+                NumberOfBuffers = 2
             };
 
             _waveOut.Init(_bufferedProvider);

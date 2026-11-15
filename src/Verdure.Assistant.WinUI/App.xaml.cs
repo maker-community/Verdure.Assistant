@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Windows.AppLifecycle;
+using Microsoft.UI.Windowing;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
 using Verdure.Assistant.Core.Services;
@@ -26,7 +27,8 @@ public partial class App : Application
 
     private IHost? _host;
     private ILogger<App>? _log;
-    private bool _shutdownDone;
+    private bool _shutdownStarted;
+    private bool _shutdownFinished;
 
     /// <summary>
     /// Gets the main window instance
@@ -76,7 +78,7 @@ public partial class App : Application
             Startup.Report(StartupPhase.Starting, "正在启动…");
 
             MainWindow = new MainWindow();
-            MainWindow.Closed += OnMainWindowClosed;
+            MainWindow.AppWindow.Closing += OnMainWindowClosing;
             MainWindow.Activate();
 
             await StartServicesAsync();
@@ -220,50 +222,32 @@ public partial class App : Application
         e.SetObserved();
     }
 
-    private void OnMainWindowClosed(object sender, WindowEventArgs args)
+    private async void OnMainWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
-        if (_shutdownDone)
+        if (_shutdownFinished)
         {
             return;
         }
-        _shutdownDone = true;
 
-        // 有序关闭：先停录音/唤醒词/连接，再释放宿主。总等待不超过几秒，避免进程残留在后台占用麦克风
+        args.Cancel = true;
+        await ShutdownAndCloseAsync();
+    }
+
+    internal async Task ShutdownAndCloseAsync()
+    {
+        if (_shutdownStarted)
+        {
+            return;
+        }
+        _shutdownStarted = true;
+
         try
         {
-            Task.Run(async () =>
-            {
-                try
-                {
-                    var deepSeekVoice = GetService<DeepSeekVoiceChatService>();
-                    if (deepSeekVoice != null)
-                    {
-                        await deepSeekVoice.StopAsync().WaitAsync(TimeSpan.FromSeconds(3));
-                    }
-
-                    var voice = GetService<IVoiceChatService>();
-                    if (voice != null)
-                    {
-                        await voice.DisconnectAsync().WaitAsync(TimeSpan.FromSeconds(3));
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _log?.LogWarning(ex, "关闭语音服务时出错");
-                }
-
-                try
-                {
-                    if (_host != null)
-                    {
-                        await _host.StopAsync(TimeSpan.FromSeconds(2));
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _log?.LogWarning(ex, "停止宿主时出错");
-                }
-            }).Wait(TimeSpan.FromSeconds(6));
+            await Task.Run(ShutdownServicesAsync).WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        catch (TimeoutException)
+        {
+            _log?.LogWarning("关闭服务超时，继续关闭窗口；资源清理仍在后台进行");
         }
         catch (Exception ex)
         {
@@ -271,7 +255,60 @@ public partial class App : Application
         }
         finally
         {
-            try { _host?.Dispose(); } catch (Exception ex) { _log?.LogDebug(ex, "释放宿主时出错"); }
+            _shutdownFinished = true;
+            MainWindow?.Close();
+        }
+    }
+
+    private async Task ShutdownServicesAsync()
+    {
+        try
+        {
+            async Task StopVoiceAsync()
+            {
+                try
+                {
+                    var voice = GetService<IVoiceChatService>();
+                    if (voice != null)
+                    {
+                        await voice.DisconnectAsync().ConfigureAwait(false);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log?.LogWarning(ex, "关闭小智语音服务时出错");
+                }
+            }
+
+            async Task StopDeepSeekAsync()
+            {
+                try
+                {
+                    var voice = GetService<DeepSeekVoiceChatService>();
+                    if (voice != null)
+                    {
+                        await voice.StopAsync().ConfigureAwait(false);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log?.LogWarning(ex, "关闭 DeepSeek 语音服务时出错");
+                }
+            }
+
+            await Task.WhenAll(StopVoiceAsync(), StopDeepSeekAsync()).ConfigureAwait(false);
+            if (_host != null)
+            {
+                await _host.StopAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.LogWarning(ex, "停止宿主时出错");
+        }
+        finally
+        {
+            try { _host?.Dispose(); } catch (Exception ex) { _log?.LogWarning(ex, "释放宿主时出错"); }
         }
     }
     private void ConfigureServices(IServiceCollection services)

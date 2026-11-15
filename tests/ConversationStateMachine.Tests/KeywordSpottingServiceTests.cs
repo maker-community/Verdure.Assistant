@@ -60,13 +60,17 @@ public class KeywordSpottingServiceTests
         service.SetConfig(NewConfig(modelsDir));
 
         var detected = 0;
+        var errors = new System.Collections.Concurrent.ConcurrentQueue<string>();
         service.KeywordDetected += (_, _) => Interlocked.Increment(ref detected);
+        service.ErrorOccurred += (_, error) => errors.Enqueue(error);
 
         Assert.True(await service.StartAsync());
         Assert.True(await service.StartAsync(), "重复启动应当是幂等的");
         Assert.True(service.IsRunning);
 
         await Task.Delay(1200);
+        Assert.True(recorder.SubscriberCount > 0, "识别器应加载模型并订阅音频");
+        Assert.Empty(errors);
 
         // 反复暂停/恢复：旧实现里 Pause 会等到下一次唤醒词才返回
         for (var i = 0; i < 5; i++)
@@ -91,6 +95,7 @@ public class KeywordSpottingServiceTests
         Assert.False(service.IsRunning);
         Assert.Equal(0, detected);
         Assert.Equal(0, recorder.SubscriberCount);
+        Assert.Empty(errors);
     }
 
     [Fact]

@@ -187,6 +187,12 @@ var currentModel = _config.KeywordModels.CurrentModel;
 
 ## 注意事项
 
+WinUI 主页当前明确选择 `keyword_xiaodian.table`（界面提示“小点”），模型随应用打包到 `Assets/keywords`。
+启动日志中的“关键词检测启动成功（模型: ...）”显示实际解析路径。默认查找顺序为程序目录下的
+`ModelFiles`、`Assets/keywords`、`keywords`，开发环境再回退到源码目录。模型内容由 Speech SDK 加载，
+返回的文本是模型内置的关键词而不是语音转写，日志中的音频峰值可以帮助排查麦克风和音量问题。
+识别使用共享的 16 kHz、16 位、单声道 PCM 音频，静音帧也会送入识别器以保持时间连续。
+
 1. 模型切换是实时的，如果关键词检测正在运行会自动重启
 2. 如果指定的模型文件不存在，切换会失败
 3. 配置更改后需要重新初始化服务才能生效

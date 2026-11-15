@@ -267,6 +267,8 @@ Additional platform-specific requirements:
 | MAUI Android | Android SDK, emulator or physical device |
 | API on Linux/Raspberry Pi | `mpg123` and optionally PortAudio |
 
+The current SoundFlow WebRTC native library does not meet Android 16's 16 KB page-size requirement; verify device compatibility before deployment.
+
 ### Installation
 
 1. Clone the repository.

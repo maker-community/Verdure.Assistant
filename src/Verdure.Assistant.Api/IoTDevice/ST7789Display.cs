@@ -1,5 +1,4 @@
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
 using System.Device.Gpio;
 using System.Device.Spi;
 
@@ -522,13 +521,13 @@ public class ST7789Display : IDisposable
                 SendCommand(0x2A);
                 SendData((byte)(x0 >> 8));
                 SendData((byte)(x0 & 0xff));
-                SendData((byte)(x1 >> 8));
+                SendData((byte)((x1 - 1) >> 8));
                 SendData((byte)((x1 - 1) & 0xff));
 
                 SendCommand(0x2B);
                 SendData((byte)(y0 >> 8));
                 SendData((byte)(y0 & 0xff));
-                SendData((byte)(y1 >> 8));
+                SendData((byte)((y1 - 1) >> 8));
                 SendData((byte)((y1 - 1) & 0xff));
 
                 SendCommand(0x2C);
@@ -609,37 +608,50 @@ public class ST7789Display : IDisposable
         SendData(imageData);
     }
 
-    // 显示ImageSharp格式图像
-    public void DrawImage(Image<Bgr24> image, int xStart = 0, int yStart = 0)
+    // 显示SkiaSharp格式图像
+    public void DrawImage(SKBitmap image, int xStart = 0, int yStart = 0)
     {
-        int imwidth = image.Width;
-        int imheight = image.Height;
+        ArgumentNullException.ThrowIfNull(image);
+        ArgumentOutOfRangeException.ThrowIfNegative(xStart);
+        ArgumentOutOfRangeException.ThrowIfNegative(yStart);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(xStart, _width);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(yStart, _height);
 
-        // 计算显示区域
-        int displayWidth = Math.Min(_width - xStart, imwidth);
-        int displayHeight = Math.Min(_height - yStart, imheight);
+        int displayWidth = Math.Min(_width - xStart, image.Width);
+        int displayHeight = Math.Min(_height - yStart, image.Height);
+        if (displayWidth == 0 || displayHeight == 0)
+        {
+            throw new ArgumentException("图像不能为空", nameof(image));
+        }
 
-        SetAddressWindow(xStart, yStart, xStart + displayWidth, yStart + displayHeight);
+        // 1.3寸屏幕使用包含末点的坐标，其他屏幕使用不包含末点的坐标。
+        int endAdjustment = _displayType == DisplayType.Display13Inch ? 1 : 0;
+        SetAddressWindow(xStart, yStart, xStart + displayWidth - endAdjustment, yStart + displayHeight - endAdjustment);
 
-        // 将图像转换为设备支持的格式
-        var pixelData = GetImageBytes(image);
+        var pixelData = GetImageBytes(image, displayWidth, displayHeight);
         SendData(pixelData);
     }
 
     // 获取图像的字节数组表示
-    public byte[] GetImageBytes(Image<Bgr24> image)
+    public static byte[] GetImageBytes(SKBitmap image, int? width = null, int? height = null)
     {
-        int imwidth = image.Width;
-        int imheight = image.Height;
-        var pix = new byte[imheight * imwidth * 2];
+        ArgumentNullException.ThrowIfNull(image);
+        int imwidth = width ?? image.Width;
+        int imheight = height ?? image.Height;
+        if (imwidth <= 0 || imwidth > image.Width)
+            throw new ArgumentOutOfRangeException(nameof(width));
+        if (imheight <= 0 || imheight > image.Height)
+            throw new ArgumentOutOfRangeException(nameof(height));
+
+        var pix = new byte[checked(imheight * imwidth * 2)];
 
         for (int y = 0; y < imheight; y++)
         {
             for (int x = 0; x < imwidth; x++)
             {
-                var color = image[x, y];
-                pix[(y * imwidth + x) * 2] = (byte)((color.R & 0xF8) | (color.G >> 5));
-                pix[(y * imwidth + x) * 2 + 1] = (byte)(((color.G << 3) & 0xE0) | (color.B >> 3));
+                var color = image.GetPixel(x, y);
+                pix[(y * imwidth + x) * 2] = (byte)((color.Red & 0xF8) | (color.Green >> 5));
+                pix[(y * imwidth + x) * 2 + 1] = (byte)(((color.Green << 3) & 0xE0) | (color.Blue >> 3));
             }
         }
 
