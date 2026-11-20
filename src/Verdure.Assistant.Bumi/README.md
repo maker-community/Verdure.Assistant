@@ -93,8 +93,11 @@ curl -X POST http://192.168.55.1:5031/api/voicechat/stop
   机器人没有"松开按钮结束说话"这个动作，设成 `false` 会让会话一直停在聆听状态，服务端最终关闭连接。
 - `WakeWordStart`：`true`（默认）时，机器人被「你好布米」语音唤醒会启动一轮对话；
   设成 `false` 则只能由外部调用 `/api/voicechat/start` 启动。
-- `WakeCueEnabled`：`true`（默认）时唤醒后先播一声两音提示音（A5→D6，共 500 ms），
-  让用户知道唤醒被听到了；放完才开始上行，避免提示音被机器人自己的麦克风收进去当成用户的话。
+- `WakeCueEnabled`：`true`（默认）时唤醒后先播一声提示音，让用户知道唤醒被听到了；
+  放完才开始上行，避免提示音被机器人自己的麦克风收进去当成用户的话。
+- `WakeCueFile`：可选，指向自定义提示音的 WAV；不填就用内置的那段（`Assets/wake-cue.wav`，
+  由 `bing.mp3` 转成 16 kHz 单声道 16-bit PCM 后嵌入程序）。自定义文件必须也是
+  **16 kHz / 单声道 / 16-bit PCM**，不符合只会打一条告警并回退到内置音，不影响唤醒。
 - `MuteBuiltInAgent` / `MuteAudioCue`：只关内置智能体的**输出**和提示音，**不动**麦克风到智能体的输入通道。
   关掉那个输入会连扬声器一起停掉且无法恢复（路线 A 的实测结论，见
   [voice-assistant.md](https://github.com/maker-community/noetix_sdk_bumi_csharp/blob/main/docs/voice-assistant.md)）。

@@ -10,6 +10,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Assets\wake-cue.wav" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Verdure.Assistant.Core\Verdure.Assistant.Core.csproj" />
   </ItemGroup>
 

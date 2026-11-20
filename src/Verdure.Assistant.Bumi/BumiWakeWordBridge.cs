@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -19,13 +20,8 @@ internal sealed class BumiWakeWordBridge : IHostedService
 {
     private const int WakeDebounceMs = 2000;
 
-    // 提示音要比播放器的 300 ms 前导缓冲长，否则短音会卡在缓冲里不响。
-    private const int CueToneMs = 250;
-    private const int CueFadeMs = 10;
     private const int CueSampleRate = 16000;
-
-    // 播放器还会再乘一次 OutputGainDb（默认 -6 dB），所以这里按 0.6 幅度给足余量。
-    private const double CueAmplitude = 0.6;
+    private const string EmbeddedCueName = "Verdure.Assistant.Bumi.Assets.wake-cue.wav";
 
     private readonly BumiMediaSession _media;
     private readonly IVoiceChatService _voiceChat;
@@ -50,7 +46,7 @@ internal sealed class BumiWakeWordBridge : IHostedService
         _audioPlayer = audioPlayer;
         _configuration = configuration;
         _logger = logger;
-        _cuePcm = CreateChime();
+        _cuePcm = LoadCue(configuration);
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -154,15 +150,16 @@ internal sealed class BumiWakeWordBridge : IHostedService
     /// </summary>
     private async Task PlayCueAsync()
     {
-        if (!_configuration.GetValue("WakeCueEnabled", true))
+        if (!_configuration.GetValue("WakeCueEnabled", true) || _cuePcm.Length == 0)
         {
             return;
         }
 
+        var cueMs = _cuePcm.Length * 1000 / (2 * CueSampleRate);
         try
         {
             await _audioPlayer.PlayAsync(_cuePcm, CueSampleRate, 1).ConfigureAwait(false);
-            await Task.Delay(CueToneMs * 2 + 120).ConfigureAwait(false);
+            await Task.Delay(cueMs + 120).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -170,38 +167,101 @@ internal sealed class BumiWakeWordBridge : IHostedService
         }
     }
 
-    /// <summary>两段正弦（A5 → D6），前后各做一次淡入淡出，避免咔哒声。</summary>
-    private static byte[] CreateChime()
+    /// <summary>
+    /// 优先用 <c>WakeCueFile</c> 指定的 WAV，否则用内置的那段（由 bing.mp3 转成 16 kHz 单声道）。
+    /// 读不到就返回空数组，只是不出声，不该影响唤醒本身。
+    /// </summary>
+    private byte[] LoadCue(IConfiguration configuration)
     {
-        var frequencies = new[] { 880.0, 1174.66 };
-        var toneSamples = CueSampleRate * CueToneMs / 1000;
-        var fadeSamples = CueSampleRate * CueFadeMs / 1000;
-        var samples = new short[toneSamples * frequencies.Length];
-
-        var offset = 0;
-        foreach (var frequency in frequencies)
+        var overridePath = configuration["WakeCueFile"];
+        if (!string.IsNullOrWhiteSpace(overridePath))
         {
-            for (var i = 0; i < toneSamples; i++)
+            try
             {
-                var envelope = 1.0;
-                if (i < fadeSamples)
+                if (File.Exists(overridePath))
                 {
-                    envelope = (double)i / fadeSamples;
-                }
-                else if (i >= toneSamples - fadeSamples)
-                {
-                    envelope = (double)(toneSamples - i) / fadeSamples;
+                    _logger.LogInformation("使用自定义唤醒提示音: {Path}", overridePath);
+                    return ReadWav(File.ReadAllBytes(overridePath));
                 }
 
-                var value = Math.Sin(2 * Math.PI * frequency * i / CueSampleRate) * envelope * CueAmplitude;
-                samples[offset + i] = (short)(value * short.MaxValue);
+                _logger.LogWarning("WakeCueFile 指向的文件不存在: {Path}，改用内置提示音", overridePath);
             }
-
-            offset += toneSamples;
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "读取 WakeCueFile 失败，改用内置提示音");
+            }
         }
 
-        var bytes = new byte[samples.Length * 2];
-        Buffer.BlockCopy(samples, 0, bytes, 0, bytes.Length);
-        return bytes;
+        try
+        {
+            using var stream = typeof(BumiWakeWordBridge).Assembly.GetManifestResourceStream(EmbeddedCueName);
+            if (stream is null)
+            {
+                _logger.LogError("内置提示音资源 {Name} 缺失，唤醒将没有提示音", EmbeddedCueName);
+                return Array.Empty<byte>();
+            }
+
+            using var buffer = new MemoryStream();
+            stream.CopyTo(buffer);
+            return ReadWav(buffer.ToArray());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "加载内置提示音失败，唤醒将没有提示音");
+            return Array.Empty<byte>();
+        }
+    }
+
+    /// <summary>取出 WAV 的 PCM 数据；机器人扬声器只认 16 kHz 单声道 16-bit。</summary>
+    private static byte[] ReadWav(byte[] wav)
+    {
+        if (wav.Length < 44 ||
+            Encoding.ASCII.GetString(wav, 0, 4) != "RIFF" ||
+            Encoding.ASCII.GetString(wav, 8, 4) != "WAVE")
+        {
+            throw new InvalidDataException("提示音不是合法的 WAV 文件");
+        }
+
+        var format = 0;
+        var channels = 0;
+        var sampleRate = 0;
+        var bits = 0;
+        var offset = 12;
+
+        while (offset + 8 <= wav.Length)
+        {
+            var id = Encoding.ASCII.GetString(wav, offset, 4);
+            var size = BitConverter.ToInt32(wav, offset + 4);
+            if (size < 0)
+            {
+                break;
+            }
+
+            var body = offset + 8;
+            if (id == "fmt " && body + 16 <= wav.Length)
+            {
+                format = BitConverter.ToInt16(wav, body);
+                channels = BitConverter.ToInt16(wav, body + 2);
+                sampleRate = BitConverter.ToInt32(wav, body + 4);
+                bits = BitConverter.ToInt16(wav, body + 14);
+            }
+            else if (id == "data")
+            {
+                if (format != 1 || channels != 1 || sampleRate != CueSampleRate || bits != 16)
+                {
+                    throw new InvalidDataException(
+                        $"提示音必须是 {CueSampleRate} Hz 单声道 16-bit PCM（当前 {sampleRate} Hz / {channels} 声道 / {bits} bit）");
+                }
+
+                var length = Math.Min(size, wav.Length - body);
+                var pcm = new byte[length];
+                Array.Copy(wav, body, pcm, 0, length);
+                return pcm;
+            }
+
+            offset = body + size + (size % 2);
+        }
+
+        throw new InvalidDataException("WAV 里找不到 data 块");
     }
 }
