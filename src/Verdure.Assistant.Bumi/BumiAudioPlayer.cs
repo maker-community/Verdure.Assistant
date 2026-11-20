@@ -28,6 +28,12 @@ public sealed class BumiAudioPlayer : IAudioPlayer, IDisposable
     private ulong _messageId;
     private bool _disposed;
 
+    // TTS 帧是网络突发到达的，边到边放会被抖动切成一段一段。先攒够一个前导缓冲再开始放。
+    private const int LeadMs = 300;
+    private int _queuedSamples;
+    // 时间戳跨句单调递增：原生播放侧按时间轴排程，重新从 0 开始会让它以为是回退。
+    private long _framesPublished;
+
     private BiquadHighPass? _highPass;
     private double _gain = 1.0;
 
@@ -75,10 +81,20 @@ public sealed class BumiAudioPlayer : IAudioPlayer, IDisposable
             stereo[(i * 2) + 1] = value;
         }
 
-        EnsurePump();
+        EnsureChannel();
         _channel?.Writer.TryWrite(stereo);
+        _queuedSamples += stereo.Length;
+
+        // 短句可能永远攒不满前导缓冲，交给 CompleteAdding/StopAsync 兜底放行。
+        if (_pump is null && QueuedMs() >= LeadMs)
+        {
+            StartPump();
+        }
+
         return Task.CompletedTask;
     }
+
+    private double QueuedMs() => _queuedSamples * 1000.0 / (_options.SampleRate * 2);
 
     public Task StopAsync()
     {
@@ -93,6 +109,7 @@ public sealed class BumiAudioPlayer : IAudioPlayer, IDisposable
             _channel = null;
             _pump = null;
             _cts = null;
+            _queuedSamples = 0;
             IsPlaying = false;
         }
 
@@ -106,6 +123,12 @@ public sealed class BumiAudioPlayer : IAudioPlayer, IDisposable
 
     public void CompleteAdding()
     {
+        // 不足一个前导缓冲的短句也要放出来。
+        if (_pump is null && _channel is not null)
+        {
+            StartPump();
+        }
+
         _channel?.Writer.TryComplete();
     }
 
@@ -143,9 +166,9 @@ public sealed class BumiAudioPlayer : IAudioPlayer, IDisposable
         return (short)(data[offset] | (data[offset + 1] << 8));
     }
 
-    private void EnsurePump()
+    private void EnsureChannel()
     {
-        if (_channel is not null)
+        if (_channel is not null || _disposed)
         {
             return;
         }
@@ -162,8 +185,22 @@ public sealed class BumiAudioPlayer : IAudioPlayer, IDisposable
                 SingleReader = true,
                 SingleWriter = false,
             });
+        }
+    }
+
+    private void StartPump()
+    {
+        lock (_gate)
+        {
+            if (_pump is not null || _channel is null || _disposed)
+            {
+                return;
+            }
+
             _cts = new CancellationTokenSource();
-            _pump = Task.Run(() => PumpAsync(_channel.Reader, _cts.Token));
+            var token = _cts.Token;
+            var reader = _channel.Reader;
+            _pump = Task.Run(() => PumpAsync(reader, token));
         }
     }
 
@@ -172,13 +209,15 @@ public sealed class BumiAudioPlayer : IAudioPlayer, IDisposable
         var frameMs = Math.Clamp(_options.PlaybackFrameMs, 10, 500);
         var samplesPerFrame = _options.SampleRate * frameMs / 1000 * 2; // 立体声：样本数含左右
         var clock = Stopwatch.StartNew();
-        var framesSent = 0;
+        var framesThisRun = 0L;
         IsPlaying = true;
 
         try
         {
             await foreach (var chunk in reader.ReadAllAsync(token).ConfigureAwait(false))
             {
+                Interlocked.Add(ref _queuedSamples, -chunk.Length);
+
                 for (var offset = 0; offset < chunk.Length; offset += samplesPerFrame)
                 {
                     token.ThrowIfCancellationRequested();
@@ -186,10 +225,11 @@ public sealed class BumiAudioPlayer : IAudioPlayer, IDisposable
                     var frame = new short[count];
                     Array.Copy(chunk, offset, frame, 0, count);
 
-                    Publish(frame, framesSent * frameMs, frameMs);
-                    framesSent++;
+                    Publish(frame, _framesPublished * frameMs, frameMs);
+                    _framesPublished++;
+                    framesThisRun++;
 
-                    var target = TimeSpan.FromMilliseconds(framesSent * (double)frameMs);
+                    var target = TimeSpan.FromMilliseconds(framesThisRun * (double)frameMs);
                     var wait = target - clock.Elapsed;
                     if (wait > TimeSpan.Zero)
                     {
@@ -208,6 +248,12 @@ public sealed class BumiAudioPlayer : IAudioPlayer, IDisposable
         finally
         {
             IsPlaying = false;
+            lock (_gate)
+            {
+                _pump = null;
+                _cts = null;
+            }
+
             PlaybackStopped?.Invoke(this, EventArgs.Empty);
         }
     }

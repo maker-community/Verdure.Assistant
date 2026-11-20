@@ -1293,15 +1293,25 @@ public class VoiceChatService : IVoiceChatService
 
         try
         {
-            var message = new ChatMessage
+            if (_communicationClient is WebSocketClient wsClient)
             {
-                Type = "text",
-                Content = text,
-                Role = "user",
-                SessionId = _sessionId
-            };
+                // 官方协议里没有 type:"text"；要让服务端把这段文字当成用户说的话，
+                // 只能发 listen state=detect，和唤醒词检测用的是同一条消息。
+                await wsClient.SendWakeWordDetectedAsync(text);
+            }
+            else
+            {
+                var message = new ChatMessage
+                {
+                    Type = "text",
+                    Content = text,
+                    Role = "user",
+                    SessionId = _sessionId
+                };
 
-            await _communicationClient.SendMessageAsync(message);
+                await _communicationClient.SendMessageAsync(message);
+            }
+
             _logger?.LogInformation("发送文本消息: {Text}", text);
         }
         catch (Exception ex)

@@ -19,9 +19,21 @@ public sealed class BumiAudioRecorder : ISharedAudioRecorder, IDisposable
     private const int MicChannelCount = 4;   // ch0–3
     private const int RobotChannelCount = 8; // 机器人固定 8 通道
 
+    // Opus 编码器要求严格 60 ms 一帧（16 kHz 下 960 样本），长度不符时它会补零或截断，
+    // 结果是"语音+静音"的碎片，服务端识别不出来。DDS 回调的块大小并不固定，
+    // 所以这里先缓冲，凑满整帧再交出去。
+    private const int OutputFrameSamples = 960;
+    private const int OutputFrameBytes = OutputFrameSamples * 2;
+
     private readonly BumiMediaSession _session;
     private readonly ILogger<BumiAudioRecorder> _logger;
     private readonly BumiAudioOptions _options;
+    private readonly double _inputGain;
+    private readonly byte[] _pendingFrame = new byte[OutputFrameBytes];
+    private int _pendingBytes;
+    private int _windowPeak;
+    private int _windowChunkSamples;
+    private long _levelLoggedAt;
     private readonly object _gate = new();
     private readonly List<EventHandler<byte[]>> _subscribers = new();
 
@@ -35,6 +47,7 @@ public sealed class BumiAudioRecorder : ISharedAudioRecorder, IDisposable
         _session = session;
         _options = options.Value;
         _logger = logger;
+        _inputGain = _options.InputGainDb > 0 ? Math.Pow(10, _options.InputGainDb / 20.0) : 1.0;
     }
 
     public event EventHandler<byte[]>? DataAvailable;
@@ -163,6 +176,7 @@ public sealed class BumiAudioRecorder : ISharedAudioRecorder, IDisposable
         }
 
         var mono = new byte[frames * 2];
+        var peak = 0;
         for (var i = 0; i < frames; i++)
         {
             var sum = 0;
@@ -172,12 +186,67 @@ public sealed class BumiAudioRecorder : ISharedAudioRecorder, IDisposable
                 sum += data[offset + c];
             }
 
-            var mixed = (short)(sum / MicChannelCount);
-            mono[i * 2] = (byte)(mixed & 0xFF);
-            mono[(i * 2) + 1] = (byte)((mixed >> 8) & 0xFF);
+            var mixed = sum / MicChannelCount;
+            var amplified = (int)Math.Clamp(mixed * _inputGain, short.MinValue, short.MaxValue);
+            var magnitude = Math.Abs(amplified);
+            if (magnitude > peak)
+            {
+                peak = magnitude;
+            }
+
+            mono[i * 2] = (byte)(amplified & 0xFF);
+            mono[(i * 2) + 1] = (byte)((amplified >> 8) & 0xFF);
         }
 
-        _channel?.Writer.TryWrite(mono);
+        LogLevel(peak, frames);
+        EmitFrames(mono);
+    }
+
+    /// <summary>把单声道数据攒成固定的 60 ms 帧再交给上层。</summary>
+    private void EmitFrames(byte[] mono)
+    {
+        var offset = 0;
+        while (offset < mono.Length)
+        {
+            var take = Math.Min(OutputFrameBytes - _pendingBytes, mono.Length - offset);
+            Buffer.BlockCopy(mono, offset, _pendingFrame, _pendingBytes, take);
+            _pendingBytes += take;
+            offset += take;
+
+            if (_pendingBytes == OutputFrameBytes)
+            {
+                _channel?.Writer.TryWrite((byte[])_pendingFrame.Clone());
+                _pendingBytes = 0;
+            }
+        }
+    }
+
+    /// <summary>每两秒报一次采集峰值和回调块大小，便于确认增益与分帧是否合适。</summary>
+    private void LogLevel(int peak, int chunkSamples)
+    {
+        if (peak > _windowPeak)
+        {
+            _windowPeak = peak;
+        }
+
+        if (chunkSamples > _windowChunkSamples)
+        {
+            _windowChunkSamples = chunkSamples;
+        }
+
+        var now = Environment.TickCount64;
+        if (now - _levelLoggedAt < 2000)
+        {
+            return;
+        }
+
+        _levelLoggedAt = now;
+        var dbfs = _windowPeak > 0 ? 20 * Math.Log10(_windowPeak / 32768.0) : -96.0;
+        _logger.LogDebug(
+            "采集峰值 {Peak}（约 {Dbfs:F1} dBFS），回调块最大 {Samples} 样本",
+            _windowPeak, dbfs, _windowChunkSamples);
+        _windowPeak = 0;
+        _windowChunkSamples = 0;
     }
 
     private async Task PumpAsync(ChannelReader<byte[]> reader, CancellationToken token)

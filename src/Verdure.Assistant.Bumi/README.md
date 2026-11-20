@@ -95,14 +95,17 @@ curl -X POST http://192.168.55.1:5031/api/voicechat/stop
   关掉那个输入会连扬声器一起停掉且无法恢复（路线 A 的实测结论，见
   [voice-assistant.md](https://github.com/maker-community/noetix_sdk_bumi_csharp/blob/main/docs/voice-assistant.md)）。
 - `RestoreOnExit`：进程退出时把改过的开关恢复原值，**建议保持开启**，否则机器人可能停在静音状态。
-- `Volume`（0–200）、`OutputGainDb`、`HighPassHz`：真机实测结果，2 声道 / 16 kHz 且 250 Hz 高通 + −6 dB 时
-  机身小喇叭最干净；音量 120 是折中值。
+- `Urls` / 监听地址见上文；`Volume`（0–200）、`OutputGainDb`、`HighPassHz`：真机实测结果，2 声道 / 16 kHz 且
+  250 Hz 高通 + −6 dB 时机身小喇叭最干净；音量 120 是折中值。
+- `InputGainDb`：采集增益，默认 +18 dB。机器人头顶麦克风远场电平很低（1–2 m 约 −34 dBFS），
+  不加增益服务端识别不出来。近距离大声说话时峰值会接近满幅，必要时调到 +12 dB。
 
 ## 部署到机器人
 
 ```bash
 # 在开发机上打包（需要事先把 Noetix.Sdk.Bumi 放进 local-nuget/）
-dotnet publish src/Verdure.Assistant.Bumi -c Release -r linux-arm64 --self-contained false -o out/bumi-api
+# 必须自包含：算力板通常只装了 Microsoft.NETCore.App，没有 ASP.NET Core 运行时。
+dotnet publish src/Verdure.Assistant.Bumi -c Release -r linux-arm64 --self-contained true -o out/bumi-api
 
 # 拷到机器人
 scp -r out/bumi-api noetix@<robot>:/home/noetix/bumi-api
@@ -137,9 +140,16 @@ WantedBy=multi-user.target
 
 ## 说明
 
+- **上行必须严格 60 ms 一帧**。机器人 DDS 回调每次只给 160 样本（10 ms），而 Opus 编码器要求 960 样本，
+  长度不符时它会补零或截断，结果是"10 ms 语音 + 50 ms 静音"的碎片，服务端完全识别不出来。
+  `BumiAudioRecorder` 因此先缓冲、凑满整帧再交出去。
+- **播放要先攒 300 ms 前导缓冲**。TTS 帧是网络突发到达的，边到边放会被抖动切成断续；
+  时间戳也必须跨句单调递增，否则原生播放侧会以为是回退。
 - **不会启用本地关键词唤醒**（`Microsoft.CognitiveServices.Speech` 的 KWS）。机器人自带唤醒词
   "你好布米" 仍在工作，本服务可以只做对话与播放，见 `docs/voice-assistant.md` 的路线 A。
-  因此发布产物里不包含 `ModelFiles/*.table`。
+  因此发布产物里不包含 `ModelFiles/*.table`（启动时会报"找不到关键词模型文件"，属预期）。
 - 服务端返回的 `tts` 音频按 16 kHz 解码播放，即使它声明 `sample_rate: 24000`——Opus 自带采样率，
   不需要重采样。
+- `send-text` 依赖官方协议的 `listen state=detect`，服务端目前只把它当唤醒词上报，
+  对任意文本不一定有回应；要稳定"让机器人说指定的话"需要本地 TTS。
 - 本项目只是替换音频设备，语音协议、状态机、打断逻辑都在 `Verdure.Assistant.Core`。
