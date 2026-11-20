@@ -91,6 +91,8 @@ curl -X POST http://192.168.55.1:5031/api/voicechat/stop
 
 - `AutoConversationMode`：`true` 时 `listen` 下发 `mode: "auto"`，由服务端判断一句话说完。
   机器人没有"松开按钮结束说话"这个动作，设成 `false` 会让会话一直停在聆听状态，服务端最终关闭连接。
+- `WakeWordStart`：`true`（默认）时，机器人被「你好布米」语音唤醒会启动一轮对话；
+  设成 `false` 则只能由外部调用 `/api/voicechat/start` 启动。
 - `MuteBuiltInAgent` / `MuteAudioCue`：只关内置智能体的**输出**和提示音，**不动**麦克风到智能体的输入通道。
   关掉那个输入会连扬声器一起停掉且无法恢复（路线 A 的实测结论，见
   [voice-assistant.md](https://github.com/maker-community/noetix_sdk_bumi_csharp/blob/main/docs/voice-assistant.md)）。
@@ -145,9 +147,14 @@ WantedBy=multi-user.target
   `BumiAudioRecorder` 因此先缓冲、凑满整帧再交出去。
 - **播放要先攒 300 ms 前导缓冲**。TTS 帧是网络突发到达的，边到边放会被抖动切成断续；
   时间戳也必须跨句单调递增，否则原生播放侧会以为是回退。
-- **不会启用本地关键词唤醒**（`Microsoft.CognitiveServices.Speech` 的 KWS）。机器人自带唤醒词
-  "你好布米" 仍在工作，本服务可以只做对话与播放，见 `docs/voice-assistant.md` 的路线 A。
-  因此发布产物里不包含 `ModelFiles/*.table`（启动时会报"找不到关键词模型文件"，属预期）。
+- **唤醒词直接用机器人自带的「你好布米」**，不需要关键词模型文件。原理：路线 A 只静音了
+  agent→speaker，麦克风到智能体的输入仍然开着，所以厂商智能体的唤醒检测照常工作，只是它自己不出声；
+  我们订阅 `MediaController.SubscribeSystemStatus`，收到
+  `WorkStatus.Wakeuped` + `StatusChangeReason.AudioWakeuped` 时启动自己的对话。
+  这**不依赖** `Microsoft.CognitiveServices.Speech` 的本地 KWS——仓库里现有的
+  `keyword_xiaodian.table` / `keyword_cortana.table` 内置的关键词是「小电」和「Cortana」，
+  不是「布米」，而且只能由 Azure Speech Studio 云端生成，所以发布产物里不包含 `ModelFiles`。
+  因此启动日志里的"找不到关键词模型文件"是预期的，与唤醒无关。
 - 服务端返回的 `tts` 音频按 16 kHz 解码播放，即使它声明 `sample_rate: 24000`——Opus 自带采样率，
   不需要重采样。
 - `send-text` 依赖官方协议的 `listen state=detect`，服务端目前只把它当唤醒词上报，

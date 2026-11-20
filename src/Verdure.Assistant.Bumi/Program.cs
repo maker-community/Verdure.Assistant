@@ -16,6 +16,7 @@ builder.Services.AddBumiAudio(options => builder.Configuration.GetSection("Bumi"
 
 builder.Services.AddSingleton<IVoiceChatService, VoiceChatService>();
 builder.Services.AddHostedService<BumiVoiceChatBootstrapService>();
+builder.Services.AddHostedService<BumiWakeWordBridge>();
 
 var app = builder.Build();
 
