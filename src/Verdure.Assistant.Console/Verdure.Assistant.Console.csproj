@@ -16,7 +16,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Verdure.Assistant.Core\Verdure.Assistant.Core.csproj" />
-    <ProjectReference Include="..\Verdure.Assistant.Bumi\Verdure.Assistant.Bumi.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting"  />
