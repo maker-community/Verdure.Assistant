@@ -50,6 +50,11 @@ class Program
             // Initialize MCP IoT devices (new architecture based on xiaozhi-esp32)
             await InitializeMcpDevicesAsync(host.Services);
 
+            // 本主机没有“松开按钮结束说话”这个动作，手动模式永远不会发出 listen stop，
+            // 服务器会一直等下去而不做识别。改为让服务端自己判断说完。
+            _voiceChatService.KeepListening = host.Services.GetRequiredService<IConfiguration>()
+                .GetValue("AutoConversationMode", true);
+
             // 初始化服务 (this will establish WebSocket connection and trigger IoT initialization)
             await _voiceChatService.InitializeAsync(_config);
 

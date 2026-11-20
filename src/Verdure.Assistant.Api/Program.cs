@@ -280,6 +280,11 @@ try
 
                             // 创建默认配置并初始化
                             var config = CreateDefaultVerdureConfig(app.Configuration);
+
+                            // 本主机没有“松开按钮结束说话”这个动作，手动模式永远不会发出
+                            // listen stop，服务器会一直等下去而不做识别。改为让服务端自己判断说完。
+                            voiceChatService.KeepListening = app.Configuration.GetValue("AutoConversationMode", true);
+
                             await voiceChatService.InitializeAsync(config);
 
                             logger?.LogInformation("语音聊天服务自动启动完成");

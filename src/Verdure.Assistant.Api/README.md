@@ -198,6 +198,7 @@ POST /api/test/music-search?songName=周杰伦  # 测试音乐搜索播放
   "ServerUrl": "wss://api.tenclass.net/xiaozhi/v1/",
   "UseWebSocket": true,
   "EnableVoice": true,
+  "AutoConversationMode": true,
   "MusicPlayer": {
     "Backend": "mpg123",
     "CacheDirectory": "",
@@ -205,6 +206,13 @@ POST /api/test/music-search?songName=周杰伦  # 测试音乐搜索播放
   }
 }
 ```
+
+`AutoConversationMode` 控制 `listen` 消息里下发的模式：
+
+- `true`（默认）→ `mode: "auto"`，由服务端自己判断一句话说完了，适用于机器人、控制台这类没有
+  「松开按钮结束说话」的宿主。
+- `false` → `mode: "manual"`，客户端必须显式发 `listen` `state: "stop"`，服务器才会开始识别。
+  这个模式下没有 UI 触发 stop，会话会一直停在聆听状态，服务器最终以 `NormalClosure` 关闭连接。
 
 ### appsettings.Development.json
 
