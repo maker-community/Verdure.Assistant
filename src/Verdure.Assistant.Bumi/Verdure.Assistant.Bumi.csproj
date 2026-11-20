@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Noetix.Sdk.Bumi" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Verdure.Assistant.Core\Verdure.Assistant.Core.csproj" />
+  </ItemGroup>
+
+  <!-- The binding is not on nuget.org yet, so restore from the local feed at the repo root. -->
+  <PropertyGroup>
+    <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);$(MSBuildThisFileDirectory)..\..\local-nuget</RestoreAdditionalProjectSources>
+  </PropertyGroup>
+
+</Project>

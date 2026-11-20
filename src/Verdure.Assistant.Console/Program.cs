@@ -1,7 +1,8 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Verdure.Assistant.Bumi;
 using Verdure.Assistant.Console.Audio;
 using Verdure.Assistant.Core.Interfaces;
 using Verdure.Assistant.Core.Models;
@@ -116,16 +117,32 @@ class Program
                 // Add Microsoft Cognitive Services keyword spotting service
                 services.AddSingleton<IKeywordSpottingService, KeywordSpottingService>();
 
-                // Register SoundFlow audio components as singleton using factory pattern
-                services.AddSingleton<SoundFlowAudioRecorder>(provider =>
+                // 音频设备可以是本机声卡，也可以是机器人（Bumi）。
+                // The audio backend is either the local sound card or a robot.
+                if (IsBumiBackend(context.Configuration))
                 {
-                    var logger = provider.GetService<ILogger<SoundFlowAudioRecorder>>();
-                    return SoundFlowAudioRecorder.GetInstance(logger);
-                });
+                    services.AddBumiAudio(options =>
+                    {
+                        options.DdsConfigPath = context.Configuration["Bumi:DdsConfigPath"] ?? options.DdsConfigPath;
+                        options.Volume = context.Configuration.GetValue("Bumi:Volume", options.Volume);
+                        options.OutputGainDb = context.Configuration.GetValue("Bumi:OutputGainDb", options.OutputGainDb);
+                        options.HighPassHz = context.Configuration.GetValue("Bumi:HighPassHz", options.HighPassHz);
+                        options.PlaybackFrameMs = context.Configuration.GetValue("Bumi:PlaybackFrameMs", options.PlaybackFrameMs);
+                        options.MuteBuiltInAgent = context.Configuration.GetValue("Bumi:MuteBuiltInAgent", options.MuteBuiltInAgent);
+                    });
+                }
+                else
+                {
+                    // Register SoundFlow audio components as singleton using factory pattern
+                    services.AddSingleton<SoundFlowAudioRecorder>(provider =>
+                    {
+                        var logger = provider.GetService<ILogger<SoundFlowAudioRecorder>>();
+                        return SoundFlowAudioRecorder.GetInstance(logger);
+                    });
 
-
-                services.AddSingleton<IAudioPlayer, SoundFlowAudioPlayer>();
-                services.AddSingleton<ISharedAudioRecorder>(provider => provider.GetRequiredService<SoundFlowAudioRecorder>());
+                    services.AddSingleton<IAudioPlayer, SoundFlowAudioPlayer>();
+                    services.AddSingleton<ISharedAudioRecorder>(provider => provider.GetRequiredService<SoundFlowAudioRecorder>());
+                }
                 // Register MCP services (new architecture based on xiaozhi-esp32)
                 services.AddSingleton<McpServer>();
                 services.AddSingleton(provider =>
@@ -137,8 +154,18 @@ class Program
                 });
             });
 
-    static VerdureConfig LoadConfiguration()
+    /// <summary>
+    /// 音频后端选择：AUDIO_BACKEND 环境变量优先，其次是 appsettings.json 的 AudioBackend。
+    /// "bumi" 使用机器人麦克风与扬声器，其余值使用本机声卡。
+    /// </summary>
+    static bool IsBumiBackend(IConfiguration configuration)
     {
+        var value = Environment.GetEnvironmentVariable("AUDIO_BACKEND")
+                    ?? configuration["AudioBackend"];
+        return string.Equals(value, "bumi", StringComparison.OrdinalIgnoreCase);
+    }
+
+    static VerdureConfig LoadConfiguration()    {
         var configuration = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", optional: true)

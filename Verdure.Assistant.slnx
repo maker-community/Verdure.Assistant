@@ -13,6 +13,7 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Verdure.Assistant.Api/Verdure.Assistant.Api.csproj" />
+    <Project Path="src/Verdure.Assistant.Bumi/Verdure.Assistant.Bumi.csproj" />
     <Project Path="src/Verdure.Assistant.MAUI/Verdure.Assistant.MAUI.csproj" />
     <Project Path="src/Verdure.Assistant.ViewModels/Verdure.Assistant.ViewModels.csproj" />
   </Folder>

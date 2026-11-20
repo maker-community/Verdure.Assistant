@@ -9,6 +9,8 @@
     <!-- IoT and Device Bindings -->
     <PackageVersion Include="Iot.Device.Bindings" Version="4.2.0" />
     <PackageVersion Include="System.Device.Gpio" Version="4.2.0" />
+    <!-- Noetix Bumi robot (built from the community binding repo into ./local-nuget) -->
+    <PackageVersion Include="Noetix.Sdk.Bumi" Version="3.1.0-preview.1" />
     <!-- MQTT -->
     <PackageVersion Include="MQTTnet" Version="5.2.0.1603" />
     <!-- Microsoft AspNetCore -->
