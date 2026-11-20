@@ -105,10 +105,11 @@ public class ConfigurationService : IConfigurationService
         _httpClient = new HttpClient();
         _httpClient.Timeout = TimeSpan.FromSeconds(30);
 
-        // 初始化设备信息
-        ClientId = GenerateClientId();
+        // 初始化设备信息：ClientId 必须由设备标识推导，不能每次启动随机生成，
+        // 否则服务端会把每次运行都当成新客户端，重新要求绑定/验证。
         _autoDeviceId = GetMacAddress();
         DeviceId = _autoDeviceId;
+        ClientId = GenerateClientId(_autoDeviceId);
         UserAgent = $"verdure-assistant/{CurrentVersion} ({Environment.OSVersion.Platform})";
 
         try
@@ -133,6 +134,28 @@ public class ConfigurationService : IConfigurationService
 
         var deviceId = settings.DeviceId?.Trim();
         DeviceId = string.IsNullOrEmpty(deviceId) ? _autoDeviceId : deviceId;
+
+        // ClientId：优先使用设置中保存的值（允许用户覆盖）；否则用当前设备标识推导，
+        // 并在首次运行时写回设置，行为与官方 ESP32 固件把 uuid 持久化到 NVS 一致。
+        var savedClientId = settings.ClientId?.Trim();
+        if (!string.IsNullOrEmpty(savedClientId))
+        {
+            ClientId = savedClientId;
+        }
+        else
+        {
+            ClientId = GenerateClientId(DeviceId);
+            settings.ClientId = ClientId;
+            try
+            {
+                await _settingsService.SaveSettingsAsync(settings).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "保存 ClientId 失败，本次运行仍使用由设备标识推导的稳定值");
+            }
+        }
+
         _settingsToken = settings.WsToken?.Trim() ?? string.Empty;
 
         if (!string.IsNullOrWhiteSpace(settings.OtaAddress))
@@ -537,9 +560,19 @@ public class ConfigurationService : IConfigurationService
         }
     }
 
-    private string GenerateClientId()
+    /// <summary>
+    /// 生成稳定的 ClientId：同一设备标识永远得到同一个 UUID（版本 5 风格，由设备标识推导）。
+    /// 旧实现每次启动都调用 <c>Guid.NewGuid()</c>，导致服务端把每次运行当成新客户端。
+    /// </summary>
+    private static string GenerateClientId(string deviceId)
     {
-        return Guid.NewGuid().ToString();
+        var seed = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes($"verdure-assistant|{deviceId}"));
+        var bytes = new byte[16];
+        Array.Copy(seed, bytes, 16);
+        bytes[7] = (byte)((bytes[7] & 0x0F) | 0x50); // version 5
+        bytes[8] = (byte)((bytes[8] & 0x3F) | 0x80); // RFC 4122 variant
+        return new Guid(bytes).ToString();
     }
 
     private string GenerateDefaultSha256()

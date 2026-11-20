@@ -24,6 +24,11 @@ namespace Verdure.Assistant.Core.Models
         public string DeviceId { get; set; } = string.Empty;
 
         /// <summary>
+        /// 客户端ID（首次运行后持久化，保证多次启动不变，避免服务端重复要求绑定）
+        /// </summary>
+        public string ClientId { get; set; } = string.Empty;
+
+        /// <summary>
         /// WebSocket服务器地址
         /// </summary>
         public string WsAddress { get; set; } = "ws://localhost:8765";
@@ -211,6 +216,7 @@ namespace Verdure.Assistant.Core.Models
                 WakeWordEnabled = WakeWordEnabled,
                 WakeWords = WakeWords,
                 DeviceId = DeviceId,
+                ClientId = ClientId,
                 WsAddress = WsAddress,
                 WsToken = WsToken,
                 OtaAddress = OtaAddress,
