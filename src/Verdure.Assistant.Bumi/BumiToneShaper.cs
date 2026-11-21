@@ -18,9 +18,24 @@ internal sealed class BumiToneShaper
     private readonly Biquad? _highPassA;
     private readonly Biquad? _highPassB;
     private readonly Biquad? _presence;
+    private readonly Biquad? _denseLowPass;
     private readonly double _gain;
     private readonly double _ceiling;
     private readonly double _releaseCoeff;
+
+    // 内容自适应：语音是稀疏的（有停顿，活动度约 0.5–0.7），音乐是密集的（约 0.85）。
+    // 用小喇叭最怕的"密集高频"来判定，只在密集内容上收掉存在感提升与一部分电平；
+    // 语音的稀疏度远低于门限，因此语音那条链的输出完全不变。
+    private readonly bool _protectDenseContent;
+    private readonly double _activityThreshold;
+    private readonly double _gateLow;
+    private readonly double _gateHigh;
+    private readonly double _hotGainScale;
+    private readonly double _activityCoeff;
+    private readonly double _blendCoeff;
+
+    private double _activity;
+    private double _blend = 1.0;
 
     private double _gainReduction = 1.0;
 
@@ -28,6 +43,14 @@ internal sealed class BumiToneShaper
     {
         var sampleRate = options.SampleRate;
         _gain = Math.Pow(10.0, options.OutputGainDb / 20.0);
+
+        _protectDenseContent = options.ProtectDenseContent;
+        _activityThreshold = short.MaxValue * Math.Pow(10.0, options.ContentActivityThresholdDb / 20.0);
+        _gateLow = options.DenseContentGateLow;
+        _gateHigh = Math.Max(options.DenseContentGateLow + 0.01, options.DenseContentGateHigh);
+        _hotGainScale = Math.Pow(10.0, options.DenseContentGainDb / 20.0);
+        _activityCoeff = 1.0 - Math.Exp(-1.0 / Math.Max(1.0, sampleRate * 0.5));
+        _blendCoeff = 1.0 - Math.Exp(-1.0 / Math.Max(1.0, sampleRate * 0.05));
 
         if (options.HighPassHz > 0 && options.HighPassHz < sampleRate / 2)
         {
@@ -46,6 +69,11 @@ internal sealed class BumiToneShaper
         if (options.PresenceGainDb != 0 && options.PresenceHz > 0 && options.PresenceHz < sampleRate / 2)
         {
             _presence = Biquad.HighShelf(options.PresenceHz, sampleRate, options.PresenceGainDb);
+        }
+
+        if (_protectDenseContent && options.DenseContentLowPassHz > 0 && options.DenseContentLowPassHz < sampleRate / 2)
+        {
+            _denseLowPass = Biquad.LowPass(options.DenseContentLowPassHz, sampleRate, 0.7071);
         }
 
         if (options.LimiterCeilingDb < 0)
@@ -74,12 +102,26 @@ internal sealed class BumiToneShaper
             value = _highPassB.Process(value);
         }
 
+        // 平方一下：语音（1.0）完全不动，音乐这种半程值会被压得更接近"平直"，
+        // 因为小喇叭的尖锐破音来自高频能量，差几个 dB 听感差别很大。
+        var mix = UpdateHotScale(value);
+        mix *= mix;
+
         if (_presence is not null)
         {
-            value = _presence.Process(value);
+            // 高架始终跑（保持滤波器状态连续），再在干声与提升之间混合。
+            var shaped = _presence.Process(value);
+            value += (shaped - value) * mix;
         }
 
-        value *= _gain;
+        if (_denseLowPass is not null)
+        {
+            // 密集内容退回平直时顺便收掉最上面的尖，小喇叭在这段最容易出破音。
+            var dull = _denseLowPass.Process(value);
+            value += (dull - value) * (1.0 - mix);
+        }
+
+        value *= _gain * (1.0 + ((_hotGainScale - 1.0) * (1.0 - mix)));
 
         if (_ceiling > 0)
         {
@@ -87,6 +129,25 @@ internal sealed class BumiToneShaper
         }
 
         return (short)Math.Clamp(value, short.MinValue, short.MaxValue);
+    }
+
+    /// <summary>
+    /// 返回 0–1 的"音色保留度"：1 = 稀疏语音（全量音色处理），0 = 密集内容（退回平直 + 让电平）。
+    /// </summary>
+    private double UpdateHotScale(double value)
+    {
+        if (!_protectDenseContent)
+        {
+            return 1.0;
+        }
+
+        // 活动度 = 最近 500 ms 里"有声"时间占比的平滑值。语音有停顿，音乐几乎不中断。
+        var active = Math.Abs(value) > _activityThreshold ? 1.0 : 0.0;
+        _activity += (active - _activity) * _activityCoeff;
+
+        var target = Math.Clamp((_gateHigh - _activity) / (_gateHigh - _gateLow), 0.0, 1.0);
+        _blend += (target - _blend) * _blendCoeff;
+        return _blend;
     }
 
     /// <summary>峰值限幅：增益回落立即生效（不会过冲），恢复慢一些避免"抽吸"感。</summary>
@@ -107,7 +168,10 @@ internal sealed class BumiToneShaper
         _highPassA?.Reset();
         _highPassB?.Reset();
         _presence?.Reset();
+        _denseLowPass?.Reset();
         _gainReduction = 1.0;
+        _activity = 0;
+        _blend = 1.0;
     }
 
     /// <summary>RBJ 双二阶滤波器（直接 I 型）。</summary>
@@ -140,9 +204,24 @@ internal sealed class BumiToneShaper
                 1 - alpha);
         }
 
-        /// <summary>高架：把 <paramref name="cutoffHz"/> 以上的频段整体抬升 <paramref name="gainDb"/>。</summary>
-        public static Biquad HighShelf(double cutoffHz, int sampleRate, double gainDb)
+        /// <summary>低通：把 <paramref name="cutoffHz"/> 以上的频段压掉，用于给密集内容"去尖"。</summary>
+        public static Biquad LowPass(double cutoffHz, int sampleRate, double q)
         {
+            var w0 = 2 * Math.PI * cutoffHz / sampleRate;
+            var cos = Math.Cos(w0);
+            var alpha = Math.Sin(w0) / (2 * q);
+
+            return new Biquad(
+                (1 - cos) / 2,
+                1 - cos,
+                (1 - cos) / 2,
+                1 + alpha,
+                -2 * cos,
+                1 - alpha);
+        }
+
+        /// <summary>高架：把 <paramref name="cutoffHz"/> 以上的频段整体抬升 <paramref name="gainDb"/>。</summary>
+        public static Biquad HighShelf(double cutoffHz, int sampleRate, double gainDb)        {
             var amplitude = Math.Pow(10.0, gainDb / 40.0);
             var w0 = 2 * Math.PI * cutoffHz / sampleRate;
             var cos = Math.Cos(w0);
