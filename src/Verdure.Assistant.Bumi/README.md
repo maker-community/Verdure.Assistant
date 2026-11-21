@@ -187,7 +187,8 @@ journalctl -u verdure-assistant-bumi -f
   这**不依赖** `Microsoft.CognitiveServices.Speech` 的本地 KWS——仓库里现有的
   `keyword_xiaodian.table` / `keyword_cortana.table` 内置的关键词是「小电」和「Cortana」，
   不是「布米」，而且只能由 Azure Speech Studio 云端生成，所以发布产物里不包含 `ModelFiles`。
-  因此启动日志里的"找不到关键词模型文件"是预期的，与唤醒无关。
+  因此 `appsettings.json` 里把 `EnableLocalKeywordSpotting` 设成 `false`，启动时不再去找模型文件、
+  也不会再报"找不到关键词模型文件"。
 - 服务端返回的 `tts` 音频按 16 kHz 解码播放，即使它声明 `sample_rate: 24000`——Opus 自带采样率，
   不需要重采样。
 - `send-text` 依赖官方协议的 `listen state=detect`，服务端目前只把它当唤醒词上报，

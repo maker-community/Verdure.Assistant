@@ -12,6 +12,12 @@ public class VerdureConfig
     public string MqttTopic { get; set; } = "xiaozhi/chat";
     public bool UseWebSocket { get; set; } = true;    
     public bool EnableVoice { get; set; } = true;
+
+    /// <summary>
+    /// 是否启用本地关键词唤醒（Azure Speech 的 KWS，需要 ModelFiles 里的 .table 模型）。
+    /// 用机器人自带的唤醒词时应当关掉，否则每次启动都会因为缺模型文件报两条错。
+    /// </summary>
+    public bool EnableLocalKeywordSpotting { get; set; } = true;
     public int AudioSampleRate { get; set; } = 16000; // INPUT_SAMPLE_RATE 匹配Python
     public int AudioOutputSampleRate { get; set; } = 16000; // OUTPUT_SAMPLE_RATE 匹配Python  
     public int AudioChannels { get; set; } = 1; // CHANNELS 匹配Python

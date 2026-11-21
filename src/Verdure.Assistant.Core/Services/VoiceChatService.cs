@@ -371,6 +371,13 @@ public class VoiceChatService : IVoiceChatService
             return;
         }
 
+        if (!_config.EnableLocalKeywordSpotting)
+        {
+            // 用机器人自带的唤醒词时不需要本地 KWS，也不需要 ModelFiles。
+            _logger?.LogInformation("本地关键词唤醒已关闭，唤醒由外部提供（例如机器人自带的唤醒词）");
+            return;
+        }
+
         if (_keywordSpottingService.IsRunning || _keywordSpottingService.IsPaused)
         {
             _keywordDetectionEnabled = true;
