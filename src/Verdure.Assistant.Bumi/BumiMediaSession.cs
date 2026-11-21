@@ -10,6 +10,8 @@ namespace Verdure.Assistant.Bumi;
 /// <remarks>
 /// 路线 A（实测结论）：只关内置智能体的输出与提示音，<b>不动</b> 麦克风到智能体的输入。
 /// 关掉那个输入会把唤醒检测和扬声器一起停掉，且无法用 TO_WAKEUP 恢复。
+/// 退出时恢复成"可用"状态（而不是回到启动时的值）：静音只在服务运行期间有效，
+/// 否则一次崩溃就会让机器人自己的助手永久哑掉。
 /// </remarks>
 public sealed class BumiMediaSession : IDisposable
 {
@@ -65,15 +67,33 @@ public sealed class BumiMediaSession : IDisposable
             _originalAgentToSpeaker = media.GetInternalAgentAudioDataToPlaybackEnable();
             _originalAudioCue = media.GetAudioCueEnable();
 
-            if (_options.MuteBuiltInAgent && _originalAgentToSpeaker)
+            if (_options.MuteBuiltInAgent)
             {
-                media.SetInternalAgentAudioDataToPlaybackEnable(false);
+                if (_originalAgentToSpeaker)
+                {
+                    media.SetInternalAgentAudioDataToPlaybackEnable(false);
+                }
+                else
+                {
+                    // 上一次运行没能恢复开关（例如被 SIGKILL）：记下来，退出时重新打开。
+                    _logger.LogWarning(
+                        "内置智能体播放在服务启动前就已被关闭，说明上一次运行没走恢复路径；退出时会重新打开");
+                }
+
                 _switchesChanged = true;
             }
 
-            if (_options.MuteAudioCue && _originalAudioCue)
+            if (_options.MuteAudioCue)
             {
-                media.SetAudioCueEnable(false);
+                if (_originalAudioCue)
+                {
+                    media.SetAudioCueEnable(false);
+                }
+                else
+                {
+                    _logger.LogWarning("提示音在服务启动前就已被关闭；退出时会重新打开");
+                }
+
                 _switchesChanged = true;
             }
 
@@ -121,12 +141,15 @@ public sealed class BumiMediaSession : IDisposable
             try
             {
                 var media = MediaController.Instance;
-                media.SetInternalAgentAudioDataToPlaybackEnable(_originalAgentToSpeaker);
-                media.SetAudioCueEnable(_originalAudioCue);
+
+                // 我们的静音只在服务运行期间有效：绝不能让机器人自己的助手在服务退出后还是哑的，
+                // 哪怕启动时它就已经是关的（上一次崩溃留下的状态）。
+                media.SetInternalAgentAudioDataToPlaybackEnable(true);
+                media.SetAudioCueEnable(true);
                 media.SetVolume(_originalVolume);
                 _logger.LogInformation(
-                    "Bumi media switches restored (agent->speaker {Agent}, cue {Cue}, volume {Volume})",
-                    _originalAgentToSpeaker, _originalAudioCue, _originalVolume);
+                    "Bumi media switches restored (agent->speaker true, cue true, volume {Volume}; 原来的 agent->speaker {WasAgent}, cue {WasCue})",
+                    _originalVolume, _originalAgentToSpeaker, _originalAudioCue);
             }
             catch (Exception ex)
             {
