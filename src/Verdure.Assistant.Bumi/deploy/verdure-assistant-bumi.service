@@ -19,6 +19,10 @@ Environment=Bumi__DdsConfigPath=/home/noetix/noetix-csharp-arm64-build-20261118/
 Environment=Bumi__Volume=100
 Environment=ASPNETCORE_URLS=http://0.0.0.0:5031
 
+# 开机时 192.168.55.x 往往还没就绪，此时建立 DDS 订阅会留下收不到状态事件的连接
+# （实测表现为唤醒词完全无反应）。先等运控板可达再启动，最多等 60 秒。
+ExecStartPre=/bin/sh -c 'for i in $(seq 1 60); do ping -c1 -W1 192.168.55.102 >/dev/null 2>&1 && exit 0; sleep 1; done; echo "192.168.55.102 unreachable after 60s" >&2; exit 1'
+
 ExecStart=/home/noetix/bumi-api/Verdure.Assistant.Bumi
 Restart=on-failure
 RestartSec=5

@@ -33,6 +33,7 @@ internal sealed class BumiWakeWordBridge : IHostedService
 
     private long _lastWakeAt;
     private bool _subscribed;
+    private string _lastStatus = string.Empty;
 
     public BumiWakeWordBridge(
         BumiMediaSession media,
@@ -93,6 +94,13 @@ internal sealed class BumiWakeWordBridge : IHostedService
 
     private void OnSystemStatus(SystemStatus status)
     {
+        var signature = $"{status.Value}/{status.Reason}";
+        if (signature != _lastStatus)
+        {
+            _lastStatus = signature;
+            _logger.LogInformation("语音模块状态: {Value}（{Reason}）", status.Value, status.Reason);
+        }
+
         if (status.Value != WorkStatus.Wakeuped || status.Reason != StatusChangeReason.AudioWakeuped)
         {
             return;
