@@ -34,6 +34,7 @@ public sealed class BumiAudioPlayer : IAudioPlayer, IDisposable
     private long _framesPublished;
 
     private BumiToneShaper? _shaper;
+    private readonly BumiTtsDumper? _dump;
 
     // 统计 TTS 帧的到达节奏：服务端如果送得比实时慢，任何播放器都补不出连续的声音。
     private readonly Stopwatch _arrivalClock = Stopwatch.StartNew();
@@ -48,6 +49,11 @@ public sealed class BumiAudioPlayer : IAudioPlayer, IDisposable
         _options = options.Value;
         _logger = logger;
         _shaper = new BumiToneShaper(_options);
+
+        if (!string.IsNullOrWhiteSpace(_options.DumpTtsDirectory))
+        {
+            _dump = new BumiTtsDumper(_options.DumpTtsDirectory, _options.SampleRate, _logger);
+        }
     }
 
     public event EventHandler? PlaybackStopped;
@@ -175,6 +181,7 @@ public sealed class BumiAudioPlayer : IAudioPlayer, IDisposable
         pump?.Wait(TimeSpan.FromSeconds(2));
         cts?.Dispose();
         ResetFilter();
+        _dump?.Flush();
         return Task.CompletedTask;
     }
 
@@ -318,6 +325,8 @@ public sealed class BumiAudioPlayer : IAudioPlayer, IDisposable
 
     private void Publish(short[] samples, long elapsedMs, int frameMs)
     {
+        _dump?.Write(samples);
+
         var stream = new AudioStream
         {
             Header = new MediaHeader(++_messageId, (ulong)(elapsedMs * 1000), string.Empty),
@@ -348,5 +357,6 @@ public sealed class BumiAudioPlayer : IAudioPlayer, IDisposable
         }
 
         _disposed = true;
+        _dump?.Dispose();
     }
 }
