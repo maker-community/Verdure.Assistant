@@ -106,10 +106,15 @@ public sealed class BumiMediaSession : IDisposable
             // 外部音频到扬声器必须开着，否则自己的声音出不来。
             media.SetExternalCustomAudioDataToPlaybackEnable(true);
 
+            // 读回值会滞后一拍：刚 set 完再 get 往往还是旧值，所以这里把"请求值"和"读回值"分开写，
+            // 免得下次看日志的人误以为静音没生效。
             _logger.LogInformation(
-                "Bumi media ready: volume {Volume}, agent->speaker {Agent}, cue {Cue}, mic->agent {Mic} (left untouched)",
+                "Bumi media ready: volume {Volume} (requested {WantedVolume}), agent->speaker requested {WantedAgent} (readback {Agent}), cue requested {WantedCue} (readback {Cue}), mic->agent {Mic} (left untouched)",
                 media.GetVolume(),
+                _options.Volume,
+                _options.MuteBuiltInAgent ? "false" : "unchanged",
                 media.GetInternalAgentAudioDataToPlaybackEnable(),
+                _options.MuteAudioCue ? "false" : "unchanged",
                 media.GetAudioCueEnable(),
                 media.GetInternalCaptureAudioDataToAgentEnable());
 
