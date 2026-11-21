@@ -96,8 +96,11 @@ public sealed class BumiAudioOptions
     /// </summary>
     public bool PlaybackPaceRealtime { get; set; } = true;
 
-    /// <summary>机器人音量（0–200）。实测 60 最干净、100 略脏但明显更响；100 是响度与失真的折中。</summary>
-    public int Volume { get; set; } = 100;
+    /// <summary>
+    /// 机器人音量（0–200）。实测 60 最干净、100 略脏但明显更响；语音取 100 可接受，
+    /// 但音乐这类密集内容在 100 会出尖锐破音，所以默认 90（响度只差约 1 dB）。
+    /// </summary>
+    public int Volume { get; set; } = 90;
 
     /// <summary>
     /// 是否静音内置智能体。只关它的输出，不动麦克风输入——关掉输入会连带杀掉扬声器。

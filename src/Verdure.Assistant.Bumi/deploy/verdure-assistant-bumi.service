@@ -16,7 +16,7 @@ Environment=LD_LIBRARY_PATH=/home/noetix/noetix-csharp-arm64-build-20261118/buil
 Environment=Bumi__DdsConfigPath=/home/noetix/noetix-csharp-arm64-build-20261118/official-sdk/config/dds.xml
 
 # 真机实测：100 是"响且不破"的折中；再往上功放压缩，几乎不更响
-Environment=Bumi__Volume=100
+Environment=Bumi__Volume=90
 Environment=ASPNETCORE_URLS=http://0.0.0.0:5031
 
 # 开机时 192.168.55.x 往往还没就绪，此时建立 DDS 订阅会留下收不到状态事件的连接
