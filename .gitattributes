@@ -61,3 +61,10 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+###############################################################################
+# Shell scripts and systemd units must keep LF line endings: a CRLF shebang or
+# an "EOF\r" heredoc terminator makes them fail on Linux.
+###############################################################################
+*.sh      text eol=lf
+*.service text eol=lf

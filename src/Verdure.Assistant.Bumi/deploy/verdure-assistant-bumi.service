@@ -1,0 +1,31 @@
+[Unit]
+Description=Verdure Assistant - Bumi voice API
+Documentation=https://github.com/maker-community/noetix_sdk_bumi_csharp
+After=network-online.target time-sync.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+User=noetix
+Group=noetix
+WorkingDirectory=/home/noetix/bumi-api
+
+# 原生库与 DDS 配置：按机器人上的实际路径修改
+Environment=LD_LIBRARY_PATH=/home/noetix/noetix-csharp-arm64-build-20261118/build
+Environment=Bumi__DdsConfigPath=/home/noetix/noetix-csharp-arm64-build-20261118/official-sdk/config/dds.xml
+
+# 真机实测：100 是"响且不破"的折中；再往上功放压缩，几乎不更响
+Environment=Bumi__Volume=100
+Environment=ASPNETCORE_URLS=http://0.0.0.0:5031
+
+ExecStart=/home/noetix/bumi-api/Verdure.Assistant.Bumi
+Restart=on-failure
+RestartSec=5
+
+# 退出时要恢复机器人的 agent→喇叭 / 提示音 / 音量开关，留足时间
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

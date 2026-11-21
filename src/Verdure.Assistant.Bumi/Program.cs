@@ -5,6 +5,9 @@ using Verdure.Assistant.Core.Services.MCP;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// 作为 systemd 服务运行：向 systemd 报告就绪、把日志写进 journal。
+builder.Host.UseSystemd();
+
 builder.Services.AddControllers();
 
 builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();

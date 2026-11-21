@@ -33,16 +33,38 @@ internal sealed class BumiVoiceChatBootstrapService : BackgroundService
             return;
         }
 
-        try
+        BumiVoiceChatDefaults.ApplyAutoConversationMode(_voiceChat, _configuration);
+        var config = BumiVoiceChatDefaults.CreateConfig(_configuration);
+
+        // 开机自启时网络和 DDS 可能还没就绪，失败就退避重试，而不是让服务停在一个半死状态。
+        for (var attempt = 1; !stoppingToken.IsCancellationRequested; attempt++)
         {
-            BumiVoiceChatDefaults.ApplyAutoConversationMode(_voiceChat, _configuration);
-            await _voiceChat.InitializeAsync(BumiVoiceChatDefaults.CreateConfig(_configuration));
-            _logger.LogInformation("语音聊天服务已自动初始化，可用 POST /api/voicechat/start 开始对话");
-        }
-        catch (Exception ex)
-        {
-            // 失败不影响 HTTP 服务本身：机器人没上电、网络没通时仍然能查看状态并重试。
-            _logger.LogError(ex, "自动初始化语音聊天失败，可稍后通过 /api/voicechat/initialize 重试");
+            if (_voiceChat.IsConnected)
+            {
+                return;
+            }
+
+            try
+            {
+                await _voiceChat.InitializeAsync(config);
+                _logger.LogInformation("语音聊天服务已自动初始化（第 {Attempt} 次尝试），可用 POST /api/voicechat/start 开始对话", attempt);
+                return;
+            }
+            catch (Exception ex)
+            {
+                var delay = TimeSpan.FromSeconds(Math.Min(60, 5 * attempt));
+                _logger.LogWarning(
+                    ex, "第 {Attempt} 次自动初始化失败，{Delay} 秒后重试（服务本身仍在运行，可查状态）", attempt, delay.TotalSeconds);
+
+                try
+                {
+                    await Task.Delay(delay, stoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+            }
         }
     }
 }

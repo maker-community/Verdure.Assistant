@@ -132,7 +132,7 @@ systemd 单元示例：
 
 ```ini
 [Unit]
-Description=Verdure Assistant (Bumi voice API)
+Description=Verdure Assistant - Bumi voice API
 After=network-online.target
 
 [Service]
@@ -144,6 +144,32 @@ Restart=on-failure
 [Install]
 WantedBy=multi-user.target
 ```
+
+### 作为开机自启服务（推荐）
+
+发布产物里已经带了可直接使用的单元文件和安装脚本：
+
+```bash
+# 1) 按机器人上的实际路径修改单元文件里的两处路径
+vim ~/bumi-api/deploy/verdure-assistant-bumi.service
+
+# 2) 安装并启动（需要 sudo）
+sudo bash ~/bumi-api/deploy/install-systemd.sh
+
+# 3) 之后
+systemctl status verdure-assistant-bumi
+journalctl -u verdure-assistant-bumi -f
+```
+
+服务用 `Type=notify`（程序里调了 `UseSystemd()`），systemd 会等 HTTP 端口就绪才算启动完成。
+几点设计说明：
+
+- **开机时网络/DDS 可能还没好**：初始化失败会按 5s、10s…最多 60s 退避重试，服务本身保持可访问。
+- **停止服务会走 SIGTERM**，程序在退出时恢复 `agent→喇叭`、提示音和音量开关；`TimeoutStopSec=30`
+  留足时间。**不要用 `kill -9`**，否则机器人会停留在静音状态。
+- **唤醒词**：服务起来后不需要任何操作，说「你好布米」即可开始对话（`WakeWordStart`）。
+- 设备 ID 由设备标识推导并持久化，绑定一次后重启不会变（见 `ClientId` 的处理）。
+
 
 ## 说明
 

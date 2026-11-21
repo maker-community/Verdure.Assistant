@@ -7,10 +7,17 @@
 
   <ItemGroup>
     <PackageReference Include="Noetix.Sdk.Bumi" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Assets\wake-cue.wav" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="deploy\**" />
+    <None Remove="deploy\**" />
+    <None Include="deploy\**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
