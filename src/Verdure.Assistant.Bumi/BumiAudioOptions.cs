@@ -27,6 +27,37 @@ public sealed class BumiAudioOptions
     /// <summary>播放前的高通截止频率（Hz）。设为 0 关闭。</summary>
     public int HighPassHz { get; set; } = 250;
 
+    /// <summary>
+    /// 高通级数：1 = 二阶（12 dB/oct，原来的行为），2 = 四阶（24 dB/oct）。
+    /// 小喇叭发不出来的低频越干净，同样的音量下失真越小。
+    /// </summary>
+    public int HighPassStages { get; set; } = 1;
+
+    /// <summary>存在感高架的截止频率（Hz）。默认 3000。</summary>
+    public int PresenceHz { get; set; } = 3000;
+
+    /// <summary>存在感高架的增益（dB）。默认 0（不提升）；+2~+4 会让声音更"清脆"。</summary>
+    public double PresenceGainDb { get; set; } = 0;
+
+    /// <summary>
+    /// 峰值限幅上限（dBFS）。默认 0（不限幅）；建议 -3，避免推到满幅时硬削波产生沙沙声。
+    /// </summary>
+    public double LimiterCeilingDb { get; set; }
+
+    /// <summary>限幅后的恢复时间（毫秒）。太短会有"抽吸"感，默认 120。</summary>
+    public double LimiterReleaseMs { get; set; } = 120;
+
+    /// <summary>
+    /// 播放前导缓冲（毫秒）。TTS 帧是网络突发到达的，缓冲越足越不容易出现空洞；默认 300。
+    /// </summary>
+    public int PlaybackLeadMs { get; set; } = 300;
+
+    /// <summary>
+    /// 是否按墙钟节奏推送。默认 true（机器人上实测这个节奏最稳）。
+    /// 设为 false 时会把音频尽快灌给原生播放侧，实测反而更断。
+    /// </summary>
+    public bool PlaybackPaceRealtime { get; set; } = true;
+
     /// <summary>机器人音量（0–200）。默认 120。</summary>
     public int Volume { get; set; } = 120;
 
