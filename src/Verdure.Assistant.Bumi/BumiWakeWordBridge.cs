@@ -82,7 +82,7 @@ internal sealed class BumiWakeWordBridge : IHostedService
             _logger.LogError(ex, "订阅机器人状态失败，唤醒词启动不可用");
         }
 
-        SleepBuiltInAgent("启动");
+        ReassertQuiet("启动");
 
         return Task.CompletedTask;
     }
@@ -118,7 +118,7 @@ internal sealed class BumiWakeWordBridge : IHostedService
 
         if (status.Value != WorkStatus.Sleeped)
         {
-            SleepBuiltInAgent($"状态 {status.Value}");
+            ReassertQuiet("状态 " + status.Value);
         }
 
         if (status.Value != WorkStatus.Wakeuped || status.Reason != StatusChangeReason.AudioWakeuped)
@@ -130,20 +130,15 @@ internal sealed class BumiWakeWordBridge : IHostedService
     }
 
     /// <summary>
-    /// 把内置智能体按回休眠：它只负责听唤醒词，对话由我们来做。
+    /// 重新压一遍"让它闭嘴"的开关：静音它的输出、关掉它的提示音，再按回休眠。
     /// </summary>
     /// <remarks>
-    /// 实测休眠期间外部播放与唤醒都正常，所以这比"只静音它的输出"更彻底：
-    /// 它不会再跑自己的识别/大模型，也不会自己发声音。回调线程上不能阻塞，
-    /// 因此延迟与调用都丢给线程池，并用去抖挡住状态的重复上报。
+    /// 每次状态变化都重来一遍是必要的：开关的读回值会滞后，模块自己也可能在唤醒流程里
+    /// 把配置改回去（实测服务跑着跑着再次读到 <c>AudioCueEnable=True</c>）。
+    /// 回调线程上不能阻塞，所以延迟与调用都丢给线程池，并用去抖挡住状态的重复上报。
     /// </remarks>
-    private void SleepBuiltInAgent(string trigger)
+    private void ReassertQuiet(string trigger)
     {
-        if (!_options.KeepBuiltInAgentAsleep)
-        {
-            return;
-        }
-
         var now = Environment.TickCount64;
         if (now - Interlocked.Read(ref _lastSleepAt) < SleepDebounceMs)
         {
@@ -155,6 +150,13 @@ internal sealed class BumiWakeWordBridge : IHostedService
         _ = Task.Run(async () =>
         {
             await Task.Delay(SleepAfterWakeMs).ConfigureAwait(false);
+            _media.EnforceMutes();
+
+            if (!_options.KeepBuiltInAgentAsleep)
+            {
+                return;
+            }
+
             try
             {
                 _media.Media.SetSystemControl(SystemControlType.ToSleep, false);

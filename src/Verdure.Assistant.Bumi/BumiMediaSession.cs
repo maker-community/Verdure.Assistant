@@ -128,6 +128,43 @@ public sealed class BumiMediaSession : IDisposable
         }
     }
 
+    /// <summary>
+    /// 再压一遍"让内置智能体闭嘴"的开关（静音它的输出、关掉它的提示音）。
+    /// </summary>
+    /// <remarks>
+    /// 开关的读回值会滞后，模块也可能在自身的唤醒流程里把配置改回去，所以每次状态变化后都要重来一遍，
+    /// 不能只在初始化时设置一次。用户可以关掉这两个静音项，此时这里什么都不做。
+    /// </remarks>
+    public void EnforceMutes()
+    {
+        lock (_gate)
+        {
+            if (_disposed || !_initialized)
+            {
+                return;
+            }
+
+            try
+            {
+                var media = MediaController.Instance;
+
+                if (_options.MuteBuiltInAgent)
+                {
+                    media.SetInternalAgentAudioDataToPlaybackEnable(false);
+                }
+
+                if (_options.MuteAudioCue)
+                {
+                    media.SetAudioCueEnable(false);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "重新静音内置智能体失败");
+            }
+        }
+    }
+
     public void Dispose()
     {
         lock (_gate)
