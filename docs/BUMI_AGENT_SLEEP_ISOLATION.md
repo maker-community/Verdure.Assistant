@@ -35,14 +35,31 @@
 - 配置：`Bumi:KeepBuiltInAgentAsleep`（默认 `true`），见 [BumiAudioOptions.cs](../src/Verdure.Assistant.Bumi/BumiAudioOptions.cs)；
 - 逻辑在 [BumiWakeWordBridge.cs](../src/Verdure.Assistant.Bumi/BumiWakeWordBridge.cs)：
   - 启动订阅状态后立刻 `ToSleep`；
-  - 收到任何非 `Sleeped` 状态（`Ready` / `Wakeuped`）就安排一次休眠；
+  - **每次状态变化**（`Ready` / `Wakeuped` / `Sleeped`）都重新压一遍静音并补一次休眠；
   - 唤醒之后再等 **500 ms** 才休眠，先让状态机落定，避免打断它自己的唤醒流程；
   - **1 s 去抖**，因为同一次切换会上报两条相同事件；
   - 休眠动作 `Task.Run` 到线程池，绝不在原生回调线程上阻塞；
   - 不再额外 `ToWakeup`：休眠本来就是模块的开机默认状态，服务退出后让它保持休眠即可。
-- 保留 `MuteBuiltInAgent`（静音它的输出）作为双保险：一个关嘴，一个关耳朵。
+- 保留 `MuteBuiltInAgent`（静音它的输出）与 `MuteAudioCue`（关它的提示音）作为双保险：一个关嘴，一个关音效。
 
-## 4. 上线后的正常日志长相
+## 4. 静音不能只设一次（踩过的坑）
+
+`AudioCueEnable` 与 `InternalAgentAudioDataToPlayback` **只在启动时设置一次是不够的**：
+2026-11-21 实测，服务启动两分钟后再读，这两个开关又变回了 `True`（豆包的提示音因此又响起来）。
+同一时间手动设置它们：`cue off` 读回立即是 `True`、**2 秒后变成 `False`**，而且经过一次
+`ToWakeup` 之后仍然是 `False`——也就是说写入是有效的，是模块自己会在某些时机把配置改回去。
+
+结论：**每次状态变化后都要重新压一遍**（静音输出 + 关提示音 + 按回休眠，延迟 500 ms、1 s 去抖）。
+代码在 [BumiWakeWordBridge.ReassertQuiet](../src/Verdure.Assistant.Bumi/BumiWakeWordBridge.cs) 与
+[BumiMediaSession.EnforceMutes](../src/Verdure.Assistant.Bumi/BumiMediaSession.cs)。
+
+验证方式（不需要耳朵）：服务运行期间用 `MediaTest config` 另外读一次开关，语音唤醒前后都应为 `False`。
+
+> 顺带一个容易误判的点：唤醒时听到的那声"叮～"**是我们自己的**唤醒提示音（`WakeCueEnabled`）。
+> 关掉 `WakeCueEnabled` 之后世界就安静了——说明豆包当时已经是哑的。判断"是谁在响"要用这种 A/B，
+> 不要凭音色猜。
+
+## 5. 上线后的正常日志长相
 
 ```
 Bumi media ready: volume 100, agent->speaker ..., cue ..., mic->agent True
@@ -53,7 +70,7 @@ Bumi media ready: volume 100, agent->speaker ..., cue ..., mic->agent True
 TTS started → Speaking                      ← 我们的回答照常播出
 ```
 
-## 5. 复现 / 回归验证
+## 6. 复现 / 回归验证
 
 不用耳朵也能判定的最小清单（服务停掉后执行）：
 
@@ -71,7 +88,7 @@ dotnet MediaTest.dll "$config" status 60         # 再说一次，应再次出�
 
 > `MediaTest` 的 `status` 只在结束时打印事件明细（前 5 条），所以要在同一个窗口里完成"说话"这个动作。
 
-## 6. 相关文档
+## 7. 相关文档
 
 | 文档 | 内容 |
 | --- | --- |
