@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Noetix.Sdk.Bumi;
 using Verdure.Assistant.Core.Interfaces;
 
@@ -14,11 +15,19 @@ namespace Verdure.Assistant.Bumi;
 /// <remarks>
 /// 这样就不需要额外的关键词模型文件。关键是路线 A 只静音了 agent→speaker，
 /// 麦克风到智能体的输入仍然开着，所以唤醒检测照常工作，只是它自己不出声。
+/// 更进一步：唤醒之后立刻把它按回休眠（<see cref="BumiAudioOptions.KeepBuiltInAgentAsleep"/>），
+/// 实测休眠期间播放与唤醒都正常，于是内置智能体退化成纯粹的唤醒词检测器。
 /// 回调运行在原生 SDK 线程上，必须立刻返回，真正的启动放到线程池里做。
 /// </remarks>
 internal sealed class BumiWakeWordBridge : IHostedService
 {
     private const int WakeDebounceMs = 2000;
+
+    /// <summary>唤醒之后再休眠的延迟：先让状态机落定，避免打断它自己的唤醒流程。</summary>
+    private const int SleepAfterWakeMs = 500;
+
+    /// <summary>休眠命令的最小间隔，状态重复上报时不要连发。</summary>
+    private const int SleepDebounceMs = 1000;
 
     private const int CueSampleRate = 16000;
     private const string EmbeddedCueName = "Verdure.Assistant.Bumi.Assets.wake-cue.wav";
@@ -27,11 +36,13 @@ internal sealed class BumiWakeWordBridge : IHostedService
     private readonly IVoiceChatService _voiceChat;
     private readonly IAudioPlayer _audioPlayer;
     private readonly IConfiguration _configuration;
+    private readonly BumiAudioOptions _options;
     private readonly ILogger<BumiWakeWordBridge> _logger;
     private readonly SemaphoreSlim _startGate = new(1, 1);
     private readonly byte[] _cuePcm;
 
     private long _lastWakeAt;
+    private long _lastSleepAt;
     private bool _subscribed;
     private string _lastStatus = string.Empty;
 
@@ -40,12 +51,14 @@ internal sealed class BumiWakeWordBridge : IHostedService
         IVoiceChatService voiceChat,
         IAudioPlayer audioPlayer,
         IConfiguration configuration,
+        IOptions<BumiAudioOptions> options,
         ILogger<BumiWakeWordBridge> logger)
     {
         _media = media;
         _voiceChat = voiceChat;
         _audioPlayer = audioPlayer;
         _configuration = configuration;
+        _options = options.Value;
         _logger = logger;
         _cuePcm = LoadCue(configuration);
     }
@@ -68,6 +81,8 @@ internal sealed class BumiWakeWordBridge : IHostedService
         {
             _logger.LogError(ex, "订阅机器人状态失败，唤醒词启动不可用");
         }
+
+        SleepBuiltInAgent("启动");
 
         return Task.CompletedTask;
     }
@@ -101,12 +116,55 @@ internal sealed class BumiWakeWordBridge : IHostedService
             _logger.LogInformation("语音模块状态: {Value}（{Reason}）", status.Value, status.Reason);
         }
 
+        if (status.Value != WorkStatus.Sleeped)
+        {
+            SleepBuiltInAgent($"状态 {status.Value}");
+        }
+
         if (status.Value != WorkStatus.Wakeuped || status.Reason != StatusChangeReason.AudioWakeuped)
         {
             return;
         }
 
         _ = Task.Run(StartConversationAsync);
+    }
+
+    /// <summary>
+    /// 把内置智能体按回休眠：它只负责听唤醒词，对话由我们来做。
+    /// </summary>
+    /// <remarks>
+    /// 实测休眠期间外部播放与唤醒都正常，所以这比"只静音它的输出"更彻底：
+    /// 它不会再跑自己的识别/大模型，也不会自己发声音。回调线程上不能阻塞，
+    /// 因此延迟与调用都丢给线程池，并用去抖挡住状态的重复上报。
+    /// </remarks>
+    private void SleepBuiltInAgent(string trigger)
+    {
+        if (!_options.KeepBuiltInAgentAsleep)
+        {
+            return;
+        }
+
+        var now = Environment.TickCount64;
+        if (now - Interlocked.Read(ref _lastSleepAt) < SleepDebounceMs)
+        {
+            return;
+        }
+
+        Interlocked.Exchange(ref _lastSleepAt, now);
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(SleepAfterWakeMs).ConfigureAwait(false);
+            try
+            {
+                _media.Media.SetSystemControl(SystemControlType.ToSleep, false);
+                _logger.LogDebug("已让内置智能体休眠（{Trigger}），它只保留唤醒词功能", trigger);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "让内置智能体休眠失败（{Trigger}）", trigger);
+            }
+        });
     }
 
     private async Task StartConversationAsync()

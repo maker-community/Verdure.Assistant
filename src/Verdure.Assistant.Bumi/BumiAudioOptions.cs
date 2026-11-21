@@ -90,4 +90,14 @@ public sealed class BumiAudioOptions
     /// 默认关闭；只在排查音质时打开。
     /// </summary>
     public string DumpTtsDirectory { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 是否让内置智能体一直保持休眠，只当唤醒词用。
+    /// </summary>
+    /// <remarks>
+    /// 实测（2026-11-21）：<see cref="SetSystemControlType.ToSleep"/> 之后外部播放照常出声，
+    /// 唤醒词照常上报 <c>Wakeuped(AudioWakeuped)</c>，并且"唤醒→休眠→再唤醒"可以无限循环。
+    /// 休眠的智能体不参与对话、不跑自己的 ASR/LLM，比只静音输出隔离得更彻底。
+    /// </remarks>
+    public bool KeepBuiltInAgentAsleep { get; set; } = true;
 }
