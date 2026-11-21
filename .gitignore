@@ -373,3 +373,6 @@ src/Verdure.Assistant.Api/qrcode.png
 
 # 本机编辑器配置，不入库
 .vscode/
+
+# Publish output
+build/
