@@ -28,6 +28,7 @@ internal sealed class BumiToneShaper
     // 音乐几乎一直有声（约 0.9），语音有停顿与弱音（约 0.6–0.8）；阈值跟着峰值包络走，
     // 因此不受母带音量影响。语音基本不触发，音乐会被明显收敛。
     private readonly bool _protectDenseContent;
+    private readonly double _presenceFloor;
     private readonly double _gateLow;
     private readonly double _gateHigh;
     private readonly double _hotGainScale;
@@ -50,6 +51,7 @@ internal sealed class BumiToneShaper
         _gain = Math.Pow(10.0, options.OutputGainDb / 20.0);
 
         _protectDenseContent = options.ProtectDenseContent;
+        _presenceFloor = Math.Clamp(options.DenseContentPresenceKeep, 0.0, 1.0);
         _gateLow = options.DenseContentGateLow;
         _gateHigh = Math.Max(options.DenseContentGateLow + 0.01, options.DenseContentGateHigh);
         _hotGainScale = Math.Pow(10.0, options.DenseContentGainDb / 20.0);
@@ -129,8 +131,10 @@ internal sealed class BumiToneShaper
         if (_presence is not null)
         {
             // 高架始终跑（保持滤波器状态连续），再在干声与提升之间混合。
+            // 密集内容不全收回：全收回会让音乐相对变"重"（高频少了，低频显得突出）。
+            var shelfMix = _presenceFloor + ((1.0 - _presenceFloor) * mix);
             var shaped = _presence.Process(value);
-            value += (shaped - value) * mix;
+            value += (shaped - value) * shelfMix;
         }
 
         if (_denseLowPass is not null)

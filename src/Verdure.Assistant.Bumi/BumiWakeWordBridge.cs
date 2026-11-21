@@ -118,11 +118,21 @@ internal sealed class BumiWakeWordBridge : IHostedService
 
         if (status.Value != WorkStatus.Sleeped)
         {
+            // 先立刻静音（不等 500 ms）：它醒来的那一刻可能已经在出声。
+            _ = Task.Run(_media.EnforceMutes);
             ReassertQuiet("状态 " + status.Value);
         }
 
         if (status.Value != WorkStatus.Wakeuped || status.Reason != StatusChangeReason.AudioWakeuped)
         {
+            return;
+        }
+
+        // 我们自己正在放声音（TTS、提示音、音乐）时，模块可能被扬声器漏出的声音自己唤醒。
+        // 那不是用户在叫它，不能据此再开一轮对话。
+        if (_audioPlayer.IsPlaying)
+        {
+            _logger.LogInformation("播放期间收到唤醒，忽略（避免被自己的声音触发）");
             return;
         }
 
@@ -161,6 +171,10 @@ internal sealed class BumiWakeWordBridge : IHostedService
             {
                 _media.Media.SetSystemControl(SystemControlType.ToSleep, false);
                 _logger.LogDebug("已让内置智能体休眠（{Trigger}），它只保留唤醒词功能", trigger);
+
+                // 休眠这次状态切换本身也可能把它的音频配置恢复成默认（实测见过），所以再压一次。
+                await Task.Delay(150).ConfigureAwait(false);
+                _media.EnforceMutes();
             }
             catch (Exception ex)
             {

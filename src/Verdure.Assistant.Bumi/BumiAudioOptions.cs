@@ -63,8 +63,14 @@ public sealed class BumiAudioOptions
     /// </remarks>
     public bool ProtectDenseContent { get; set; } = true;
 
-    /// <summary>密度（相对峰值的有声占比）低于此值视为语音，不介入。默认 0.85。</summary>
+    /// <summary>密度低于此值视为语音，不介入。默认 0.85。</summary>
     public double DenseContentGateLow { get; set; } = 0.85;
+
+    /// <summary>
+    /// 密集内容保留多少存在感提升（0–1）。默认 0.4：完全不提升会让音乐"变重"、发闷，
+    /// 这正是第一次全收回后的听感。
+    /// </summary>
+    public double DenseContentPresenceKeep { get; set; } = 0.4;
 
     /// <summary>密度高于此值视为密集内容，完全介入。默认 0.94。</summary>
     public double DenseContentGateHigh { get; set; } = 0.94;
