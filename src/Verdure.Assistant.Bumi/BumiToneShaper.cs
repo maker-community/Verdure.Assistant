@@ -19,22 +19,27 @@ internal sealed class BumiToneShaper
     private readonly Biquad? _highPassB;
     private readonly Biquad? _presence;
     private readonly Biquad? _denseLowPass;
+    private readonly Biquad? _denseHighPass;
     private readonly double _gain;
     private readonly double _ceiling;
     private readonly double _releaseCoeff;
 
-    // 内容自适应：语音是稀疏的（有停顿，活动度约 0.5–0.7），音乐是密集的（约 0.85）。
-    // 用小喇叭最怕的"密集高频"来判定，只在密集内容上收掉存在感提升与一部分电平；
-    // 语音的稀疏度远低于门限，因此语音那条链的输出完全不变。
+    // 内容自适应：密度 = 最近 500 ms 里"相对自身峰值算有声"的时间占比。
+    // 音乐几乎一直有声（约 0.9），语音有停顿与弱音（约 0.6–0.8）；阈值跟着峰值包络走，
+    // 因此不受母带音量影响。语音基本不触发，音乐会被明显收敛。
     private readonly bool _protectDenseContent;
-    private readonly double _activityThreshold;
     private readonly double _gateLow;
     private readonly double _gateHigh;
     private readonly double _hotGainScale;
-    private readonly double _activityCoeff;
+    private readonly double _peakDecayCoeff;
+    private readonly double _densityCoeff;
     private readonly double _blendCoeff;
 
-    private double _activity;
+    private const double ActiveRelativeToPeak = 0.02; // 比局部峰值低 34 dB 以下不算"有声"
+    private const double QuietRmsThreshold = 32.0;    // 约 -60 dBFS（样本域），静音时不做判定
+
+    private double _peakEnvelope;
+    private double _density;
     private double _blend = 1.0;
 
     private double _gainReduction = 1.0;
@@ -45,12 +50,12 @@ internal sealed class BumiToneShaper
         _gain = Math.Pow(10.0, options.OutputGainDb / 20.0);
 
         _protectDenseContent = options.ProtectDenseContent;
-        _activityThreshold = short.MaxValue * Math.Pow(10.0, options.ContentActivityThresholdDb / 20.0);
         _gateLow = options.DenseContentGateLow;
         _gateHigh = Math.Max(options.DenseContentGateLow + 0.01, options.DenseContentGateHigh);
         _hotGainScale = Math.Pow(10.0, options.DenseContentGainDb / 20.0);
-        _activityCoeff = 1.0 - Math.Exp(-1.0 / Math.Max(1.0, sampleRate * 0.5));
-        _blendCoeff = 1.0 - Math.Exp(-1.0 / Math.Max(1.0, sampleRate * 0.05));
+        _peakDecayCoeff = 1.0 - Math.Exp(-1.0 / Math.Max(1.0, sampleRate * 1.0));
+        _densityCoeff = 1.0 - Math.Exp(-1.0 / Math.Max(1.0, sampleRate * 0.5));
+        _blendCoeff = 1.0 - Math.Exp(-1.0 / Math.Max(1.0, sampleRate * 0.4));
 
         if (options.HighPassHz > 0 && options.HighPassHz < sampleRate / 2)
         {
@@ -76,6 +81,14 @@ internal sealed class BumiToneShaper
             _denseLowPass = Biquad.LowPass(options.DenseContentLowPassHz, sampleRate, 0.7071);
         }
 
+        if (_protectDenseContent && options.DenseContentHighPassHz > options.HighPassHz &&
+            options.DenseContentHighPassHz < sampleRate / 2)
+        {
+            // 音乐的低频吃掉的正是振膜行程：这台小喇叭连 500 Hz 以下都发不出来（实测 180 Hz 谐波
+            // 比基波还响），所以密集内容再抬一档高通，把行程让给中频。
+            _denseHighPass = Biquad.HighPass(options.DenseContentHighPassHz, sampleRate, 0.7071);
+        }
+
         if (options.LimiterCeilingDb < 0)
         {
             _ceiling = short.MaxValue * Math.Pow(10.0, options.LimiterCeilingDb / 20.0);
@@ -90,6 +103,11 @@ internal sealed class BumiToneShaper
 
     public short Process(short sample)
     {
+        // 活动度必须在**高通之前**判断：音乐的能量主要在 100 Hz 以下，先高通会把电平削掉一大半，
+        // 判据就永远看不到"密集"。语音的密度在两种测法下都只有 0.5–0.7，所以这样不影响语音。
+        var mix = UpdateHotScale(sample);
+        mix *= mix;
+
         var value = (double)sample;
 
         if (_highPassA is not null)
@@ -102,10 +120,11 @@ internal sealed class BumiToneShaper
             value = _highPassB.Process(value);
         }
 
-        // 平方一下：语音（1.0）完全不动，音乐这种半程值会被压得更接近"平直"，
-        // 因为小喇叭的尖锐破音来自高频能量，差几个 dB 听感差别很大。
-        var mix = UpdateHotScale(value);
-        mix *= mix;
+        if (_denseHighPass is not null)
+        {
+            var tight = _denseHighPass.Process(value);
+            value += (tight - value) * (1.0 - mix);
+        }
 
         if (_presence is not null)
         {
@@ -141,11 +160,18 @@ internal sealed class BumiToneShaper
             return 1.0;
         }
 
-        // 活动度 = 最近 500 ms 里"有声"时间占比的平滑值。语音有停顿，音乐几乎不中断。
-        var active = Math.Abs(value) > _activityThreshold ? 1.0 : 0.0;
-        _activity += (active - _activity) * _activityCoeff;
+        // 密度 = 最近 500 ms 里"相对自身峰值算有声"的时间占比。阈值跟着峰值包络走，
+        // 所以与母带音量无关：音乐几乎一直有声（约 0.9），语音有停顿与弱音（约 0.6–0.8）。
+        var magnitude = Math.Abs(value);
+        _peakEnvelope = magnitude > _peakEnvelope
+            ? magnitude
+            : _peakEnvelope + ((magnitude - _peakEnvelope) * _peakDecayCoeff);
 
-        var target = Math.Clamp((_gateHigh - _activity) / (_gateHigh - _gateLow), 0.0, 1.0);
+        var threshold = Math.Max(_peakEnvelope * ActiveRelativeToPeak, QuietRmsThreshold);
+        var active = magnitude > threshold ? 1.0 : 0.0;
+        _density += (active - _density) * _densityCoeff;
+
+        var target = Math.Clamp((_gateHigh - _density) / (_gateHigh - _gateLow), 0.0, 1.0);
         _blend += (target - _blend) * _blendCoeff;
         return _blend;
     }
@@ -169,8 +195,10 @@ internal sealed class BumiToneShaper
         _highPassB?.Reset();
         _presence?.Reset();
         _denseLowPass?.Reset();
+        _denseHighPass?.Reset();
         _gainReduction = 1.0;
-        _activity = 0;
+        _peakEnvelope = 0;
+        _density = 0;
         _blend = 1.0;
     }
 

@@ -55,32 +55,35 @@ public sealed class BumiAudioOptions
     public double LimiterCeilingDb { get; set; } = -3;
 
     /// <summary>
-    /// 是否对"密集"内容（典型是音乐）自动收回存在感提升与一部分电平。
+    /// 是否对"密集"内容（典型是音乐）自动收回存在感提升、加高通与低通，并让掉一部分电平。
     /// </summary>
     /// <remarks>
-    /// 小喇叭上的"尖锐破音"出现在高频密集、几乎没有停顿的内容上。语音的短时活动度只有
-    /// 0.5–0.7（有停顿），音乐约 0.85，所以用活动度判定足够可靠，也不需要知道音频来源。
-    /// 门限以下完全不介入，语音那条链的输出保持不变。
+    /// 判据是短时峰均比（crest factor），与音量无关：语音约 15–18 dB（有停顿、瞬态强），
+    /// 音乐约 5–7 dB（压得很密）。门限以上完全不介入，因此语音那条链的输出逐样本不变。
     /// </remarks>
     public bool ProtectDenseContent { get; set; } = true;
 
-    /// <summary>判定"有声"的幅度门限（dBFS）。默认 -34，低于它的样本不算活动。</summary>
-    public double ContentActivityThresholdDb { get; set; } = -34;
+    /// <summary>密度（相对峰值的有声占比）低于此值视为语音，不介入。默认 0.85。</summary>
+    public double DenseContentGateLow { get; set; } = 0.85;
 
-    /// <summary>活动度低于此值时不介入（纯语音）。默认 0.75。</summary>
-    public double DenseContentGateLow { get; set; } = 0.75;
-
-    /// <summary>活动度高于此值完全退回平直（音乐）。默认 0.90。</summary>
-    public double DenseContentGateHigh { get; set; } = 0.90;
+    /// <summary>密度高于此值视为密集内容，完全介入。默认 0.94。</summary>
+    public double DenseContentGateHigh { get; set; } = 0.94;
 
     /// <summary>完全退回平直时额外让掉的电平（dB）。默认 -3。</summary>
-    public double DenseContentGainDb { get; set; } = -3;
+    public double DenseContentGainDb { get; set; } = 0;
 
     /// <summary>
     /// 密集内容用的低通截止频率（Hz）。默认 6500：小喇叭在 6 kHz 以上最容易出尖锐破音，
     /// 音乐密集时把这段收掉；语音不受影响（它走的是全量音色链）。设为 0 关闭。
     /// </summary>
     public double DenseContentLowPassHz { get; set; } = 6500;
+
+    /// <summary>
+    /// 密集内容额外加的高通截止频率（Hz）。默认 300：这台小喇叭实测连 500 Hz 以下都发不出来
+    /// （180 Hz 的谐波比基波还响），音乐的低频只会吃掉振膜行程、换来失真，所以密集时直接砍掉。
+    /// 语音不受影响。设为 0 关闭。
+    /// </summary>
+    public double DenseContentHighPassHz { get; set; } = 300;
 
     /// <summary>限幅后的恢复时间（毫秒）。太短会有"抽吸"感，默认 120。</summary>
     public double LimiterReleaseMs { get; set; } = 120;
